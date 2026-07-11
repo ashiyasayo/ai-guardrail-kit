@@ -2,13 +2,14 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-section="${1:-shared}"
+section="${1:-all}"
 
-if [[ "$section" != shared ]]; then
+if [[ "$section" != shared && "$section" != modes && "$section" != all ]]; then
   printf 'FAIL: unsupported test section: %s\n' "$section" >&2
   exit 1
 fi
 
+if [[ "$section" == shared || "$section" == all ]]; then
 ROOT="$ROOT" python3 - <<'PY'
 import contextlib
 import ast
@@ -173,3 +174,82 @@ for invalid_cwd in root_cases:
 
 print("PASS: Codex shared hook protocol and security checks")
 PY
+fi
+
+if [[ "$section" == modes || "$section" == all ]]; then
+ROOT="$ROOT" python3 - <<'PY'
+import ast, hashlib, json, os, shutil, subprocess, tempfile, time
+from pathlib import Path
+
+root = Path(os.environ["ROOT"])
+plugins = root / "codex" / "plugins"
+
+def event(cwd, tool="Write", tool_input=None):
+    return {"cwd": str(cwd), "hook_event_name": "PreToolUse", "model": "test",
+            "permission_mode": "default", "session_id": "s", "tool_input": tool_input or {"file_path": "src/app.py", "content": "x"},
+            "tool_name": tool, "tool_use_id": "u", "transcript_path": "", "turn_id": "t"}
+
+def run(hook, data):
+    proc = subprocess.run(["python3", str(hook)], input=json.dumps(data), text=True, capture_output=True)
+    assert proc.returncode == 0, (hook, proc.stderr)
+    return json.loads(proc.stdout)["hookSpecificOutput"] if proc.stdout.strip() else None
+
+def denied(hook, data):
+    result = run(hook, data)
+    assert result and result["permissionDecision"] == "deny", (hook, result)
+    return result["permissionDecisionReason"]
+
+for source in plugins.rglob("*.py"):
+    ast.parse(source.read_text(), filename=str(source), feature_version=(3, 9))
+
+with tempfile.TemporaryDirectory() as td:
+    td = Path(td); install = td / "installed"
+    shutil.copytree(plugins, install)
+    project = td / "project"; project.mkdir()
+    guard = project / ".codex" / "guardrail"; (guard / "plan").mkdir(parents=True)
+
+    dg = install / "decomposition-gate/hooks/decomposition_gate.py"
+    denied(dg, event(project))
+    plan = guard / "plan/decomposition.md"
+    assert run(dg, event(project, tool_input={"file_path": str(plan), "content": "draft"})) is None
+    plan.write_text("## 已知資訊\n## 缺少的資訊\n")
+    denied(dg, event(project))
+    plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】x\n")
+    assert run(dg, event(project)) is None
+
+    hp = install / "harness/hooks/plan_gate.py"
+    approve = install / "harness/scripts/approve_plan.py"
+    approval = guard / "approval.json"
+    denied(hp, event(project))
+    subprocess.run(["python3", str(approve), str(project)], check=True, capture_output=True, text=True)
+    assert run(hp, event(project)) is None
+    approval.write_text(json.dumps({"plan_sha256": hashlib.sha256(plan.read_bytes()).hexdigest(), "approved_at": time.time()-3601}))
+    denied(hp, event(project))
+    approval.write_text(json.dumps({"plan_sha256": hashlib.sha256(plan.read_bytes()).hexdigest(), "approved_at": time.time()+61}))
+    denied(hp, event(project))
+    denied(hp, event(project, tool_input={"file_path": str(approval), "content": "{}"}))
+    subprocess.run(["python3", str(approve), str(project)], check=True, capture_output=True, text=True)
+    dangerous = install / "harness/hooks/block_dangerous_commands.py"
+    denied(dangerous, event(project, "Bash", {"command": "git reset --hard"}))
+    secrets = install / "harness/hooks/block_secrets.py"
+    denied(secrets, event(project, tool_input={"file_path": "x", "content": "AWS=AKIA1234567890ABCDEF"}))
+
+    ip = install / "integrated-harness/hooks/plan_gate.py"
+    policy = guard / "orchestration-policy.md"
+    shutil.copy(install / "integrated-harness/orchestration-policy.md", policy)
+    plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】x\n## 允許修改範圍\n- `src/`\n")
+    denied(ip, event(project))
+    ia = install / "integrated-harness/scripts/approve_plan.py"
+    subprocess.run(["python3", str(ia), str(project)], check=True, capture_output=True, text=True)
+    assert run(ip, event(project)) is None
+    denied(ip, event(project, tool_input={"file_path": "other/x", "content": "x"}))
+    plan.write_text(plan.read_text()+"changed\n")
+    denied(ip, event(project))
+    policy.write_text(policy.read_text().replace("strict", "light", 1))
+    assert run(ip, event(project, tool_input={"file_path": "other/x", "content": "x"})) is None
+    policy.unlink()
+    denied(ip, event(project))
+
+print("PASS: Codex standalone guardrail modes (22 assertions)")
+PY
+fi
