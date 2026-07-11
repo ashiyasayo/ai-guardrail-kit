@@ -62,3 +62,25 @@ The selector references the repository-local marketplace hook paths, so moving
 or deleting the repository after selection invalidates verification and hook
 execution. This is intentional for the repository-local marketplace model and
 is detected by `verify-codex-mode`.
+
+## Review remediation
+
+- Signal traps for INT, TERM, and HUP now run rollback and retain conventional
+  exit statuses 130, 143, and 129.
+- Hook commands are shell-argument quoted and then TOML-string escaped; tests
+  cover spaces, quotes, backslashes, command substitution, backticks, and
+  semicolons without executing path content.
+- Plugin JSON is schema-checked for exact `pluginId`, matching name and
+  marketplace, explicit boolean `installed`/`enabled`, and uniqueness.
+- Rollback treats inspection and every mutation/restore/verification error as a
+  rollback failure and finishes with exact managed-plugin and config comparison.
+- Forward and rollback config replacement both use a same-directory temporary
+  file and atomic rename, preserving original permission mode. The `.codex`
+  directory and config are revalidated immediately before each replacement.
+
+Portable shell cannot fully eliminate the final pathname race between the last
+symlink check and `mv(1)` because it lacks directory-fd-relative, no-follow
+rename operations. The implementation minimizes this interval and rejects both
+`.codex` and config symlinks at initial validation and immediately before every
+forward or rollback filesystem mutation. A native helper using `openat(2)` and
+`renameat(2)` would be required to close that residual boundary completely.

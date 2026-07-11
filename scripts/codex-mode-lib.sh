@@ -20,7 +20,7 @@ agk_resolve_project() {
 
 agk_validate_config() {
   local project=$1 config="$1/.codex/config.toml" codex_dir="$1/.codex"
-  [[ -d $codex_dir && -w $codex_dir ]] || { agk_die "project .codex directory must exist and be writable: $codex_dir"; return 1; }
+  [[ ! -L $codex_dir && -d $codex_dir && -w $codex_dir ]] || { agk_die "project .codex directory must be a real writable directory: $codex_dir"; return 1; }
   if [[ -L $config ]]; then agk_die "refusing symlinked config: $config"; return 1; fi
   if [[ -e $config && ! -f $config ]]; then agk_die "refusing non-regular config: $config"; return 1; fi
   [[ ! -e $config || -r $config ]] || { agk_die "config is not readable: $config"; return 1; }
@@ -48,11 +48,18 @@ import json, pathlib, sys
 market = sys.argv[1]
 managed = {"decomposition-gate", "harness", "integrated-harness"}
 data = json.loads(pathlib.Path(sys.argv[2]).read_text())
-for item in data.get("installed", []):
-    if (item.get("installed", True) and item.get("enabled", True)
-            and item.get("marketplaceName") == market
-            and item.get("name") in managed):
-        print(item["name"])
+if not isinstance(data, dict) or not isinstance(data.get("installed"), list): raise SystemExit(1)
+seen = set()
+for item in data["installed"]:
+    if not isinstance(item, dict): raise SystemExit(1)
+    name, plugin_id = item.get("name"), item.get("pluginId")
+    relevant = item.get("marketplaceName") == market or name in managed or (isinstance(plugin_id, str) and plugin_id.endswith("@" + market))
+    if not relevant: continue
+    expected = f"{name}@{market}" if name in managed else None
+    if (expected is None or plugin_id != expected or item.get("marketplaceName") != market
+            or item.get("installed") is not True or item.get("enabled") is not True
+            or name in seen): raise SystemExit(1)
+    seen.add(name); print(name)
 PY
   local result=$?
   rm -f "$listing"
@@ -65,18 +72,25 @@ agk_render_block() {
   case $mode in
     decomposition-gate)
       printf '[[hooks.PreToolUse]]\nmatcher = "exec_command|apply_patch"\n\n'
-      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = "python3 %s/decomposition_gate.py"\n' "$root"
+      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n' "$(agk_command_value "$root/decomposition_gate.py")"
       ;;
     harness|integrated-harness)
       printf '[[hooks.PreToolUse]]\nmatcher = "exec_command|apply_patch"\n\n'
-      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = "python3 %s/plan_gate.py"\n\n' "$root"
+      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/plan_gate.py")"
       printf '[[hooks.PreToolUse]]\nmatcher = "exec_command"\n\n'
-      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = "python3 %s/block_dangerous_commands.py"\n\n' "$root"
+      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/block_dangerous_commands.py")"
       printf '[[hooks.PreToolUse]]\nmatcher = "exec_command|apply_patch"\n\n'
-      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = "python3 %s/block_secrets.py"\n' "$root"
+      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n' "$(agk_command_value "$root/block_secrets.py")"
       ;;
   esac
   printf '%s\n' "$AGK_END"
+}
+
+agk_command_value() {
+  python3 - "$1" <<'PY'
+import json, shlex, sys
+print(json.dumps("python3 -- " + shlex.quote(sys.argv[1])))
+PY
 }
 
 agk_replace_config() {
@@ -102,6 +116,19 @@ target.write_bytes(new)
 PY
   then rm -f "$tmp"; return 1; fi
   if [[ ${AI_GUARDRAIL_TEST_FAIL_CONFIG_WRITE:-0} == 1 ]]; then rm -f "$tmp"; return 70; fi
+  agk_validate_config "$project" >/dev/null || { rm -f "$tmp"; return 1; }
+  if [[ -e $config ]]; then chmod --reference="$config" "$tmp" 2>/dev/null || chmod "$(stat -f '%Lp' "$config")" "$tmp" 2>/dev/null || true; fi
+  mv "$tmp" "$config"
+}
+
+
+agk_restore_config() {
+  local project=$1 snapshot=$2 existed=$3 config="$1/.codex/config.toml" tmp
+  agk_validate_config "$project" >/dev/null || return 1
+  if [[ $existed == 0 ]]; then rm -f "$config"; return; fi
+  tmp=$(mktemp "$project/.codex/.config.toml.ai-guardrail.XXXXXX") || return 1
+  cp -p "$snapshot" "$tmp" || { rm -f "$tmp"; return 1; }
+  agk_validate_config "$project" >/dev/null || { rm -f "$tmp"; return 1; }
   mv "$tmp" "$config"
 }
 

@@ -35,7 +35,15 @@ agk_render_block "$mode" "$repo" > "$wanted"
 cmp -s "$actual" "$wanted" || { agk_die "managed hooks do not match installed mode $mode"; exit 1; }
 while IFS= read -r path; do
   [[ -f $path && -x $path ]] || { agk_die "hook file is not executable: $path"; exit 1; }
-done < <(sed -n 's|^command = "python3 \(.*\.py\)"$|\1|p' "$actual")
+done < <(python3 - "$actual" <<'PY'
+import shlex, sys, tomllib
+d=tomllib.load(open(sys.argv[1], 'rb'))
+for group in d['hooks']['PreToolUse']:
+    argv=shlex.split(group['hooks'][0]['command'])
+    if len(argv) != 3 or argv[:2] != ['python3', '--']: raise SystemExit(1)
+    print(argv[2])
+PY
+)
 command -v python3 >/dev/null || { agk_die 'python3 executable is unavailable'; exit 1; }
 python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 9))' || { agk_die 'Python 3.9 or newer is required'; exit 1; }
 printf 'Verified Codex mode %s.\n' "$mode"

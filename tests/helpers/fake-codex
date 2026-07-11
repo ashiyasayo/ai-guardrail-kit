@@ -14,10 +14,21 @@ fail_if_requested() {
   fi
 }
 
+count_operation() {
+  local operation=$1 count_file n=0
+  count_file="$state/${operation}.count"
+  [[ -f $count_file ]] && read -r n < "$count_file"
+  n=$((n + 1)); printf '%s\n' "$n" > "$count_file"
+  [[ ${FAKE_CODEX_DELAY_OPERATION:-} == "$operation" ]] && sleep 2
+  if [[ ${FAKE_CODEX_FAIL_OPERATION:-} == "$operation:$n" ]]; then exit 42; fi
+}
+
 [[ ${1:-} == plugin ]] || { printf 'fake codex: unsupported command\n' >&2; exit 2; }
 case ${2:-} in
   list)
+    count_operation list
     fail_if_requested list
+    if [[ -n ${FAKE_CODEX_LIST_JSON:-} ]]; then printf '%s\n' "$FAKE_CODEX_LIST_JSON"; exit 0; fi
     python3 - "$installed" <<'PY'
 import json, pathlib, sys
 names = [x for x in pathlib.Path(sys.argv[1]).read_text().splitlines() if x]
@@ -29,11 +40,11 @@ print(json.dumps({"installed": [
 PY
     ;;
   add)
-    plugin=${3:?missing plugin}; fail_if_requested add "$plugin"
+    plugin=${3:?missing plugin}; count_operation add; fail_if_requested add "$plugin"
     grep -Fxq "$plugin" "$installed" || printf '%s\n' "$plugin" >> "$installed"
     ;;
   remove)
-    plugin=${3:?missing plugin}; fail_if_requested remove "$plugin"
+    plugin=${3:?missing plugin}; count_operation remove; fail_if_requested remove "$plugin"
     tmp="$state/installed.tmp"
     grep -Fxv "$plugin" "$installed" > "$tmp" || true
     mv "$tmp" "$installed"
