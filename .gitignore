@@ -1,0 +1,10 @@
+.DS_Store
+.claude/.plan_approved
+.worktrees/
+.agent/
+.claude/skills/
+.codex/
+.shared/
+docs/
+__pycache__/
+*.pyc
