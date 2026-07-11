@@ -28,6 +28,7 @@
 | `block_dangerous_commands.py` | PreToolUse / `Bash` | 攔截刪除、毀損資料庫、破壞 Git 歷史、停用安全服務等紅線操作 |
 | `settings.json` | Claude Code 設定 | 將三支 hook 掛載到對應的 PreToolUse matcher |
 | `fable-orchestrator-prompt.md` | 編排規格提示稿 | 引導高階模型產生 A–I 章的 `ORCHESTRATOR.md`；它是生成素材，不是執行時規則 |
+| `MAINTENANCE.md` | 維護說明 | 設計理由、與 `integrated-harness` 的差異與跨產品同步原則（維護者閱讀，不需複製到專案） |
 | `CLAUDE.md` | 專案指引範本 | 命名規範（識別字英文、註解與回覆用台灣繁體中文）、架構原則（Clean Architecture／SOLID／TDD-BDD、既有系統最小變動）與 Spec by Example（需求以具體範例表達並可轉為可執行測試） |
 
 分工原則：`plan_gate` 管「未核准的一般寫入」；
@@ -118,6 +119,8 @@ echo '{"tool_name":"Bash","tool_input":{"command":"rm -rf /var/www"}}' \
   不安全 shell 結構定義於 `UNSAFE_SHELL_PATTERN`（單一規則，勿逐指令列舉）
 - 新增憑證樣式：修改 `block_secrets.py` 的 `SECRET_PATTERNS`
 - 任何修改後，以上方測試指令回歸驗證放行/攔截行為
+- 設計理由、與 `integrated-harness` 同名 hook 的差異，以及修補共用規則時的
+  跨產品同步原則，見 [`MAINTENANCE.md`](MAINTENANCE.md)
 
 ## 需要你補充的設定
 
