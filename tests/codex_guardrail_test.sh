@@ -239,6 +239,12 @@ with tempfile.TemporaryDirectory() as td:
         "git status --hostname-bin=evil",
         "git -c diff.external=evil diff",
         "git diff | cat",
+        "find . -exec touch escaped ;",
+        "find . -execdir touch escaped ;",
+        "find . -delete",
+        "find . -fprintf /tmp/find-output x",
+        "find . -fprint /tmp/find-output",
+        "find . -fls /tmp/find-output",
     ):
         asked(hp, event(project, "exec_command", {"cmd": command}))
     asked(hp, event(project, "exec_command", {"cmd": "touch x"}))
@@ -267,11 +273,15 @@ with tempfile.TemporaryDirectory() as td:
     tests = project / "tests"; tests.mkdir()
     (tests / "smoke.sh").write_text("#!/bin/sh\n")
     outside = td / "outside.sh"; outside.write_text("#!/bin/sh\n")
+    external_scripts = td / "external-scripts"; external_scripts.mkdir()
+    (external_scripts / "evil.sh").write_text("#!/bin/sh\n")
+    (tests / "link").symlink_to(external_scripts, target_is_directory=True)
     (project / "tests-prefix").mkdir()
     (project / "tests-prefix" / "evil.sh").write_text("#!/bin/sh\n")
     asked(ip, event(project, "exec_command", {"cmd": "bash tests/smoke.sh"}))
     for command in (
-        "bash tests/../outside.sh",
+        "bash tests/../../outside.sh",
+        "bash tests/link/evil.sh",
         "bash " + str(outside),
         "bash tests/smoke.sh && touch escaped",
         "bash tests-prefix/evil.sh",
@@ -286,6 +296,6 @@ with tempfile.TemporaryDirectory() as td:
     for plugin in ("harness", "integrated-harness"):
         assert (install / plugin / "hooks/security_checks.py").read_bytes() == (root / "shared/codex/security_checks.py").read_bytes()
 
-print("PASS: Codex standalone guardrail modes (22 assertions)")
+print("PASS: Codex standalone guardrail mode checks")
 PY
 fi

@@ -8,7 +8,7 @@
 
 - Initial RED/GREEN established the three standalone native modes.
 - Remediation RED: adversarial `diff --output=stolen a b` was incorrectly classified read-only, proving the incomplete option audit.
-- Remediation GREEN: disallowed output/execution flags, shell operators, light-mode shell mutation, and canonical `bash tests/` containment cases pass.
+- Remediation GREEN: disallowed output/execution flags (including representative `find -exec`, `-execdir`, `-delete`, `-fprintf`, `-fprint`, and `-fls` forms), shell operators, light-mode shell mutation, and canonical `bash tests/` containment cases pass.
 
 ## Runtime packaging decision
 
@@ -23,9 +23,9 @@ Marketplace installations cache each plugin independently, so repository-level `
 
 ## Self-review
 
-- Harness read-only classification rejects shell operators and every audited output/execution option, including Git `--output`, `--ext-diff`, `--textconv`, `--pre`, and `--hostname-bin`.
+- Harness read-only classification rejects shell operators and the directly tested output/execution options: Git `--output`, `--ext-diff`, `--textconv`, `--pre`, and `--hostname-bin`; plus representative `find -exec`, `-execdir`, `-delete`, `-fprintf`, `-fprint`, and `-fls` forms.
 - Missing or invalid integrated policy defaults to strict. Light allows only deterministically scoped patches without prompting; mutating native shell commands return `ask` because their complete filesystem effects cannot be proven.
-- The strict `bash tests/` exception uses canonical containment beneath the project test directory and rejects traversal, absolute paths, operators, and similarly prefixed directories.
+- The strict `bash tests/` exception uses canonical containment beneath the project test directory. Tests reject a traversal that resolves to an existing script outside the project, a `tests/link` symlink to an external script directory, absolute paths, operators, and similarly prefixed directories.
 - Claude files were read as semantic sources and were not modified.
 - Plugin hooks were executed from a copied standalone plugin directory.
 
@@ -61,8 +61,8 @@ a repository-local approval file or script, which would be agent-invocable.
   reason contains the current plan SHA-256 for audit context. Light permits
   in-scope patches without prompting, while mutating shell requests still ask.
 - Native payload schemas are checked. Unknown tools fail closed unless they are
-  explicitly proven read-only. Patch paths are project-relative and canonical;
-  traversal, absolute paths, and symlink escapes are denied. The decomposition
+  explicitly proven read-only. Patch-path tests cover project-relative canonical
+  containment, traversal, absolute paths, and symlink escapes. The decomposition
   self-write exemption matches the exact project-relative path only and rejects
   a symlink target.
 - Dangerous-command and secret hooks consume native `cmd` and `patch` fields and
@@ -79,6 +79,7 @@ disables that human-interaction boundary; deterministic deny checks remain.
 
 ## Final verification (2026-07-11)
 
+- Adversarial RED check: replacing canonical `Path.resolve()` with lexical `Path.absolute()` made `bash tests/codex_guardrail_test.sh modes` fail because an external traversal/symlink command received `ask` instead of `deny`; restoring canonical resolution returned the suite to GREEN.
 - `bash tests/codex_guardrail_test.sh`: shared and standalone mode suites pass.
 - `bash tests/codex_marketplace_test.sh`: marketplace/plugin skeleton suite passes.
 - `bash decomposition-gate/tests/smoke_test.sh`: 14 passed, 0 failed.
