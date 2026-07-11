@@ -229,6 +229,9 @@ with tempfile.TemporaryDirectory() as td:
     assert not (install / "harness/scripts/approve_plan.py").exists()
     asked(hp, event(project))
     assert run(hp, event(project, "exec_command", {"cmd": "git status"})) is None
+    # `find` is intentionally absent from the narrow read-only allowlist.
+    # Even a harmless invocation therefore receives native approval.
+    asked(hp, event(project, "exec_command", {"cmd": "find ."}))
     for command in (
         "diff --output=stolen a b",
         "git diff --output=stolen",
@@ -239,13 +242,17 @@ with tempfile.TemporaryDirectory() as td:
         "git status --hostname-bin=evil",
         "git -c diff.external=evil diff",
         "git diff | cat",
+    ):
+        asked(hp, event(project, "exec_command", {"cmd": command}))
+    find_commands_that_must_not_bypass_native_ask = (
         "find . -exec touch escaped ;",
         "find . -execdir touch escaped ;",
         "find . -delete",
         "find . -fprintf /tmp/find-output x",
         "find . -fprint /tmp/find-output",
         "find . -fls /tmp/find-output",
-    ):
+    )
+    for command in find_commands_that_must_not_bypass_native_ask:
         asked(hp, event(project, "exec_command", {"cmd": command}))
     asked(hp, event(project, "exec_command", {"cmd": "touch x"}))
     asked(hp, event(project, "exec_command", {"cmd": "git status; touch x"}))

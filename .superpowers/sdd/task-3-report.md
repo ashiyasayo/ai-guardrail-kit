@@ -8,7 +8,7 @@
 
 - Initial RED/GREEN established the three standalone native modes.
 - Remediation RED: adversarial `diff --output=stolen a b` was incorrectly classified read-only, proving the incomplete option audit.
-- Remediation GREEN: disallowed output/execution flags (including representative `find -exec`, `-execdir`, `-delete`, `-fprintf`, `-fprint`, and `-fls` forms), shell operators, light-mode shell mutation, and canonical `bash tests/` containment cases pass.
+- Remediation GREEN: conservative command classification, disallowed Git output/execution flags, shell operators, light-mode shell mutation, and canonical `bash tests/` containment cases pass. Because `find` is outside the narrow read-only allowlist, both harmless `find .` and write-capable forms receive native approval; the latter cases prove they cannot bypass that boundary.
 
 ## Runtime packaging decision
 
@@ -23,7 +23,7 @@ Marketplace installations cache each plugin independently, so repository-level `
 
 ## Self-review
 
-- Harness read-only classification rejects shell operators and the directly tested output/execution options: Git `--output`, `--ext-diff`, `--textconv`, `--pre`, and `--hostname-bin`; plus representative `find -exec`, `-execdir`, `-delete`, `-fprintf`, `-fprint`, and `-fls` forms.
+- Harness read-only classification rejects shell operators and the directly tested Git output/execution options: `--output`, `--ext-diff`, `--textconv`, `--pre`, and `--hostname-bin`. It conservatively classifies every `find` command as write-capable because `find` is absent from the read-only allowlist; tests establish the `find .` baseline and verify that representative write-capable forms cannot bypass native approval. They do not claim option-specific `find` detection.
 - Missing or invalid integrated policy defaults to strict. Light allows only deterministically scoped patches without prompting; mutating native shell commands return `ask` because their complete filesystem effects cannot be proven.
 - The strict `bash tests/` exception uses canonical containment beneath the project test directory. Tests reject a traversal that resolves to an existing script outside the project, a `tests/link` symlink to an external script directory, absolute paths, operators, and similarly prefixed directories.
 - Claude files were read as semantic sources and were not modified.
@@ -79,6 +79,7 @@ disables that human-interaction boundary; deterministic deny checks remain.
 
 ## Final verification (2026-07-11)
 
+- Final review remediation: added an explicit `find .` native-approval baseline, renamed the write-capable `find` fixture group around bypass prevention, and documented that all `find` commands are conservatively classified rather than option-audited. `bash tests/codex_guardrail_test.sh` passed afterward (shared and standalone mode suites).
 - Adversarial RED check: replacing canonical `Path.resolve()` with lexical `Path.absolute()` made `bash tests/codex_guardrail_test.sh modes` fail because an external traversal/symlink command received `ask` instead of `deny`; restoring canonical resolution returned the suite to GREEN.
 - `bash tests/codex_guardrail_test.sh`: shared and standalone mode suites pass.
 - `bash tests/codex_marketplace_test.sh`: marketplace/plugin skeleton suite passes.
