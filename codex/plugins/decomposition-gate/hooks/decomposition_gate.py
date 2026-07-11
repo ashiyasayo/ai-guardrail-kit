@@ -1,25 +1,48 @@
 #!/usr/bin/env python3
-import re, sys
+import re
+import sys
 from hook_protocol import deny, load_event, project_root
 
-PLAN=".codex/guardrail/plan/decomposition.md"
-MARKERS=("## 已知資訊","## 缺少的資訊","【假設】")
-WRITES={"Write":"file_path","Edit":"file_path","MultiEdit":"file_path","NotebookEdit":"notebook_path"}
-WRITE_RE=re.compile(r">{1,2}|(?:^|[|;&]\s*)(?:sudo\s+)?(?:rm|mv|cp|mkdir|touch)\b|\bsed\b[^|;&]*\s-[A-Za-z]*i|(?:^|\s)--(?:output|in-place)(?:[=\s]|$)")
+PLAN = ".codex/guardrail/plan/decomposition.md"
+MARKERS = ("## 已知資訊", "## 缺少的資訊", "【假設】")
+PATCH_PATH = re.compile(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", re.MULTILINE)
+READ_ONLY = {"list_mcp_resources", "list_mcp_resource_templates", "read_mcp_resource", "view_image"}
+
+def patch_paths(patch):
+    if not isinstance(patch, str) or not patch.startswith("*** Begin Patch\n") or not patch.endswith("*** End Patch"):
+        return None
+    paths = PATCH_PATH.findall(patch)
+    return paths or None
 
 def main():
-    event=load_event(sys.stdin); root=project_root(event); tool=event["tool_name"]; inp=event["tool_input"]
-    if tool in WRITES:
-        target=inp.get(WRITES[tool],"")
-        if target and str(target).replace("\\","/").endswith(PLAN): return
-    elif tool=="Bash":
-        command=inp.get("command","")
-        if PLAN in command.replace("\\","/"): return
-        if not isinstance(command,str) or not WRITE_RE.search(command): return
-    else: return
-    path=root/PLAN
-    try: content=path.read_text()
-    except (OSError,UnicodeError): deny("Plan gate: 找不到或無法讀取拆解產出物。")
-    missing=[m for m in MARKERS if m not in content]
-    if missing: deny("Plan gate: 拆解產出物不完整，缺少必要標記："+"、".join(missing))
-if __name__=="__main__": main()
+    event = load_event(sys.stdin); root = project_root(event)
+    tool, data = event["tool_name"], event["tool_input"]
+    if tool in READ_ONLY:
+        return
+    if tool == "apply_patch":
+        paths = patch_paths(data.get("patch"))
+        if paths == [PLAN]:
+            plan_path = root / PLAN
+            try:
+                plan_path.parent.resolve().relative_to(root)
+                if plan_path.is_symlink(): deny("Plan gate: decomposition path must not be a symlink.")
+            except (OSError, ValueError):
+                deny("Plan gate: decomposition path escapes the project.")
+            return
+        if not paths:
+            deny("Plan gate: malformed native apply_patch payload.")
+    elif tool == "exec_command":
+        # Shell syntax is too broad to prove write-free here; gate it like a write.
+        if not isinstance(data.get("cmd"), str):
+            deny("Plan gate: malformed native exec_command payload.")
+    else:
+        deny("Plan gate: unknown tool is not proven read-only.")
+    try:
+        content = (root / PLAN).read_text()
+    except (OSError, UnicodeError):
+        deny("Plan gate: 找不到或無法讀取拆解產出物。")
+    if any(marker not in content for marker in MARKERS):
+        deny("Plan gate: 拆解產出物不完整。")
+
+if __name__ == "__main__":
+    main()

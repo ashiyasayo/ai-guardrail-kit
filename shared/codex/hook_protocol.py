@@ -50,6 +50,19 @@ def deny(reason: str) -> NoReturn:
     raise SystemExit(0)
 
 
+def ask(reason: str) -> NoReturn:
+    """Request the platform's native per-tool human approval."""
+    result = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "ask",
+            "permissionDecisionReason": reason,
+        }
+    }
+    print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
+    raise SystemExit(0)
+
+
 def load_event(stdin: IO[str]) -> Dict[str, Any]:
     """Load and minimally validate one Codex PreToolUse event, failing closed."""
     try:

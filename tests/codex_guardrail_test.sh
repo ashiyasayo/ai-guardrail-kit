@@ -184,9 +184,9 @@ from pathlib import Path
 root = Path(os.environ["ROOT"])
 plugins = root / "codex" / "plugins"
 
-def event(cwd, tool="Write", tool_input=None):
+def event(cwd, tool="apply_patch", tool_input=None):
     return {"cwd": str(cwd), "hook_event_name": "PreToolUse", "model": "test",
-            "permission_mode": "default", "session_id": "s", "tool_input": tool_input or {"file_path": "src/app.py", "content": "x"},
+            "permission_mode": "default", "session_id": "s", "tool_input": tool_input or {"patch": "*** Begin Patch\n*** Add File: src/app.py\n+x\n*** End Patch"},
             "tool_name": tool, "tool_use_id": "u", "transcript_path": "", "turn_id": "t"}
 
 def run(hook, data):
@@ -197,6 +197,11 @@ def run(hook, data):
 def denied(hook, data):
     result = run(hook, data)
     assert result and result["permissionDecision"] == "deny", (hook, result)
+    return result["permissionDecisionReason"]
+
+def asked(hook, data):
+    result = run(hook, data)
+    assert result and result["permissionDecision"] == "ask", (hook, result)
     return result["permissionDecisionReason"]
 
 for source in plugins.rglob("*.py"):
@@ -211,44 +216,48 @@ with tempfile.TemporaryDirectory() as td:
     dg = install / "decomposition-gate/hooks/decomposition_gate.py"
     denied(dg, event(project))
     plan = guard / "plan/decomposition.md"
-    assert run(dg, event(project, tool_input={"file_path": str(plan), "content": "draft"})) is None
+    plan_patch = "*** Begin Patch\n*** Add File: .codex/guardrail/plan/decomposition.md\n+draft\n*** End Patch"
+    assert run(dg, event(project, tool_input={"patch": plan_patch})) is None
+    denied(dg, event(project, tool_input={"patch": plan_patch.replace(".codex/guardrail/plan/decomposition.md", "x/.codex/guardrail/plan/decomposition.md")}))
+    denied(dg, event(project, "unknown_tool", {}))
     plan.write_text("## 已知資訊\n## 缺少的資訊\n")
     denied(dg, event(project))
     plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】x\n")
     assert run(dg, event(project)) is None
 
     hp = install / "harness/hooks/plan_gate.py"
-    approve = install / "harness/scripts/approve_plan.py"
-    approval = guard / "approval.json"
-    denied(hp, event(project))
-    subprocess.run(["python3", str(approve), str(project)], check=True, capture_output=True, text=True)
-    assert run(hp, event(project)) is None
-    approval.write_text(json.dumps({"plan_sha256": hashlib.sha256(plan.read_bytes()).hexdigest(), "approved_at": time.time()-3601}))
-    denied(hp, event(project))
-    approval.write_text(json.dumps({"plan_sha256": hashlib.sha256(plan.read_bytes()).hexdigest(), "approved_at": time.time()+61}))
-    denied(hp, event(project))
-    denied(hp, event(project, tool_input={"file_path": str(approval), "content": "{}"}))
-    subprocess.run(["python3", str(approve), str(project)], check=True, capture_output=True, text=True)
+    assert not (install / "harness/scripts/approve_plan.py").exists()
+    asked(hp, event(project))
+    assert run(hp, event(project, "exec_command", {"cmd": "git status"})) is None
+    asked(hp, event(project, "exec_command", {"cmd": "touch x"}))
+    asked(hp, event(project, "exec_command", {"cmd": "git status; touch x"}))
+    asked(hp, event(project, "exec_command", {"cmd": "git branch attacker"}))
+    denied(hp, event(project, "unknown_tool", {}))
     dangerous = install / "harness/hooks/block_dangerous_commands.py"
-    denied(dangerous, event(project, "Bash", {"command": "git reset --hard"}))
+    denied(dangerous, event(project, "exec_command", {"cmd": "git reset --hard"}))
     secrets = install / "harness/hooks/block_secrets.py"
-    denied(secrets, event(project, tool_input={"file_path": "x", "content": "AWS=AKIA1234567890ABCDEF"}))
+    denied(secrets, event(project, tool_input={"patch": "*** Begin Patch\n*** Add File: x\n+AWS=AKIA1234567890ABCDEF\n*** End Patch"}))
 
     ip = install / "integrated-harness/hooks/plan_gate.py"
     policy = guard / "orchestration-policy.md"
     shutil.copy(install / "integrated-harness/orchestration-policy.md", policy)
     plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】x\n## 允許修改範圍\n- `src/`\n")
-    denied(ip, event(project))
-    ia = install / "integrated-harness/scripts/approve_plan.py"
-    subprocess.run(["python3", str(ia), str(project)], check=True, capture_output=True, text=True)
-    assert run(ip, event(project)) is None
-    denied(ip, event(project, tool_input={"file_path": "other/x", "content": "x"}))
+    first_reason = asked(ip, event(project))
+    assert hashlib.sha256(plan.read_bytes()).hexdigest() in first_reason
+    denied(ip, event(project, tool_input={"patch": "*** Begin Patch\n*** Add File: other/x\n+x\n*** End Patch"}))
     plan.write_text(plan.read_text()+"changed\n")
-    denied(ip, event(project))
+    assert hashlib.sha256(plan.read_bytes()).hexdigest() in asked(ip, event(project))
     policy.write_text(policy.read_text().replace("strict", "light", 1))
-    assert run(ip, event(project, tool_input={"file_path": "other/x", "content": "x"})) is None
+    assert run(ip, event(project)) is None
+    denied(ip, event(project, tool_input={"patch": "*** Begin Patch\n*** Add File: other/x\n+x\n*** End Patch"}))
     policy.unlink()
-    denied(ip, event(project))
+    asked(ip, event(project))
+
+    # Packaged runtime is the exact audited shared runtime.
+    for plugin in ("decomposition-gate", "harness", "integrated-harness"):
+        assert (install / plugin / "hooks/hook_protocol.py").read_bytes() == (root / "shared/codex/hook_protocol.py").read_bytes()
+    for plugin in ("harness", "integrated-harness"):
+        assert (install / plugin / "hooks/security_checks.py").read_bytes() == (root / "shared/codex/security_checks.py").read_bytes()
 
 print("PASS: Codex standalone guardrail modes (22 assertions)")
 PY

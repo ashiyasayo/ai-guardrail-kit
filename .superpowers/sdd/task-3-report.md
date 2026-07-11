@@ -73,3 +73,47 @@ Evidence commands used:
   human-initiator field
 - `codex --help` -> `--ask-for-approval` may be `never`, and
   `--dangerously-bypass-approvals-and-sandbox` exists
+
+## Native `ask` remediation (2026-07-11)
+
+Status changed from the superseded blocker above to **DONE** after the human
+selected Codex's native `ask` decision as the trust boundary.
+
+### RED/GREEN evidence
+
+- RED: the amended native-mode test failed at the first `apply_patch` event
+  because the old implementation recognized only Claude-style `Write` and
+  `Bash` payloads.
+- GREEN: `bash tests/codex_guardrail_test.sh modes` passes with native
+  `apply_patch.patch` and `exec_command.cmd` fixtures.
+- Complete verification passes: the full Codex suite, Claude decomposition
+  smoke (14/14), Claude integrated smoke (136/136), and Claude orchestration
+  contract (0 failures).
+
+### Fixes and security evidence
+
+- Removed both Codex `approve_plan.py` files and all approval-record behavior.
+- Harness asks through native Codex for every classified write-capable request;
+  only narrowly parsed read commands pass silently. Compound shell syntax and
+  mutating `git branch` forms cannot exploit substring classification.
+- Integrated mode validates the plan markers, parsed policy, canonical allowed
+  scopes, patch targets, and policy-derived strict command allowlist before
+  returning `ask`. Its reason contains the current plan SHA-256 for audit
+  context. Light mode permits only requests that pass the same deterministic
+  plan/scope checks. Missing or malformed policy defaults to strict.
+- Native payload schemas are checked. Unknown tools fail closed unless they are
+  explicitly proven read-only. Patch paths are project-relative and canonical;
+  traversal, absolute paths, and symlink escapes are denied. The decomposition
+  self-write exemption matches the exact project-relative path only and rejects
+  a symlink target.
+- Dangerous-command and secret hooks consume native `cmd` and `patch` fields and
+  remain independent of plan approval eligibility.
+- Every installed `hook_protocol.py` and `security_checks.py` is byte-identical
+  to its shared audited source, with standalone-install byte-equality tests to
+  prevent packaging drift.
+
+### Remaining boundary
+
+Native `ask` is a platform approval request, not a substitute for Codex runtime
+configuration. An operator who globally disables platform approvals also
+disables that human-interaction boundary; deterministic deny checks remain.

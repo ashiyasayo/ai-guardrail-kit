@@ -65,7 +65,7 @@ def pending_content(tool_input: Dict[str, Any]) -> str:
     if not isinstance(tool_input, dict):
         return ""
     parts = []
-    for key in ("content", "new_string", "new_source", "command"):
+    for key in ("patch", "cmd", "content", "new_string", "new_source", "command"):
         value = tool_input.get(key)
         if isinstance(value, str):
             parts.append(value)
