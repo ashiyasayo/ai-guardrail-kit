@@ -33,3 +33,43 @@ Marketplace installations cache each plugin independently, so repository-level `
 
 - Local runtime copies intentionally duplicate the stable shared boundary. Future shared protocol/security changes must update packaged copies and their standalone parity tests together.
 - Codex plugin installation does not itself activate hooks; selector/configuration work remains outside Task 3.
+
+## Review remediation status (2026-07-11)
+
+**BLOCKED.** The Critical human-presence requirement cannot be guaranteed by the
+installed Codex hook platform (`codex-cli 0.144.1`). A `PreToolUse` event exposes
+session/turn/tool metadata, but no platform-authenticated principal or
+human-initiated bit. The installed binary's event schema includes
+`session_id`, `transcript_path`, `hook_event_name`, `permission_mode`, `source`,
+`turn_id`, and tool data; none distinguishes a command typed by a human from a
+command requested by the agent. The same binary exposes native write-capable
+tools (`exec_command` and `apply_patch`) and its CLI supports configurations that
+run commands without per-command human confirmation.
+
+Consequently, any repository-local approval mechanism that the human can invoke
+(a script, executable, file write, environment variable, nonce file, socket, or
+local signing key readable/invocable in the guarded environment) can also be
+invoked or minted by the agent through `exec_command`/`apply_patch`, unless an
+external trusted component withholds that capability. The current
+`scripts/approve_plan.py` is therefore demonstrably agent-invocable and cannot
+satisfy the requirement. Hook payload fields are untrusted JSON inputs to the
+hook and cannot supply the missing trust boundary.
+
+No remediation code was committed for the remaining Important findings because
+the task explicitly requires reporting BLOCKED rather than presenting a partial
+implementation as secure when this Critical property is unavailable. A viable
+continuation requires a Codex platform primitive that emits an authenticated
+human approval/token outside guarded tool reach, or a separately trusted
+supervisor/credential service whose signing operation is unavailable to every
+agent-callable tool.
+
+Evidence commands used:
+
+- `codex --version` -> `codex-cli 0.144.1`
+- `codex features list` -> hooks stable; `guardian_approval` stable; no
+  human-presence hook feature
+- `strings /opt/homebrew/bin/codex` -> native `exec_command` and `apply_patch`
+  tool kinds; `PreToolUse` event fields listed above; no authenticated
+  human-initiator field
+- `codex --help` -> `--ask-for-approval` may be `never`, and
+  `--dangerously-bypass-approvals-and-sandbox` exists
