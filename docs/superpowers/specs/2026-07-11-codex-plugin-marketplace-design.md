@@ -27,21 +27,16 @@ close enough to review and test together.
 The first phase adds new Codex paths without moving the current Claude assets:
 
 ```text
-marketplaces/
-└── codex/
-    └── marketplace.json
-
-plugins/
-├── decomposition-gate/
-│   └── codex/
-│       ├── .codex-plugin/plugin.json
-│       ├── hooks/
-│       ├── skills/
-│       └── scripts/
-├── harness/
-│   └── codex/
-└── integrated-harness/
-    └── codex/
+codex/
+├── marketplace.json
+└── plugins/
+    ├── decomposition-gate/
+    │   ├── .codex-plugin/plugin.json
+    │   ├── hooks/
+    │   ├── skills/
+    │   └── scripts/
+    ├── harness/
+    └── integrated-harness/
 
 scripts/
 ├── select-codex-mode
@@ -56,10 +51,10 @@ tests/
 └── codex_guardrail_test.sh
 ```
 
-When the Claude marketplace is implemented, each product may gain a `shared/`
-directory for platform-neutral schemas, fixtures, and rule vectors. That later
-reorganization must preserve compatibility with the current top-level Claude
-installation paths.
+When the Claude marketplace is implemented it will use the parallel
+`claude/plugins/<mode>` layout. Platform-neutral schemas, fixtures, and rule
+vectors may live under repository-root `shared/`. That later reorganization must
+preserve compatibility with the current top-level Claude installation paths.
 
 ## Marketplace and Plugin Packaging
 

@@ -24,18 +24,18 @@
 ### Task 1: Marketplace and Plugin Skeletons
 
 **Files:**
-- Create: `marketplaces/codex/marketplace.json`
-- Create: `plugins/decomposition-gate/codex/.codex-plugin/plugin.json`
-- Create: `plugins/harness/codex/.codex-plugin/plugin.json`
-- Create: `plugins/integrated-harness/codex/.codex-plugin/plugin.json`
-- Create: `plugins/decomposition-gate/codex/skills/decomposition-gate/SKILL.md`
-- Create: `plugins/harness/codex/skills/harness/SKILL.md`
-- Create: `plugins/integrated-harness/codex/skills/integrated-harness/SKILL.md`
+- Create: `codex/marketplace.json`
+- Create: `codex/plugins/decomposition-gate/.codex-plugin/plugin.json`
+- Create: `codex/plugins/harness/.codex-plugin/plugin.json`
+- Create: `codex/plugins/integrated-harness/.codex-plugin/plugin.json`
+- Create: `codex/plugins/decomposition-gate/skills/decomposition-gate/SKILL.md`
+- Create: `codex/plugins/harness/skills/harness/SKILL.md`
+- Create: `codex/plugins/integrated-harness/skills/integrated-harness/SKILL.md`
 - Create: `tests/codex_marketplace_test.sh`
 
 **Interfaces:**
 - Produces: marketplace name `ai-guardrail-kit`; plugin names identical to the three mode names.
-- Produces: each plugin at `plugins/<mode>/codex` with version `0.1.0`.
+- Produces: each plugin at `codex/plugins/<mode>` with version `0.1.0`.
 
 - [ ] **Step 1: Write the failing marketplace test**
 
@@ -45,14 +45,14 @@ Create a shell test that loads JSON with Python and asserts the marketplace name
 
 Run: `bash tests/codex_marketplace_test.sh`
 
-Expected: FAIL because `marketplaces/codex/marketplace.json` does not exist.
+Expected: FAIL because `codex/marketplace.json` does not exist.
 
 - [ ] **Step 3: Scaffold the three plugins and marketplace**
 
 Use the plugin-creator scaffold script with repo-local paths, then adjust the generated marketplace source paths to:
 
 ```json
-{"source":"local","path":"../../plugins/decomposition-gate/codex"}
+{"source":"local","path":"./plugins/decomposition-gate"}
 ```
 
 and the corresponding paths for the other two modes. Keep unsupported `hooks` out of all three plugin manifests. Each skill must state its scope, its non-sandbox limitation, the required selector command, and that a new thread is required after switching.
@@ -62,9 +62,9 @@ and the corresponding paths for the other two modes. Keep unsupported `hooks` ou
 Run:
 
 ```bash
-python3 /Users/saiko/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/decomposition-gate/codex
-python3 /Users/saiko/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/harness/codex
-python3 /Users/saiko/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/integrated-harness/codex
+python3 /Users/saiko/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py codex/plugins/decomposition-gate
+python3 /Users/saiko/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py codex/plugins/harness
+python3 /Users/saiko/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py codex/plugins/integrated-harness
 bash tests/codex_marketplace_test.sh
 ```
 
@@ -73,15 +73,15 @@ Expected: all commands PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add marketplaces plugins tests/codex_marketplace_test.sh
+git add codex tests/codex_marketplace_test.sh
 git commit -m "feat: add Codex guardrail marketplace"
 ```
 
 ### Task 2: Codex Hook Protocol and Shared Security Checks
 
 **Files:**
-- Create: `plugins/shared/codex/hook_protocol.py`
-- Create: `plugins/shared/codex/security_checks.py`
+- Create: `shared/codex/hook_protocol.py`
+- Create: `shared/codex/security_checks.py`
 - Create: `tests/fixtures/codex/allow.json`
 - Create: `tests/fixtures/codex/dangerous-command.json`
 - Create: `tests/fixtures/codex/secret-write.json`
@@ -115,29 +115,29 @@ Expected: PASS with no secret value in stdout or stderr.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add plugins/shared tests/fixtures/codex tests/codex_guardrail_test.sh
+git add shared/codex tests/fixtures/codex tests/codex_guardrail_test.sh
 git commit -m "feat: add Codex hook protocol and security checks"
 ```
 
 ### Task 3: Three Native Guardrail Modes
 
 **Files:**
-- Create: `plugins/decomposition-gate/codex/hooks/decomposition_gate.py`
-- Create: `plugins/harness/codex/hooks/plan_gate.py`
-- Create: `plugins/harness/codex/hooks/block_dangerous_commands.py`
-- Create: `plugins/harness/codex/hooks/block_secrets.py`
-- Create: `plugins/harness/codex/scripts/approve_plan.py`
-- Create: `plugins/integrated-harness/codex/hooks/plan_gate.py`
-- Create: `plugins/integrated-harness/codex/hooks/block_dangerous_commands.py`
-- Create: `plugins/integrated-harness/codex/hooks/block_secrets.py`
-- Create: `plugins/integrated-harness/codex/scripts/approve_plan.py`
-- Create: `plugins/integrated-harness/codex/orchestration-policy.md`
+- Create: `codex/plugins/decomposition-gate/hooks/decomposition_gate.py`
+- Create: `codex/plugins/harness/hooks/plan_gate.py`
+- Create: `codex/plugins/harness/hooks/block_dangerous_commands.py`
+- Create: `codex/plugins/harness/hooks/block_secrets.py`
+- Create: `codex/plugins/harness/scripts/approve_plan.py`
+- Create: `codex/plugins/integrated-harness/hooks/plan_gate.py`
+- Create: `codex/plugins/integrated-harness/hooks/block_dangerous_commands.py`
+- Create: `codex/plugins/integrated-harness/hooks/block_secrets.py`
+- Create: `codex/plugins/integrated-harness/scripts/approve_plan.py`
+- Create: `codex/plugins/integrated-harness/orchestration-policy.md`
 - Extend: `tests/codex_guardrail_test.sh`
 
 **Interfaces:**
 - Uses project artifacts under `.codex/guardrail/`: `plan/decomposition.md`, `approval.json`, and `orchestration-policy.md`.
 - Approval record: `{"plan_sha256":"<64 lowercase hex>","approved_at":<unix seconds>}`.
-- Hook exit/result contract is exclusively supplied by `plugins/shared/codex/hook_protocol.py`.
+- Hook exit/result contract is exclusively supplied by `shared/codex/hook_protocol.py`.
 
 - [ ] **Step 1: Add failing mode tests**
 
@@ -177,7 +177,7 @@ Expected: all Codex and existing Claude tests PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add plugins tests/codex_guardrail_test.sh
+git add codex/plugins tests/codex_guardrail_test.sh
 git commit -m "feat: port guardrail modes to Codex hooks"
 ```
 
@@ -257,7 +257,7 @@ Expected: FAIL because `docs/codex-marketplace.md` is missing.
 Document:
 
 ```bash
-codex plugin marketplace add "$(pwd)/marketplaces/codex"
+codex plugin marketplace add "$(pwd)/codex"
 ./scripts/select-codex-mode decomposition-gate .
 ./scripts/verify-codex-mode decomposition-gate .
 ```
@@ -275,9 +275,9 @@ bash tests/codex_mode_switch_test.sh
 bash decomposition-gate/tests/smoke_test.sh
 bash integrated-harness/tests/smoke_test.sh
 bash integrated-harness/tests/orchestration_test.sh
-python3 /Users/saiko/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/decomposition-gate/codex
-python3 /Users/saiko/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/harness/codex
-python3 /Users/saiko/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/integrated-harness/codex
+python3 /Users/saiko/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py codex/plugins/decomposition-gate
+python3 /Users/saiko/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py codex/plugins/harness
+python3 /Users/saiko/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py codex/plugins/integrated-harness
 git diff --check
 ```
 
@@ -286,7 +286,7 @@ Expected: every command exits 0 with no warnings containing `FAIL`, `Traceback`,
 - [ ] **Step 5: Commit**
 
 ```bash
-git add README.md docs/codex-marketplace.md plugins/*/codex/skills tests/codex_marketplace_test.sh
+git add README.md docs/codex-marketplace.md codex/plugins/*/skills tests/codex_marketplace_test.sh
 git commit -m "docs: document Codex guardrail plugins"
 ```
 
