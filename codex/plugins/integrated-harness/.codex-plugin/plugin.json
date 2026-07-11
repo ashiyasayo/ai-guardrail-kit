@@ -1,0 +1,18 @@
+{
+  "name": "integrated-harness",
+  "version": "0.1.0",
+  "description": "Integrated Harness plugin",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Integrated Harness",
+    "shortDescription": "Use Integrated Harness in Codex.",
+    "longDescription": "Integrated Harness adds a local Codex plugin scaffold.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Help me use Integrated Harness."
+  }
+}
