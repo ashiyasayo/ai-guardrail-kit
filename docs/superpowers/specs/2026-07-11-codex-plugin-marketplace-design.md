@@ -10,7 +10,7 @@ the other two.
 The three modes retain their existing product meanings:
 
 - `decomposition-gate` enforces task decomposition before write operations.
-- `harness` enforces human approval and permanent safety checks.
+- `harness` requests native Codex human approval and enforces permanent safety checks.
 - `integrated-harness` combines both controls with orchestration policy.
 
 The initial delivery targets Codex only. Existing Claude Code behavior and file
@@ -142,21 +142,24 @@ This mode is workflow discipline, not human authorization or a security sandbox.
 
 ### Harness
 
-The plugin blocks write-capable operations without a current human approval
-record. Approval is created only by a user-run repository script and expires
-after the configured interval. The Codex workflow and hook cannot approve their
-own plan.
+For write-capable operations, the plugin returns the native Codex `ask` decision
+so the Codex UI or CLI obtains approval from the human. It does not use a
+repository-local approval file or approval script because an agent could invoke
+such a script through a tool. Read-only operations continue normally.
 
 Independent safety hooks block destructive shell commands and likely plaintext
 credentials. These checks are permanent and are not bypassed by plan approval.
 
 ### Integrated Harness
 
-The plugin combines decomposition validation, human approval, destructive-command
-blocking, credential blocking, and orchestration guidance. In strict mode,
-approval records include a SHA-256 digest of the decomposition artifact. Editing
-the artifact invalidates the approval. Light mode follows its explicit Codex
-policy while retaining permanent command and credential checks.
+The plugin combines decomposition validation, native human approval,
+destructive-command blocking, credential blocking, and orchestration guidance.
+In strict mode, the hook computes the current decomposition SHA-256 for audit
+context and returns `ask` only after the plan, scope, and strict allowlist checks
+pass. Because each approval is tied to the current tool request, editing the plan
+causes later requests to be checked against the new content. Light mode follows
+its explicit Codex policy without an approval prompt while retaining permanent
+command and credential checks.
 
 Codex policy is stored separately from Claude settings. The three Codex plugins
 share a Python 3.9 minimum to simplify distribution and testing.
@@ -164,7 +167,7 @@ share a Python 3.9 minimum to simplify distribution and testing.
 ## Error Handling and Security Boundaries
 
 All guardrails fail closed for missing files, malformed input, unreadable policy,
-expired approval, digest mismatch, and hook parsing errors. Error messages state
+invalid scope, and hook parsing errors. Error messages state
 which condition failed and identify the user action needed to proceed without
 revealing credential content.
 
@@ -194,10 +197,10 @@ Implementation follows test-first development. Automated tests cover:
 - preservation of unrelated `.codex/config.toml` content;
 - decomposition rejection for missing and malformed artifacts and acceptance of a
   valid artifact;
-- approval rejection when absent or expired and acceptance when valid;
+- native `ask` output for guarded writes and no repository-local approval bypass;
 - permanent blocking of representative destructive commands and plaintext
   credentials;
-- integrated approval invalidation after decomposition content changes;
+- integrated `ask` audit context changes after decomposition content changes;
 - strict and light policy behavior;
 - continued success of the existing Claude smoke and orchestration tests.
 
@@ -216,5 +219,5 @@ The Codex phase is complete when:
    state always satisfies mutual exclusion after a reported success.
 4. Guardrail and switching regression tests pass in isolation.
 5. Existing Claude tests remain unchanged and pass.
-6. Installation, selection, update, verification, limitations, and new-thread
-   activation are documented.
+6. Installation, selection, update, verification, native approval semantics,
+   limitations, and new-thread activation are documented.

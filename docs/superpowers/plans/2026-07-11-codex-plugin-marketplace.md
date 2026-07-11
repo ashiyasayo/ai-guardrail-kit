@@ -126,22 +126,20 @@ git commit -m "feat: add Codex hook protocol and security checks"
 - Create: `codex/plugins/harness/hooks/plan_gate.py`
 - Create: `codex/plugins/harness/hooks/block_dangerous_commands.py`
 - Create: `codex/plugins/harness/hooks/block_secrets.py`
-- Create: `codex/plugins/harness/scripts/approve_plan.py`
 - Create: `codex/plugins/integrated-harness/hooks/plan_gate.py`
 - Create: `codex/plugins/integrated-harness/hooks/block_dangerous_commands.py`
 - Create: `codex/plugins/integrated-harness/hooks/block_secrets.py`
-- Create: `codex/plugins/integrated-harness/scripts/approve_plan.py`
 - Create: `codex/plugins/integrated-harness/orchestration-policy.md`
 - Extend: `tests/codex_guardrail_test.sh`
 
 **Interfaces:**
-- Uses project artifacts under `.codex/guardrail/`: `plan/decomposition.md`, `approval.json`, and `orchestration-policy.md`.
-- Approval record: `{"plan_sha256":"<64 lowercase hex>","approved_at":<unix seconds>}`.
+- Uses project artifacts under `.codex/guardrail/`: `plan/decomposition.md` and `orchestration-policy.md`.
+- Human approval uses the native Codex `ask` decision; no repository-local approval file or script exists.
 - Hook exit/result contract is exclusively supplied by `shared/codex/hook_protocol.py`.
 
 - [ ] **Step 1: Add failing mode tests**
 
-Cover missing/malformed/valid decomposition, plan-file self-write allowance, absent/expired/current approval, approval-file self-write denial, destructive-command denial after approval, credential denial after approval, strict/light integrated behavior, allowed-scope enforcement, and digest invalidation after editing the decomposition file.
+Cover missing/malformed/valid decomposition, exact project-scoped plan-file self-write allowance, native `ask` for guarded writes, destructive-command denial despite approval eligibility, credential denial despite approval eligibility, strict/light integrated behavior, allowed-scope enforcement, strict allowlist parsing, unknown-tool fail-closed behavior, and changed audit digest after editing the decomposition file. Fixtures must use verified native Codex tool names and input fields.
 
 - [ ] **Step 2: Run and verify RED**
 
@@ -155,11 +153,11 @@ Port the marker checks and minimal write-intent detection from the Claude implem
 
 - [ ] **Step 4: Implement harness**
 
-Use an approval JSON record created only by `approve_plan.py`; require an age of at most 3600 seconds and deny future timestamps over 60 seconds. Keep read-only command parsing, approval self-protection, dangerous-command blocking, and secret blocking independent.
+Return native Codex `ask` for write-capable operations after classification. Keep read-only command parsing, dangerous-command blocking, and secret blocking independent. Do not create an approval file, approval script, nonce, or other repository-local human-presence substitute.
 
 - [ ] **Step 5: Implement integrated-harness**
 
-Port strict/light policy parsing, plan markers, allowed scopes, strict Bash allowlist, SHA-256 approval binding, permanent command blocking, and secret blocking. Default missing or invalid policy to strict.
+Port strict/light policy parsing, plan markers, allowed scopes, strict Bash allowlist, SHA-256 audit context, permanent command blocking, and secret blocking. Strict returns native `ask` after all deterministic checks pass; light permits in-scope operations without `ask`. Default missing or invalid policy to strict.
 
 - [ ] **Step 6: Run and verify GREEN**
 
@@ -262,7 +260,7 @@ codex plugin marketplace add "$(pwd)/codex"
 ./scripts/verify-codex-mode decomposition-gate .
 ```
 
-Include selection guidance, human-only approval commands, cachebuster/update behavior, safe removal through the selector tooling, rollback messages, limitations, and new-thread activation.
+Include selection guidance, native Codex approval behavior, cachebuster/update behavior, safe removal through the selector tooling, rollback messages, limitations, and new-thread activation.
 
 - [ ] **Step 4: Run complete verification**
 
