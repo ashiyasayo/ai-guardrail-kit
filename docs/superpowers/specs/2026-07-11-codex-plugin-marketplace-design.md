@@ -157,9 +157,11 @@ destructive-command blocking, credential blocking, and orchestration guidance.
 In strict mode, the hook computes the current decomposition SHA-256 for audit
 context and returns `ask` only after the plan, scope, and strict allowlist checks
 pass. Because each approval is tied to the current tool request, editing the plan
-causes later requests to be checked against the new content. Light mode follows
-its explicit Codex policy without an approval prompt while retaining permanent
-command and credential checks.
+causes later requests to be checked against the new content. Light mode permits
+only deterministically scoped `apply_patch` requests without an approval prompt.
+Mutating `exec_command` requests still return native `ask`, because arbitrary
+shell filesystem effects cannot be proven to stay within the declared scope.
+Permanent command and credential checks remain active in every mode.
 
 Codex policy is stored separately from Claude settings. The three Codex plugins
 share a Python 3.9 minimum to simplify distribution and testing.

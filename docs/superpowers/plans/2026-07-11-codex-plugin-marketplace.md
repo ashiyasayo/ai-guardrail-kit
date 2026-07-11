@@ -157,7 +157,7 @@ Return native Codex `ask` for write-capable operations after classification. Kee
 
 - [ ] **Step 5: Implement integrated-harness**
 
-Port strict/light policy parsing, plan markers, allowed scopes, strict Bash allowlist, SHA-256 audit context, permanent command blocking, and secret blocking. Strict returns native `ask` after all deterministic checks pass; light permits in-scope operations without `ask`. Default missing or invalid policy to strict.
+Port strict/light policy parsing, plan markers, allowed scopes, strict Bash allowlist, SHA-256 audit context, permanent command blocking, and secret blocking. Strict returns native `ask` after all deterministic checks pass. Light permits deterministically scoped `apply_patch` operations without `ask`, but returns native `ask` for mutating `exec_command` requests because arbitrary shell filesystem effects cannot be proven to remain in scope. Default missing or invalid policy to strict.
 
 - [ ] **Step 6: Run and verify GREEN**
 

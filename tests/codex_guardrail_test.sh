@@ -229,6 +229,18 @@ with tempfile.TemporaryDirectory() as td:
     assert not (install / "harness/scripts/approve_plan.py").exists()
     asked(hp, event(project))
     assert run(hp, event(project, "exec_command", {"cmd": "git status"})) is None
+    for command in (
+        "diff --output=stolen a b",
+        "git diff --output=stolen",
+        "git --no-pager diff --output stolen",
+        "git diff --ext-diff",
+        "git log --textconv",
+        "git show --pre=evil",
+        "git status --hostname-bin=evil",
+        "git -c diff.external=evil diff",
+        "git diff | cat",
+    ):
+        asked(hp, event(project, "exec_command", {"cmd": command}))
     asked(hp, event(project, "exec_command", {"cmd": "touch x"}))
     asked(hp, event(project, "exec_command", {"cmd": "git status; touch x"}))
     asked(hp, event(project, "exec_command", {"cmd": "git branch attacker"}))
@@ -249,7 +261,22 @@ with tempfile.TemporaryDirectory() as td:
     assert hashlib.sha256(plan.read_bytes()).hexdigest() in asked(ip, event(project))
     policy.write_text(policy.read_text().replace("strict", "light", 1))
     assert run(ip, event(project)) is None
+    asked(ip, event(project, "exec_command", {"cmd": "touch src/light.txt"}))
     denied(ip, event(project, tool_input={"patch": "*** Begin Patch\n*** Add File: other/x\n+x\n*** End Patch"}))
+    policy.write_text(policy.read_text().replace("light", "strict", 1))
+    tests = project / "tests"; tests.mkdir()
+    (tests / "smoke.sh").write_text("#!/bin/sh\n")
+    outside = td / "outside.sh"; outside.write_text("#!/bin/sh\n")
+    (project / "tests-prefix").mkdir()
+    (project / "tests-prefix" / "evil.sh").write_text("#!/bin/sh\n")
+    asked(ip, event(project, "exec_command", {"cmd": "bash tests/smoke.sh"}))
+    for command in (
+        "bash tests/../outside.sh",
+        "bash " + str(outside),
+        "bash tests/smoke.sh && touch escaped",
+        "bash tests-prefix/evil.sh",
+    ):
+        denied(ip, event(project, "exec_command", {"cmd": command}))
     policy.unlink()
     asked(ip, event(project))
 

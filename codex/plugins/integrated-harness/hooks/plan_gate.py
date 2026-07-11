@@ -72,14 +72,24 @@ def patch_targets(data, root):
         targets.append(target)
     return targets
 
-def strict_command(cmd, allowlist):
+def strict_command(cmd, allowlist, root):
     if not isinstance(cmd, str) or UNSAFE.search(cmd): return False
     try: tokens = shlex.split(cmd)
     except ValueError: return False
     for entry in allowlist:
         try: allowed = shlex.split(entry)
         except ValueError: continue
-        if tokens[:len(allowed)] == allowed and (allowed != ["bash", "tests/"] or (len(tokens) > 1 and tokens[1].startswith("tests/") and ".." not in Path(tokens[1]).parts)):
+        if allowed == ["bash", "tests/"]:
+            if len(tokens) < 2 or tokens[0] != "bash" or Path(tokens[1]).is_absolute():
+                continue
+            tests_root = (root / "tests").resolve()
+            candidate = (root / tokens[1]).resolve()
+            try:
+                candidate.relative_to(tests_root)
+                return True
+            except ValueError:
+                continue
+        if tokens[:len(allowed)] == allowed:
             return True
     return False
 
@@ -96,10 +106,10 @@ def main():
     elif tool == "exec_command":
         cmd = data.get("cmd")
         if not isinstance(cmd, str): deny("Malformed native exec_command payload.")
-        if mode == "strict" and not strict_command(cmd, allowlist): deny("strict 模式禁止非 allowlist 指令。")
+        if mode == "strict" and not strict_command(cmd, allowlist, root): deny("strict 模式禁止非 allowlist 指令。")
     else:
         deny("Unknown tool is not proven read-only.")
-    if mode == "light": return
+    if mode == "light" and tool == "apply_patch": return
     digest = hashlib.sha256((root / PLAN).read_bytes()).hexdigest()
     ask("Integrated harness native approval; current plan SHA-256: " + digest)
 
