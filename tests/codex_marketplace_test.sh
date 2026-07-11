@@ -34,5 +34,31 @@ for p,name in zip(data['plugins'],names):
  frontmatter=lines[1:closing]
  frontmatter_names=[line.split(':',1)[1].strip() for line in frontmatter if line.startswith('name:')]
  check(frontmatter_names==[name], f'{name}: frontmatter name must be {name}, found {frontmatter_names}')
+
+readme=(root/'README.md').read_text()
+guide_path=root/'docs/codex-marketplace.md'
+check(guide_path.exists(), 'docs/codex-marketplace.md must exist')
+guide=guide_path.read_text()
+check('docs/codex-marketplace.md' in readme, 'README must link to the Codex marketplace guide')
+required = {
+ 'codex plugin marketplace add "$(pwd)/codex"': 'marketplace add command',
+ './scripts/select-codex-mode decomposition-gate .': 'selector command',
+ './scripts/verify-codex-mode decomposition-gate .': 'verifier command',
+ '.codex/config.toml': 'managed config path',
+ '# ai-guardrail-kit:begin': 'managed block delimiter',
+ 'Python 3.9': 'Python minimum',
+ 'new thread': 'new-thread activation instruction',
+ 'native Codex `ask`': 'native approval semantics',
+ 'codex plugin add/remove': 'direct CLI desynchronization boundary',
+ 'cachebuster': 'local update workflow',
+ 'TOCTOU': 'selector race limitation',
+}
+for needle, label in required.items():
+ check(needle in guide, f'Codex guide must document {label}')
+check('/Users/' not in guide, 'Codex guide must not contain a developer-machine path')
+for name in names:
+ skill=(root/f'codex/plugins/{name}/skills/{name}/SKILL.md').read_text()
+ check('new thread' in skill, f'{name}: skill must require a new thread')
+ check(f'scripts/select-codex-mode {name}' in skill, f'{name}: skill must name its selector command')
 print('PASS: Codex marketplace and plugin skeletons')
 PY

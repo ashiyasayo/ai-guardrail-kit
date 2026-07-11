@@ -5,6 +5,8 @@ description: Require a valid decomposition artifact before implementation work p
 
 # Decomposition Gate
 
-This workflow gates implementation on a project decomposition plan. Plugin hooks are not a sandbox and installation alone does not activate them.
+This workflow gates implementation on `.codex/guardrail/plan/decomposition.md`.
+It is workflow discipline, not authorization or a sandbox. Installation alone
+does not activate plugin hooks.
 
-Activate this mode with `scripts/select-codex-mode decomposition-gate`, then start a new thread after switching.
+Activate it from the repository with `scripts/select-codex-mode decomposition-gate <project-dir>`, verify it with `scripts/verify-codex-mode decomposition-gate <project-dir>`, then start a new thread after switching.
