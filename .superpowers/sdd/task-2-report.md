@@ -79,3 +79,29 @@ Result: exit 0; output included
 - `deny` exits zero because the verified schema communicates the denial on
   stdout; later executable hook tests should validate this end to end through
   Codex when selector configuration is available.
+
+## Review fixes RED/GREEN evidence
+
+RED command:
+
+```text
+bash tests/codex_guardrail_test.sh shared
+```
+
+RED result: exit 1. The custom stdin stream raised `OSError: read failed`,
+which escaped `load_event` instead of producing a verified denial.
+
+GREEN command:
+
+```text
+bash tests/codex_guardrail_test.sh shared && PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile shared/codex/hook_protocol.py shared/codex/security_checks.py && git diff --check
+```
+
+GREEN result: exit 0 with
+`PASS: Codex shared hook protocol and security checks`.
+
+The shared test now also parses every `shared/codex/*.py` file with
+`ast.parse(..., feature_version=(3, 9))`, exercises denial output for stdin
+read/Unicode/recursion failures, validates required field types and permission
+modes, verifies secret denial stdout/stderr never contain the fixture secret,
+and rejects nonexistent, regular-file, empty, and non-string project roots.

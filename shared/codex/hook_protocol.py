@@ -24,6 +24,22 @@ _REQUIRED_FIELDS = (
     "transcript_path",
     "turn_id",
 )
+_REQUIRED_NONEMPTY_STRINGS = (
+    "cwd",
+    "model",
+    "permission_mode",
+    "session_id",
+    "tool_name",
+    "tool_use_id",
+    "turn_id",
+)
+_PERMISSION_MODES = frozenset((
+    "default",
+    "acceptEdits",
+    "plan",
+    "bypassPermissions",
+    "dontAsk",
+))
 
 
 def deny(reason: str) -> NoReturn:
@@ -47,7 +63,7 @@ def load_event(stdin: IO[str]) -> Dict[str, Any]:
     """Load and minimally validate one Codex PreToolUse event, failing closed."""
     try:
         event = json.load(stdin)
-    except (json.JSONDecodeError, TypeError, ValueError):
+    except (OSError, UnicodeError, RecursionError, TypeError, ValueError):
         deny("Invalid Codex hook input")
 
     if not isinstance(event, dict):
@@ -56,7 +72,12 @@ def load_event(stdin: IO[str]) -> Dict[str, Any]:
         deny("Invalid Codex hook input")
     if event.get("hook_event_name") != "PreToolUse":
         deny("Invalid Codex hook input")
-    if not isinstance(event.get("tool_name"), str):
+    if any(
+        not isinstance(event.get(field), str) or not event[field]
+        for field in _REQUIRED_NONEMPTY_STRINGS
+    ):
+        deny("Invalid Codex hook input")
+    if event["permission_mode"] not in _PERMISSION_MODES:
         deny("Invalid Codex hook input")
     if not isinstance(event.get("tool_input"), dict):
         deny("Invalid Codex hook input")
