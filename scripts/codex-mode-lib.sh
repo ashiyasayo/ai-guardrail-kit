@@ -59,11 +59,26 @@ for item in data["installed"]:
     if (expected is None or plugin_id != expected or item.get("marketplaceName") != market
             or item.get("installed") is not True or item.get("enabled") is not True
             or name in seen): raise SystemExit(1)
-    seen.add(name); print(name)
+    seen.add(name)
+for name in sorted(seen): print(name)
 PY
   local result=$?
   rm -f "$listing"
   return $result
+}
+
+agk_file_mode() {
+  local path=$1 mode
+  if mode=$(stat -f '%Lp' "$path" 2>/dev/null); then printf '%s\n' "$mode"; return 0; fi
+  if mode=$(stat -c '%a' "$path" 2>/dev/null); then printf '%s\n' "$mode"; return 0; fi
+  agk_die "could not determine file mode: $path"
+}
+
+agk_copy_mode() {
+  local source=$1 target=$2 mode
+  [[ ${AI_GUARDRAIL_TEST_FAIL_MODE_COPY:-0} != 1 ]] || return 1
+  mode=$(agk_file_mode "$source") || return 1
+  chmod "$mode" "$target"
 }
 
 agk_render_block() {
@@ -117,7 +132,7 @@ PY
   then rm -f "$tmp"; return 1; fi
   if [[ ${AI_GUARDRAIL_TEST_FAIL_CONFIG_WRITE:-0} == 1 ]]; then rm -f "$tmp"; return 70; fi
   agk_validate_config "$project" >/dev/null || { rm -f "$tmp"; return 1; }
-  if [[ -e $config ]]; then chmod --reference="$config" "$tmp" 2>/dev/null || chmod "$(stat -f '%Lp' "$config")" "$tmp" 2>/dev/null || true; fi
+  if [[ -e $config ]] && ! agk_copy_mode "$config" "$tmp"; then rm -f "$tmp"; return 1; fi
   mv "$tmp" "$config"
 }
 

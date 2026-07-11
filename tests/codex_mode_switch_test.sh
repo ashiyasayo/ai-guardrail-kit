@@ -31,6 +31,10 @@ assert_bad_json '{"installed":[{"pluginId":"decomposition-gate@ai-guardrail-kit"
 assert_bad_json '{"installed":[{"pluginId":"wrong@ai-guardrail-kit","name":"decomposition-gate","marketplaceName":"ai-guardrail-kit","installed":true,"enabled":true}]}'
 assert_bad_json '{"installed":[{"pluginId":"decomposition-gate@ai-guardrail-kit","name":"decomposition-gate","marketplaceName":"ai-guardrail-kit","installed":true,"enabled":true},{"pluginId":"decomposition-gate@ai-guardrail-kit","name":"decomposition-gate","marketplaceName":"ai-guardrail-kit","installed":true,"enabled":true}]}'
 assert_bad_json '{"installed":"bad"}'
+assert_bad_json '[]'
+assert_bad_json '{}'
+assert_bad_json '{"installed":["bad"]}'
+assert_bad_json '{"installed":[{"pluginId":7,"name":"decomposition-gate","marketplaceName":"ai-guardrail-kit","installed":true,"enabled":true}]}'
 "$repo/scripts/select-codex-mode" decomposition-gate "$project"
 [[ $first == "$(shasum -a 256 "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'selection not idempotent'
 
@@ -86,6 +90,13 @@ unset FAKE_CODEX_FAIL_OPERATION FAKE_CODEX_FAIL_PLUGIN
 [[ $config_before == "$(shasum -a 256 "$tmp/rollback-add/.codex/config.toml")" ]] || fail 'config changed after remove failure'
 [[ $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'plugins changed after remove failure'
 
+new_project "$tmp/snapshot-copy"; printf 'snapshot-original\n' > "$tmp/snapshot-copy/.codex/config.toml"
+export AI_GUARDRAIL_TEST_FAIL_SNAPSHOT_COPY=1
+if "$repo/scripts/select-codex-mode" harness "$tmp/snapshot-copy" >/dev/null 2>&1; then fail 'snapshot copy failure accepted'; fi
+unset AI_GUARDRAIL_TEST_FAIL_SNAPSHOT_COPY
+[[ $(cat "$tmp/snapshot-copy/.codex/config.toml") == snapshot-original ]] || fail 'snapshot failure mutated config'
+[[ ! -s $AI_GUARDRAIL_TEST_STATE/installed ]] || fail 'snapshot failure mutated plugins'
+
 new_project "$tmp/rollback-write"
 "$repo/scripts/select-codex-mode" harness "$tmp/rollback-write" >/dev/null
 config_before=$(shasum -a 256 "$tmp/rollback-write/.codex/config.toml")
@@ -120,12 +131,39 @@ new_project "$tmp/mode"; printf 'mode-original\n' > "$tmp/mode/.codex/config.tom
 "$repo/scripts/select-codex-mode" harness "$tmp/mode" >/dev/null
 [[ $(stat -f '%Lp' "$tmp/mode/.codex/config.toml") == 640 ]] || fail 'forward write changed mode'
 
-new_project "$tmp/signal"; printf 'harness@ai-guardrail-kit\n' > "$AI_GUARDRAIL_TEST_STATE/installed"; printf 'signal-original\n' > "$tmp/signal/.codex/config.toml"
-FAKE_CODEX_DELAY_OPERATION=remove "$repo/scripts/select-codex-mode" integrated-harness "$tmp/signal" >/dev/null 2>&1 & pid=$!
-sleep 0.2; kill -TERM "$pid"; set +e; wait "$pid"; status=$?; set -e
-[[ $status -eq 143 ]] || fail "TERM status $status"
-grep -Fxq harness@ai-guardrail-kit "$AI_GUARDRAIL_TEST_STATE/installed" || fail 'signal plugin rollback failed'
-[[ $(cat "$tmp/signal/.codex/config.toml") == signal-original ]] || fail 'signal config rollback failed'
+config_before=$(shasum -a 256 "$tmp/mode/.codex/config.toml"); plugins_before=$(cat "$AI_GUARDRAIL_TEST_STATE/installed")
+export AI_GUARDRAIL_TEST_FAIL_MODE_COPY=1
+if "$repo/scripts/select-codex-mode" integrated-harness "$tmp/mode" >/dev/null 2>&1; then fail 'mode copy failure accepted'; fi
+unset AI_GUARDRAIL_TEST_FAIL_MODE_COPY
+[[ $config_before == "$(shasum -a 256 "$tmp/mode/.codex/config.toml")" ]] || fail 'mode failure changed config'
+[[ $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'mode failure changed plugins'
+[[ $(stat -f '%Lp' "$tmp/mode/.codex/config.toml") == 640 ]] || fail 'mode failure rollback changed mode'
+
+new_project "$tmp/order"; printf 'harness@ai-guardrail-kit\ndecomposition-gate@ai-guardrail-kit\n' > "$AI_GUARDRAIL_TEST_STATE/installed"
+export FAKE_CODEX_FAIL_OPERATION='remove:2'
+output=$("$repo/scripts/select-codex-mode" integrated-harness "$tmp/order" 2>&1) && fail 'ordered rollback setup accepted'
+unset FAKE_CODEX_FAIL_OPERATION
+grep -Fq 'rollback succeeded' <<<"$output" || fail 'set-equivalent rollback order reported failure'
+
+for signal_case in TERM:143 HUP:129; do
+  signal=${signal_case%%:*}; expected=${signal_case#*:}
+  new_project "$tmp/signal-$signal"; printf 'harness@ai-guardrail-kit\n' > "$AI_GUARDRAIL_TEST_STATE/installed"; printf 'signal-original\n' > "$tmp/signal-$signal/.codex/config.toml"
+  FAKE_CODEX_DELAY_OPERATION=remove "$repo/scripts/select-codex-mode" integrated-harness "$tmp/signal-$signal" >/dev/null 2>&1 & pid=$!
+  sleep 0.2; kill -"$signal" "$pid"; set +e; wait "$pid"; status=$?; set -e
+  [[ $status -eq $expected ]] || fail "$signal status $status"
+  grep -Fxq harness@ai-guardrail-kit "$AI_GUARDRAIL_TEST_STATE/installed" || fail "$signal plugin rollback failed"
+  [[ $(cat "$tmp/signal-$signal/.codex/config.toml") == signal-original ]] || fail "$signal config rollback failed"
+done
+
+new_project "$tmp/signal-INT"; printf 'harness@ai-guardrail-kit\n' > "$AI_GUARDRAIL_TEST_STATE/installed"; printf 'signal-original\n' > "$tmp/signal-INT/.codex/config.toml"
+FAKE_CODEX_DELAY_OPERATION=remove python3 - "$repo/scripts/select-codex-mode" "$tmp/signal-INT" <<'PY' || fail 'INT status or rollback failed'
+import os, signal, subprocess, sys, time
+p = subprocess.Popen([sys.argv[1], "integrated-harness", sys.argv[2]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+time.sleep(.2); p.send_signal(signal.SIGINT)
+raise SystemExit(0 if p.wait() == 130 else 1)
+PY
+grep -Fxq harness@ai-guardrail-kit "$AI_GUARDRAIL_TEST_STATE/installed" || fail 'INT plugin rollback failed'
+[[ $(cat "$tmp/signal-INT/.codex/config.toml") == signal-original ]] || fail 'INT config rollback failed'
 
 printf 'unrelated@elsewhere\n' >> "$AI_GUARDRAIL_TEST_STATE/installed"
 "$repo/scripts/select-codex-mode" decomposition-gate "$tmp/rollback-write" >/dev/null

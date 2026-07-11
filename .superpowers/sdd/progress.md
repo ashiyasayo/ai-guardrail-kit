@@ -1,3 +1,5 @@
 Task 1: complete (commits a7f3036..b0e3cc2, review clean; validator unavailable because environment lacks PyYAML)
 Task 2: complete (commits b0e3cc2..6542417, review clean)
+Task 3: complete (commits 6542417..36d8a9f, review clean)
 Task 3: complete (native ask remediation, conservative find classification, and external traversal/symlink adversarial coverage; all Codex and relevant Claude suites pass)
+Task 4: complete (checked pre-mutation snapshots, deterministic mode preservation and rollback verification, canonical plugin snapshots, signal and malformed JSON coverage; switch/marketplace suites, syntax, and diff checks pass)
