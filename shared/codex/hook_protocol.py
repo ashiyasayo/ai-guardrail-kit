@@ -33,15 +33,6 @@ _REQUIRED_NONEMPTY_STRINGS = (
     "tool_use_id",
     "turn_id",
 )
-_PERMISSION_MODES = frozenset((
-    "default",
-    "acceptEdits",
-    "plan",
-    "bypassPermissions",
-    "dontAsk",
-))
-
-
 def deny(reason: str) -> NoReturn:
     """Emit a Codex PreToolUse denial and terminate successfully.
 
@@ -76,8 +67,6 @@ def load_event(stdin: IO[str]) -> Dict[str, Any]:
         not isinstance(event.get(field), str) or not event[field]
         for field in _REQUIRED_NONEMPTY_STRINGS
     ):
-        deny("Invalid Codex hook input")
-    if event["permission_mode"] not in _PERMISSION_MODES:
         deny("Invalid Codex hook input")
     if not isinstance(event.get("tool_input"), dict):
         deny("Invalid Codex hook input")

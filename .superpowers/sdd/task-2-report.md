@@ -105,3 +105,32 @@ The shared test now also parses every `shared/codex/*.py` file with
 read/Unicode/recursion failures, validates required field types and permission
 modes, verifies secret denial stdout/stderr never contain the fixture secret,
 and rejects nonexistent, regular-file, empty, and non-string project roots.
+
+## Permission-mode review fix RED/GREEN evidence
+
+The installed-schema evidence establishes `permission_mode` as a required
+string, but does not establish a closed enum. The validator therefore enforces
+the established nonempty-string contract without hard-coding current mode
+names, so future Codex modes remain forward compatible.
+
+RED command:
+
+```text
+bash tests/codex_guardrail_test.sh shared
+```
+
+RED result: exit 1 with
+`AssertionError: unfamiliar nonempty permission mode was denied`.
+
+GREEN command:
+
+```text
+bash tests/codex_guardrail_test.sh shared && python3 -m py_compile shared/codex/hook_protocol.py shared/codex/security_checks.py
+```
+
+GREEN result: exit 0 with
+`PASS: Codex shared hook protocol and security checks`.
+
+The regression accepts an otherwise valid event using
+`futurePermissionMode`, while the existing coverage continues to deny empty
+and non-string `permission_mode` values.

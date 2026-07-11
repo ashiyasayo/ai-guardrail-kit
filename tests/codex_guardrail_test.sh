@@ -88,7 +88,16 @@ for field in ("cwd", "model", "permission_mode", "session_id", "tool_name", "too
     else:
         raise AssertionError(f"non-string {field} was accepted")
 
-for invalid_mode in ("invalid", ""):
+unfamiliar_mode = event("allow.json")
+unfamiliar_mode["permission_mode"] = "futurePermissionMode"
+try:
+    with contextlib.redirect_stdout(io.StringIO()):
+        loaded_unfamiliar_mode = protocol.load_event(io.StringIO(json.dumps(unfamiliar_mode)))
+except SystemExit as exc:
+    raise AssertionError("unfamiliar nonempty permission mode was denied") from exc
+assert loaded_unfamiliar_mode == unfamiliar_mode
+
+for invalid_mode in ("",):
     invalid = event("allow.json")
     invalid["permission_mode"] = invalid_mode
     try:
