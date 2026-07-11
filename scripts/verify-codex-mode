@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+script_dir=$(cd "$(dirname "$0")" && pwd -P)
+repo=$(cd "$script_dir/.." && pwd -P)
+# shellcheck source=codex-mode-lib.sh
+source "$script_dir/codex-mode-lib.sh"
+
+expected=''
+if [[ $# -gt 0 ]] && agk_valid_mode "$1"; then expected=$1; shift; fi
+[[ $# -le 1 ]] || { agk_die 'usage: verify-codex-mode [expected-mode] [project-dir]'; exit 2; }
+project=$(agk_resolve_project "${1:-.}") || exit 1
+agk_validate_config "$project" || exit 1
+mapfile_cmd=false
+installed=$(agk_installed_modes) || { agk_die 'could not inspect installed plugins'; exit 1; }
+count=$(printf '%s\n' "$installed" | awk 'NF { n++ } END { print n+0 }')
+[[ $count -eq 1 ]] || { agk_die "expected exactly one installed managed plugin, found $count"; exit 1; }
+mode=$(printf '%s\n' "$installed" | awk 'NF { print; exit }')
+[[ -z $expected || $expected == "$mode" ]] || { agk_die "installed mode $mode does not match expected $expected"; exit 1; }
+
+config="$project/.codex/config.toml"
+[[ -f $config ]] || { agk_die 'managed config block is missing'; exit 1; }
+actual=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-actual.XXXXXX")
+wanted=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-wanted.XXXXXX")
+trap 'rm -f "$actual" "$wanted"' EXIT
+python3 - "$config" "$actual" "$AGK_BEGIN" "$AGK_END" <<'PY'
+import pathlib, sys
+source, target = map(pathlib.Path, sys.argv[1:3]); begin, end = sys.argv[3:5]
+s = source.read_text()
+if s.count(begin) != 1 or s.count(end) != 1:
+    raise SystemExit(1)
+start, finish = s.index(begin), s.index(end) + len(end)
+target.write_text(s[start:finish] + "\n")
+PY
+agk_render_block "$mode" "$repo" > "$wanted"
+cmp -s "$actual" "$wanted" || { agk_die "managed hooks do not match installed mode $mode"; exit 1; }
+while IFS= read -r path; do
+  [[ -f $path && -x $path ]] || { agk_die "hook file is not executable: $path"; exit 1; }
+done < <(sed -n 's|^command = "python3 \(.*\.py\)"$|\1|p' "$actual")
+command -v python3 >/dev/null || { agk_die 'python3 executable is unavailable'; exit 1; }
+python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 9))' || { agk_die 'Python 3.9 or newer is required'; exit 1; }
+printf 'Verified Codex mode %s.\n' "$mode"

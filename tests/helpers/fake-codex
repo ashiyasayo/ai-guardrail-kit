@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+state=${AI_GUARDRAIL_TEST_STATE:?AI_GUARDRAIL_TEST_STATE is required}
+mkdir -p "$state"
+installed="$state/installed"
+touch "$installed"
+
+fail_if_requested() {
+  local operation=$1 plugin=${2:-}
+  if [[ ${FAKE_CODEX_FAIL_OPERATION:-} == "$operation" &&
+        ( -z ${FAKE_CODEX_FAIL_PLUGIN:-} || ${FAKE_CODEX_FAIL_PLUGIN} == "$plugin" ) ]]; then
+    printf 'fake codex: forced %s failure for %s\n' "$operation" "$plugin" >&2
+    exit 42
+  fi
+}
+
+[[ ${1:-} == plugin ]] || { printf 'fake codex: unsupported command\n' >&2; exit 2; }
+case ${2:-} in
+  list)
+    fail_if_requested list
+    python3 - "$installed" <<'PY'
+import json, pathlib, sys
+names = [x for x in pathlib.Path(sys.argv[1]).read_text().splitlines() if x]
+print(json.dumps({"installed": [
+    {"pluginId": n, "name": n.split("@", 1)[0],
+     "marketplaceName": n.split("@", 1)[1], "installed": True,
+     "enabled": True} for n in names
+]}))
+PY
+    ;;
+  add)
+    plugin=${3:?missing plugin}; fail_if_requested add "$plugin"
+    grep -Fxq "$plugin" "$installed" || printf '%s\n' "$plugin" >> "$installed"
+    ;;
+  remove)
+    plugin=${3:?missing plugin}; fail_if_requested remove "$plugin"
+    tmp="$state/installed.tmp"
+    grep -Fxv "$plugin" "$installed" > "$tmp" || true
+    mv "$tmp" "$installed"
+    ;;
+  *) printf 'fake codex: unsupported plugin operation\n' >&2; exit 2 ;;
+esac
