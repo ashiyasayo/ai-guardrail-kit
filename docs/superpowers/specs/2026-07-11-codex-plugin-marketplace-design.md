@@ -47,6 +47,9 @@ scripts/
 ├── select-codex-mode
 └── verify-codex-mode
 
+.codex/
+└── config.toml                 # selector-managed project hook activation
+
 tests/
 ├── codex_marketplace_test.sh
 ├── codex_mode_switch_test.sh
@@ -66,9 +69,16 @@ required installation policy, authentication policy, and category metadata.
 
 Each plugin has its own normalized name and semantic version. Its
 `.codex-plugin/plugin.json` contains only fields supported by Codex validation.
-Hook companion files are packaged separately rather than represented through an
-unsupported manifest field. Skills describe the user-visible workflow; hooks
-provide deterministic enforcement.
+Skills describe the user-visible workflow; hook executables provide deterministic
+enforcement.
+
+Codex currently exposes stable hooks but does not expose plugin-installed hooks as
+an active plugin capability (`plugin_hooks` is removed). Installing a plugin alone
+therefore cannot activate its hook executables. The selector installs the plugin
+content and manages a clearly delimited hook block in the target project's
+`.codex/config.toml`. This project configuration references the selected plugin's
+hook executables. The selector preserves all configuration outside its managed
+block.
 
 Local development updates use the Codex cachebuster and reinstall flow. The
 marketplace file is not hand-edited as part of an update operation. After a mode
@@ -77,9 +87,10 @@ skills and hooks are loaded cleanly.
 
 ## Mutual Exclusion and Mode Selection
 
-Codex marketplace metadata is not treated as a native mutual-exclusion system.
-The repository enforces the invariant through `select-codex-mode` and
-`verify-codex-mode`.
+Codex marketplace metadata is not treated as a native mutual-exclusion system,
+and plugin installation does not activate plugin hooks. The repository enforces
+the invariant through `select-codex-mode`, `verify-codex-mode`, and the selector-
+managed project hook configuration.
 
 The selector accepts exactly one of:
 
@@ -92,24 +103,35 @@ integrated-harness
 Its operation is:
 
 1. Validate the requested name and marketplace before changing installed state.
-2. Read the installed state of all three managed plugins.
-3. Remove the two non-target modes.
-4. Install or update the requested mode from the repository marketplace.
-5. Run the verifier and require exactly the requested mode to remain.
+2. Validate that the project's `.codex/config.toml` can be read and updated while
+   preserving configuration outside the managed hook block.
+3. Read the installed state of all three managed plugins and save the current
+   managed hook block for rollback.
+4. Remove the two non-target modes.
+5. Install or update the requested mode from the repository marketplace.
+6. Atomically replace the managed hook block with the target mode's hooks.
+7. Run the verifier and require exactly the requested plugin and hook set to
+   remain.
 
-An invalid mode or marketplace causes no state change. If target installation
-fails after another mode was removed, the selector attempts to restore the
-previous mode. It exits unsuccessfully and reports whether restoration succeeded;
-it never reports a successful switch unless final verification passes.
+An invalid mode, marketplace, or uneditable project configuration causes no state
+change. If target installation or hook activation fails after another mode was
+removed, the selector attempts to restore both the previous plugin and the
+previous managed hook block. Configuration writes use a temporary sibling file
+and atomic rename. The selector exits unsuccessfully and reports whether
+restoration succeeded; it never reports a successful switch unless final
+verification passes.
 
 The verifier supports both human use and CI. It fails when more than one managed
-mode is installed. During a completed selection it also checks that the expected
-target is the sole installed mode.
+mode is installed, when the managed hook block does not match the installed mode,
+or when one side is absent. During a completed selection it checks that the
+expected target is both the sole installed plugin and the sole active managed
+hook set.
 
-Direct use of the Codex plugin CLI can bypass the selector. Documentation must
-state this boundary, and each mode must fail closed when it can reliably detect a
-conflicting managed mode at runtime. The project does not claim marketplace-level
-native exclusion.
+Direct use of the Codex plugin CLI can bypass the selector and `codex plugin
+remove` does not clean the project hook block. Documentation must state this
+boundary and direct installation, switching, and removal through the repository
+commands. The project does not claim marketplace-level native exclusion or
+plugin-managed hook activation.
 
 ## Guardrail Behavior
 
@@ -156,8 +178,10 @@ complete sandbox. Documentation preserves this limitation and recommends Codex
 permissions, secret managers, static analysis, and human review as complementary
 controls.
 
-The selector limits its mutations to the three marketplace-managed plugin names.
-It does not alter unrelated plugins or Codex configuration.
+The selector limits plugin mutations to the three marketplace-managed names. It
+alters only its delimited block in project `.codex/config.toml`; unrelated plugins
+and configuration are preserved byte-for-byte. Symlinked or non-regular config
+targets are rejected unless a later design explicitly defines safe handling.
 
 ## Testing
 
@@ -169,7 +193,10 @@ Implementation follows test-first development. Automated tests cover:
 - all six transitions between distinct modes;
 - idempotent selection of the already active mode;
 - restoration reporting after simulated installation failure;
+- atomic rollback after simulated hook-configuration failure;
 - conflict detection when two or more modes appear installed;
+- mismatch detection between installed mode and active managed hooks;
+- preservation of unrelated `.codex/config.toml` content;
 - decomposition rejection for missing and malformed artifacts and acceptance of a
   valid artifact;
 - approval rejection when absent or expired and acceptance when valid;
@@ -190,8 +217,8 @@ The Codex phase is complete when:
 1. The repository marketplace validates and exposes all three plugins.
 2. Each plugin contains Codex-native workflow and enforcement behavior matching
    its documented product scope.
-3. The selector safely switches among all modes and final state always satisfies
-   mutual exclusion after a reported success.
+3. The selector safely switches among all modes and final plugin plus project-hook
+   state always satisfies mutual exclusion after a reported success.
 4. Guardrail and switching regression tests pass in isolation.
 5. Existing Claude tests remain unchanged and pass.
 6. Installation, selection, update, verification, limitations, and new-thread
