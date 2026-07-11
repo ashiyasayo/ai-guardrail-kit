@@ -97,6 +97,36 @@ unset AI_GUARDRAIL_TEST_FAIL_SNAPSHOT_COPY
 [[ $(cat "$tmp/snapshot-copy/.codex/config.toml") == snapshot-original ]] || fail 'snapshot failure mutated config'
 [[ ! -s $AI_GUARDRAIL_TEST_STATE/installed ]] || fail 'snapshot failure mutated plugins'
 
+new_project "$tmp/snapshot-list"; mkdir "$tmp/snapshot-tmp"
+export TMPDIR="$tmp/snapshot-tmp" FAKE_CODEX_FAIL_OPERATION=list
+if "$repo/scripts/select-codex-mode" harness "$tmp/snapshot-list" >/dev/null 2>&1; then fail 'snapshot list failure accepted'; fi
+unset FAKE_CODEX_FAIL_OPERATION TMPDIR
+if compgen -G "$tmp/snapshot-tmp/ai-guardrail-rollback.*" >/dev/null; then fail 'snapshot list failure leaked rollback directory'; fi
+
+new_project "$tmp/zero-write"
+export AI_GUARDRAIL_TEST_FAIL_CONFIG_WRITE=1
+output=$("$repo/scripts/select-codex-mode" harness "$tmp/zero-write" 2>&1) && fail 'zero-plugin write failure accepted'
+unset AI_GUARDRAIL_TEST_FAIL_CONFIG_WRITE
+grep -Fq 'rollback succeeded' <<<"$output" || fail 'zero-plugin write rollback reported failure'
+[[ ! -s $AI_GUARDRAIL_TEST_STATE/installed ]] || fail 'zero-plugin write failure not rolled back'
+[[ ! -e $tmp/zero-write/.codex/config.toml ]] || fail 'zero-plugin write created config'
+
+new_project "$tmp/zero-verify"
+export FAKE_CODEX_FAIL_OPERATION='list:2'
+output=$("$repo/scripts/select-codex-mode" harness "$tmp/zero-verify" 2>&1) && fail 'zero-plugin verification failure accepted'
+unset FAKE_CODEX_FAIL_OPERATION
+grep -Fq 'rollback succeeded' <<<"$output" || fail 'zero-plugin verification rollback reported failure'
+[[ ! -s $AI_GUARDRAIL_TEST_STATE/installed ]] || fail 'zero-plugin verification failure not rolled back'
+[[ ! -e $tmp/zero-verify/.codex/config.toml ]] || fail 'zero-plugin verification left config'
+
+new_project "$tmp/zero-signal"
+FAKE_CODEX_DELAY_AFTER_OPERATION=add "$repo/scripts/select-codex-mode" harness "$tmp/zero-signal" >/dev/null 2>&1 & pid=$!
+for _ in {1..50}; do [[ -s $AI_GUARDRAIL_TEST_STATE/installed ]] && break; sleep 0.02; done
+kill -TERM "$pid"; set +e; wait "$pid"; status=$?; set -e
+[[ $status -eq 143 ]] || fail "zero-plugin TERM status $status"
+[[ ! -s $AI_GUARDRAIL_TEST_STATE/installed ]] || fail 'zero-plugin TERM rollback failed'
+[[ ! -e $tmp/zero-signal/.codex/config.toml ]] || fail 'zero-plugin TERM created config'
+
 new_project "$tmp/rollback-write"
 "$repo/scripts/select-codex-mode" harness "$tmp/rollback-write" >/dev/null
 config_before=$(shasum -a 256 "$tmp/rollback-write/.codex/config.toml")

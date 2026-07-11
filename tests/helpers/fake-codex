@@ -42,6 +42,7 @@ PY
   add)
     plugin=${3:?missing plugin}; count_operation add; fail_if_requested add "$plugin"
     grep -Fxq "$plugin" "$installed" || printf '%s\n' "$plugin" >> "$installed"
+    if [[ ${FAKE_CODEX_DELAY_AFTER_OPERATION:-} == add ]]; then sleep 2; fi
     ;;
   remove)
     plugin=${3:?missing plugin}; count_operation remove; fail_if_requested remove "$plugin"

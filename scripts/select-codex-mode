@@ -12,6 +12,7 @@ agk_validate_config "$project" || exit 1
 
 config="$project/.codex/config.toml"
 snapshot=$(mktemp -d "${TMPDIR:-/tmp}/ai-guardrail-rollback.XXXXXX") || exit 1
+trap '(( BASH_SUBSHELL > 0 )) || rm -rf "$snapshot"' EXIT
 config_existed=0
 if [[ -e $config ]]; then
   # Validation and snapshotting cannot be atomic across this external path; the
@@ -24,7 +25,7 @@ fi
 if ! agk_installed_modes > "$snapshot/modes"; then agk_die 'could not inspect installed plugins'; exit 1; fi
 
 rollback() {
-  local failed=0 current old m
+  local failed=0 current original old m
   if ! current=$(agk_installed_modes 2>/dev/null); then failed=1; current=''; fi
   for m in "${AGK_MODES[@]}"; do
     if grep -Fxq "$m" <<<"$current" && ! grep -Fxq "$m" "$snapshot/modes"; then
@@ -37,7 +38,8 @@ rollback() {
     grep -Fxq "$old" <<<"$current" || codex plugin add "$(agk_plugin_path "$old")" >/dev/null 2>&1 || failed=1
   done < "$snapshot/modes"
   agk_restore_config "$project" "$snapshot/config" "$config_existed" || failed=1
-  if ! current=$(agk_installed_modes 2>/dev/null) || ! cmp -s "$snapshot/modes" <(printf '%s\n' "$current") ||
+  original=$(<"$snapshot/modes")
+  if ! current=$(agk_installed_modes 2>/dev/null) || [[ $original != "$current" ]] ||
      { [[ $config_existed == 1 ]] && ! cmp -s "$snapshot/config" "$config"; } ||
      { [[ $config_existed == 1 ]] && [[ $(agk_file_mode "$snapshot/config") != $(agk_file_mode "$config") ]]; } ||
      { [[ $config_existed == 0 ]] && [[ -e $config ]]; }; then failed=1; fi
