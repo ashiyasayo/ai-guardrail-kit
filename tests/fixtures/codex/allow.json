@@ -1,0 +1,12 @@
+{
+  "cwd": "/tmp",
+  "hook_event_name": "PreToolUse",
+  "model": "gpt-5",
+  "permission_mode": "default",
+  "session_id": "session-test",
+  "tool_input": {"command": "git status --short"},
+  "tool_name": "Bash",
+  "tool_use_id": "tool-test",
+  "transcript_path": null,
+  "turn_id": "turn-test"
+}
