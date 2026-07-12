@@ -5,6 +5,7 @@
 .claude/skills/
 .codex/
 .shared/
+.superpowers/
 docs/
 __pycache__/
 *.pyc
