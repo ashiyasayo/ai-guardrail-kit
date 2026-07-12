@@ -23,7 +23,8 @@ lifecycle tooling:
 
 ```text
 claude/
-├── marketplace.json
+├── .claude-plugin/
+│   └── marketplace.json
 └── plugins/
     ├── decomposition-gate/
     ├── harness/
@@ -51,7 +52,8 @@ approval semantics, and lifecycle contracts differ.
 
 ## Marketplace and Plugin Packaging
 
-The repository exposes one Claude Code marketplace with exactly three local
+The repository exposes one Claude Code marketplace at Claude's native
+`.claude-plugin/marketplace.json` path with exactly three local
 plugin entries. Each entry identifies one complete plugin package with a valid
 manifest, normalized name, and semantic version.
 
