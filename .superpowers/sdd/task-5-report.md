@@ -77,3 +77,9 @@ gaps, which Task 5 cannot truthfully paper over:
 The user-facing cachebuster example uses a portable
 `<plugin-creator-skill-root>` placeholder rather than a developer-specific
 absolute path.
+
+## Blocking product-fix addendum
+
+The manual workaround is superseded by transactional refresh and the exact safe
+remove/absence-verification commands. The unexplained plugin-creator placeholder
+was removed from user documentation.

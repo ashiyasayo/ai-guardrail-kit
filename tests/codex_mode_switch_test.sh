@@ -36,7 +36,26 @@ assert_bad_json '{}'
 assert_bad_json '{"installed":["bad"]}'
 assert_bad_json '{"installed":[{"pluginId":7,"name":"decomposition-gate","marketplaceName":"ai-guardrail-kit","installed":true,"enabled":true}]}'
 "$repo/scripts/select-codex-mode" decomposition-gate "$project"
-[[ $first == "$(shasum -a 256 "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'selection not idempotent'
+[[ $(<"$AI_GUARDRAIL_TEST_STATE/add.count") -eq 2 ]] || fail 'same mode was not refreshed'
+[[ $first == "$(shasum -a 256 "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'refresh changed final state'
+
+config_before=$(shasum -a 256 "$project/.codex/config.toml"); plugins_before=$(cat "$AI_GUARDRAIL_TEST_STATE/installed")
+export FAKE_CODEX_FAIL_OPERATION=add:3
+if "$repo/scripts/select-codex-mode" decomposition-gate "$project" >/dev/null 2>&1; then fail 'refresh add failure accepted'; fi
+unset FAKE_CODEX_FAIL_OPERATION
+[[ $config_before == "$(shasum -a 256 "$project/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'refresh add failure not rolled back'
+
+printf '%s\n' unrelated@elsewhere >> "$AI_GUARDRAIL_TEST_STATE/installed"
+before_bytes=$(shasum -a 256 "$project/.codex/config.toml")
+"$repo/scripts/select-codex-mode" --remove "$project"
+"$repo/scripts/verify-codex-mode" --no-managed-mode "$project" >/dev/null || fail 'removed mode did not verify'
+grep -Fxq unrelated@elsewhere "$AI_GUARDRAIL_TEST_STATE/installed" || fail 'remove deleted unrelated plugin'
+grep -Fq 'prefix = "unchanged"' "$project/.codex/config.toml" || fail 'remove changed unrelated config'
+grep -Fq '# suffix stays too' "$project/.codex/config.toml" || fail 'remove changed suffix'
+! grep -Fq '# ai-guardrail-kit:begin' "$project/.codex/config.toml" || fail 'remove retained managed block'
+removed=$(shasum -a 256 "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")
+"$repo/scripts/select-codex-mode" --remove "$project"
+[[ $removed == "$(shasum -a 256 "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'remove not idempotent'
 
 for from in decomposition-gate harness integrated-harness; do
   for to in decomposition-gate harness integrated-harness; do

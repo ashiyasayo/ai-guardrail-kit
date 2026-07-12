@@ -6,13 +6,21 @@ repo=$(cd "$script_dir/.." && pwd -P)
 source "$script_dir/codex-mode-lib.sh"
 
 expected=''
+no_managed=0
+if [[ ${1:-} == --no-managed-mode ]]; then no_managed=1; shift; fi
 if [[ $# -gt 0 ]] && agk_valid_mode "$1"; then expected=$1; shift; fi
-[[ $# -le 1 ]] || { agk_die 'usage: verify-codex-mode [expected-mode] [project-dir]'; exit 2; }
+[[ $# -le 1 ]] || { agk_die 'usage: verify-codex-mode [--no-managed-mode | expected-mode] [project-dir]'; exit 2; }
 project=$(agk_resolve_project "${1:-.}") || exit 1
 agk_validate_config "$project" || exit 1
 mapfile_cmd=false
 installed=$(agk_installed_modes) || { agk_die 'could not inspect installed plugins'; exit 1; }
 count=$(printf '%s\n' "$installed" | awk 'NF { n++ } END { print n+0 }')
+if (( no_managed )); then
+  [[ $count -eq 0 ]] || { agk_die "expected no installed managed plugin, found $count"; exit 1; }
+  config="$project/.codex/config.toml"
+  [[ ! -e $config ]] || ! grep -Fq "$AGK_BEGIN" "$config" || { agk_die 'managed config block remains'; exit 1; }
+  printf 'Verified no managed Codex mode.\n'; exit 0
+fi
 [[ $count -eq 1 ]] || { agk_die "expected exactly one installed managed plugin, found $count"; exit 1; }
 mode=$(printf '%s\n' "$installed" | awk 'NF { print; exit }')
 [[ -z $expected || $expected == "$mode" ]] || { agk_die "installed mode $mode does not match expected $expected"; exit 1; }

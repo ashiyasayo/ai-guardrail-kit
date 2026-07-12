@@ -84,3 +84,8 @@ rename operations. The implementation minimizes this interval and rejects both
 `.codex` and config symlinks at initial validation and immediately before every
 forward or rollback filesystem mutation. A native helper using `openat(2)` and
 `renameat(2)` would be required to close that residual boundary completely.
+
+## Blocking product-fix addendum
+
+Added transactional same-mode refresh and selector-owned `--remove`, including
+explicit no-managed-mode verification and preservation of unrelated state.

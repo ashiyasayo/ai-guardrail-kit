@@ -57,35 +57,31 @@ targets. Run the verifier after any suspected state change:
 ```
 
 Direct `codex plugin add/remove` can desynchronize installed plugin state from
-the project hook block. Use `scripts/select-codex-mode` for ordinary installation
-and switching. The repository currently has no full-uninstall command: do not
-present a direct plugin removal as safe removal, because `codex plugin remove`
-does not remove the managed project hooks. A complete removal must coordinate
-both states; until dedicated tooling exists, retain a verified selected mode or
-perform a reviewed manual removal of both the owned block and managed plugin.
+the project hook block. Use the selector for installation, switching, refreshing,
+and safe removal:
+
+```bash
+./scripts/select-codex-mode --remove /path/to/project
+./scripts/verify-codex-mode --no-managed-mode /path/to/project
+```
+
+Removal transactionally removes all managed plugins and only the selector-owned
+config block. Unrelated plugins and config bytes are preserved. Repeating it is
+safe.
 
 ## Local update workflow
 
 Codex caches installed local plugin content. During repository development,
-update the selected plugin manifest with the official plugin-creator cachebuster
-helper (replace `<mode>`), then reinstall that plugin from this configured local
-marketplace:
+refresh the selected plugin transactionally through the selector:
 
 ```bash
-python3 <plugin-creator-skill-root>/scripts/update_plugin_cachebuster.py codex/plugins/<mode>
-codex plugin add <mode>@ai-guardrail-kit
 ./scripts/select-codex-mode <mode> .
 ./scripts/verify-codex-mode <mode> .
 ```
 
-The helper replaces a single `+codex.<cachebuster>` suffix; do not hand-edit
-`codex/marketplace.json` merely to refresh cached content. The direct add above is
-only the documented reinstall step and must be followed by selector and verifier
-reconciliation. Unlike normal selector switching, this update sequence is not one
-transaction: keep a backup and treat any failed add or reconciliation as an
-incomplete update. The current selector skips reinstall when the selected mode is
-already installed, so running the selector alone does not refresh cached plugin
-content. Start a new thread afterward.
+The selector removes and re-adds an already selected target, so the same command
+refreshes cached plugin content with transactional rollback. Start a new thread
+afterward.
 
 ## Failure, rollback, and security boundaries
 

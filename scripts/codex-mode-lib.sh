@@ -136,6 +136,28 @@ PY
   mv "$tmp" "$config"
 }
 
+agk_remove_config_block() {
+  local project=$1 config="$1/.codex/config.toml" tmp
+  [[ -e $config ]] || return 0
+  tmp=$(mktemp "$project/.codex/.config.toml.ai-guardrail.XXXXXX") || return 1
+  if ! python3 - "$config" "$tmp" "$AGK_BEGIN" "$AGK_END" <<'PY'
+import pathlib, sys
+source, target = map(pathlib.Path, sys.argv[1:3]); begin, end = map(str.encode, sys.argv[3:5])
+old = source.read_bytes()
+if begin not in old:
+    target.write_bytes(old); raise SystemExit
+start = old.index(begin); finish = old.index(end, start) + len(end)
+if finish < len(old) and old[finish:finish+2] == b"\r\n": finish += 2
+elif finish < len(old) and old[finish:finish+1] == b"\n": finish += 1
+target.write_bytes(old[:start] + old[finish:])
+PY
+  then rm -f "$tmp"; return 1; fi
+  [[ ${AI_GUARDRAIL_TEST_FAIL_CONFIG_WRITE:-0} != 1 ]] || { rm -f "$tmp"; return 70; }
+  agk_validate_config "$project" >/dev/null || { rm -f "$tmp"; return 1; }
+  agk_copy_mode "$config" "$tmp" || { rm -f "$tmp"; return 1; }
+  mv "$tmp" "$config"
+}
+
 
 agk_restore_config() {
   local project=$1 snapshot=$2 existed=$3 config="$1/.codex/config.toml" tmp

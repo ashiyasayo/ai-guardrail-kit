@@ -6,7 +6,8 @@ repo=$(cd "$script_dir/.." && pwd -P)
 source "$script_dir/codex-mode-lib.sh"
 
 mode=${1:-}
-agk_valid_mode "$mode" || { agk_die "expected one of: decomposition-gate, harness, integrated-harness"; exit 2; }
+remove=0
+if [[ $mode == --remove ]]; then remove=1; else agk_valid_mode "$mode" || { agk_die "expected --remove or one of: decomposition-gate, harness, integrated-harness"; exit 2; }; fi
 project=$(agk_resolve_project "${2:-.}") || exit 1
 agk_validate_config "$project" || exit 1
 
@@ -54,17 +55,22 @@ trap 'on_signal INT 130' INT
 trap 'on_signal TERM 143' TERM
 trap 'on_signal HUP 129' HUP
 for other in "${AGK_MODES[@]}"; do
-  [[ $other == "$mode" ]] && continue
   if grep -Fxq "$other" "$snapshot/modes"; then
     codex plugin remove "$(agk_plugin_path "$other")" >/dev/null || { rollback; exit 1; }
   fi
 done
-if ! grep -Fxq "$mode" "$snapshot/modes"; then
+if (( ! remove )); then
   codex plugin add "$(agk_plugin_path "$mode")" >/dev/null || { rollback; exit 1; }
 fi
 
-block="$snapshot/block"
-agk_render_block "$mode" "$repo" > "$block"
-agk_replace_config "$project" "$block" || { rollback; exit 1; }
-if ! "$script_dir/verify-codex-mode" "$mode" "$project" >/dev/null; then rollback; exit 1; fi
-printf 'Selected Codex mode %s; start a new thread to activate it.\n' "$mode"
+if (( remove )); then
+  agk_remove_config_block "$project" || { rollback; exit 1; }
+  "$script_dir/verify-codex-mode" --no-managed-mode "$project" >/dev/null || { rollback; exit 1; }
+  printf 'Removed Codex guardrail mode; start a new thread to deactivate it.\n'
+else
+  block="$snapshot/block"
+  agk_render_block "$mode" "$repo" > "$block"
+  agk_replace_config "$project" "$block" || { rollback; exit 1; }
+  "$script_dir/verify-codex-mode" "$mode" "$project" >/dev/null || { rollback; exit 1; }
+  printf 'Selected Codex mode %s; start a new thread to activate it.\n' "$mode"
+fi

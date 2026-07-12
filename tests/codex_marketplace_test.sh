@@ -44,13 +44,15 @@ required = {
  'codex plugin marketplace add "$(pwd)/codex"': 'marketplace add command',
  './scripts/select-codex-mode decomposition-gate .': 'selector command',
  './scripts/verify-codex-mode decomposition-gate .': 'verifier command',
+ './scripts/select-codex-mode --remove /path/to/project': 'safe remove command',
+ './scripts/verify-codex-mode --no-managed-mode /path/to/project': 'removed-state verifier command',
  '.codex/config.toml': 'managed config path',
  '# ai-guardrail-kit:begin': 'managed block delimiter',
  'Python 3.9': 'Python minimum',
  'new thread': 'new-thread activation instruction',
  'native Codex `ask`': 'native approval semantics',
  'codex plugin add/remove': 'direct CLI desynchronization boundary',
- 'cachebuster': 'local update workflow',
+ 'refresh': 'local update workflow',
  'TOCTOU': 'selector race limitation',
 }
 for needle, label in required.items():
