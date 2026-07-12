@@ -15,45 +15,37 @@ case $target in
 esac
 project=${1:-.}
 [[ -d $project ]] || { printf 'project directory does not exist: %s\n' "$project" >&2; exit 1; }
+project=$(cd "$project" && pwd -P) || exit 1
+if (( ! empty )); then agk_claude_validate_package "$repo" "$target" || { printf 'Claude package validation failed\n' >&2; exit 1; }; fi
 
-effective=$(agk_claude_effective_modes) || { printf 'could not inspect Claude plugin state\n' >&2; exit 1; }
+raw=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-claude-verify.XXXXXX") || exit 1
+trap 'rm -f "$raw"' EXIT
+(cd "$project" && claude plugin list --json) >"$raw" || { printf 'could not inspect Claude plugin state\n' >&2; exit 1; }
+python3 - "$raw" "$AGK_CLAUDE_MARKETPLACE" "${AGK_CLAUDE_MODES[@]}" <<'PY' || { printf 'unsupported managed user-scope installation\n' >&2; exit 1; }
+import json,pathlib,sys
+data=json.loads(pathlib.Path(sys.argv[1]).read_text()); market=sys.argv[2]; modes=set(sys.argv[3:])
+if not isinstance(data,list): raise SystemExit(1)
+for x in data:
+ if not isinstance(x,dict) or not isinstance(x.get('id'),str) or x.get('scope') not in ('project','local','user') or not isinstance(x.get('enabled'),bool): raise SystemExit(1)
+ if '@' in x['id']:
+  n,o=x['id'].rsplit('@',1)
+  if n in modes and o==market and x['scope']=='user': raise SystemExit(1)
+PY
+
+effective=$(cd "$project" && agk_claude_effective_modes) || { printf 'could not inspect Claude plugin state\n' >&2; exit 1; }
 if (( empty )); then
   [[ -z $effective ]] || { while IFS= read -r mode; do [[ -n $mode ]] && printf 'managed mode remains: %s\n' "$mode" >&2; done <<<"$effective"; exit 1; }
   printf 'Verified no managed Claude mode.\n'; exit 0
 fi
 if [[ $effective != "$target" ]]; then
   for scope in project local; do
-    modes=$(agk_claude_list_scope "$scope") || { printf 'could not inspect %s scope\n' "$scope" >&2; exit 1; }
+    modes=$(cd "$project" && agk_claude_list_scope "$scope") || { printf 'could not inspect %s scope\n' "$scope" >&2; exit 1; }
     while IFS= read -r mode; do [[ -n $mode && $mode != "$target" ]] && printf 'conflict: %s (%s)\n' "$mode" "$scope" >&2; done <<<"$modes"
   done
   printf 'effective mode is not exactly %s\n' "$target" >&2; exit 1
 fi
 found=0
-for scope in project local; do agk_claude_is_enabled "$target" "$scope" && found=1; done
+for scope in project local; do (cd "$project" && agk_claude_is_enabled "$target" "$scope") && found=1; done
 (( found )) || { printf 'enabled target installation is missing\n' >&2; exit 1; }
 
-python3 - "$repo/claude/.claude-plugin/marketplace.json" "$repo/claude/plugins/$target" "$target" "$AGK_CLAUDE_MARKETPLACE" <<'PY' || exit 1
-import json, pathlib, re, sys
-market_path, root_name, target, identity = sys.argv[1:]
-market = json.loads(pathlib.Path(market_path).read_text())
-if market.get("name") != identity:
-    raise SystemExit("marketplace identity mismatch")
-entries = [p for p in market.get("plugins", []) if isinstance(p, dict) and p.get("name") == target]
-if len(entries) != 1 or entries[0].get("source") != f"./plugins/{target}":
-    raise SystemExit("target marketplace package is missing or ambiguous")
-root = pathlib.Path(root_name)
-manifest = json.loads((root / ".claude-plugin/plugin.json").read_text())
-if manifest.get("name") != target:
-    raise SystemExit("plugin manifest identity mismatch")
-hooks = root / "hooks/hooks.json"
-if hooks.exists():
-    data = json.loads(hooks.read_text())
-    for group in data.get("hooks", {}).values():
-        for rule in group:
-            for hook in rule.get("hooks", []):
-                command = hook.get("command", "")
-                matches = re.findall(r'\$\{CLAUDE_PLUGIN_ROOT\}/([^"\s]+)', command)
-                if not matches or any(not (root / item).is_file() for item in matches):
-                    raise SystemExit("manifest-referenced hook is missing")
-PY
 printf 'Verified Claude mode %s.\n' "$target"

@@ -2,6 +2,14 @@
 set -euo pipefail
 state=${AI_GUARDRAIL_CLAUDE_TEST_STATE:?AI_GUARDRAIL_CLAUDE_TEST_STATE is required}
 mkdir -p "$state"
+[[ -z ${FAKE_CLAUDE_REQUIRE_PROJECT_CWD:-} || $PWD == "$FAKE_CLAUDE_REQUIRE_PROJECT_CWD" ]] || { printf 'fake claude: wrong project cwd\n' >&2; exit 44; }
+printf '%s\t%s\n' "$PWD" "$*" >> "$state/calls.log"
+
+delay_until_released() {
+  local name=$1
+  : > "$state/delay.$name.ready"
+  while [[ ! -e $state/delay.$name.release ]]; do sleep 0.02; done
+}
 
 scope_arg() {
   local default=${1:-project}; shift || true
@@ -16,14 +24,15 @@ mutate() {
   local action=$1 plugin=$2 scope=$3 file
   file="$state/$scope.json"
   python3 - "$file" "$action" "$plugin" "$scope" <<'PY'
-import json, pathlib, sys
+import json, os, pathlib, sys
 path = pathlib.Path(sys.argv[1]); action, plugin, scope = sys.argv[2:]
 try: data = json.loads(path.read_text()) if path.exists() else []
 except json.JSONDecodeError: raise SystemExit(1)
 items = {x["id"]: x for x in data}
 if action == "install":
     old = items.get(plugin, {})
-    items[plugin] = {"id": plugin, "version": str(int(old.get("version", "0")) + 1), "scope": scope, "enabled": old.get("enabled", False)}
+    default_enabled = os.environ.get("FAKE_CLAUDE_INSTALL_ENABLED", "0") == "1"
+    items[plugin] = {"id": plugin, "version": str(int(old.get("version", "0")) + 1), "scope": scope, "enabled": old.get("enabled", default_enabled)}
 elif action == "update":
     if plugin not in items: raise SystemExit(1)
     items[plugin]["version"] = str(int(items[plugin].get("version", "0")) + 1)
@@ -42,6 +51,7 @@ PY
 [[ ${1:-} == plugin ]] || { printf 'fake claude: unsupported command\n' >&2; exit 2; }
 case ${2:-} in
   list)
+    [[ ${FAKE_CLAUDE_DELAY_OPERATION:-} != list ]] || delay_until_released list
     [[ ${3:-} == --json ]] || exit 2
     if [[ -n ${FAKE_CLAUDE_LIST_OUTPUT:-} ]]; then printf '%s\n' "$FAKE_CLAUDE_LIST_OUTPUT"; exit 0; fi
     if [[ ${FAKE_CLAUDE_CORRUPT_LIST:-0} == 1 || -e $state/corrupt-next-list ]]; then rm -f "$state/corrupt-next-list"; printf '{corrupt\n'; exit 0; fi
@@ -61,11 +71,13 @@ PY
     ;;
   install|update|uninstall|enable|disable)
     operation=$2; plugin=${3:?missing plugin}; scope_arg project "${@:4}"
+    [[ ${FAKE_CLAUDE_DELAY_OPERATION:-} != "$operation" ]] || delay_until_released "$operation"
     mode=${plugin%@*}
     if [[ $operation == install && ${FAKE_CLAUDE_FAIL_INSTALL:-} == "$mode" ]]; then exit 42; fi
     if [[ $operation == uninstall && ${FAKE_CLAUDE_FAIL_REMOVE:-} == "$mode" ]]; then exit 42; fi
     if [[ $operation == enable && ${FAKE_CLAUDE_FAIL_ENABLE:-} == "$mode" ]]; then exit 42; fi
     mutate "$operation" "$plugin" "$SCOPE"
+    [[ ${FAKE_CLAUDE_DELAY_AFTER_OPERATION:-} != "$operation" ]] || delay_until_released "after-$operation"
     ;;
   *) printf 'fake claude: unsupported plugin operation\n' >&2; exit 2;;
 esac

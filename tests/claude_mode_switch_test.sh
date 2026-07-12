@@ -10,7 +10,7 @@ export AI_GUARDRAIL_CLAUDE_TEST_STATE="$tmp/state"
 
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 assert_output() { local expected=$1; shift; local actual; actual=$("$@") || fail "command failed: $*"; [[ $actual == "$expected" ]] || fail "expected [$expected], got [$actual]"; }
-reset_state() { rm -f "$AI_GUARDRAIL_CLAUDE_TEST_STATE"/*.json; }
+reset_state() { rm -f "$AI_GUARDRAIL_CLAUDE_TEST_STATE"/*.json "$AI_GUARDRAIL_CLAUDE_TEST_STATE"/*.log "$AI_GUARDRAIL_CLAUDE_TEST_STATE"/delay.*; }
 install() { claude plugin install "$1@ai-guardrail-kit" --scope "$2" >/dev/null; }
 enable() { claude plugin enable "$1@ai-guardrail-kit" --scope "$2" >/dev/null; }
 
@@ -20,11 +20,11 @@ group=${1:-state}
 source "$repo/scripts/claude-mode-lib.sh"
 
 if [[ $group == lifecycle ]]; then
-  project="$tmp/project"; mkdir -p "$project"
+  project="$tmp/project"; mkdir -p "$project"; project=$(cd "$project" && pwd -P)
   select_mode() { "$repo/scripts/select-claude-mode" "$@" "$project"; }
   verify_mode() { "$repo/scripts/verify-claude-mode" "$@" "$project"; }
   assert_effective() { verify_mode "$1" >/dev/null || fail "effective mode is not $1"; }
-  state_digest() { find "$AI_GUARDRAIL_CLAUDE_TEST_STATE" -type f -maxdepth 1 -print0 | sort -z | xargs -0 shasum -a 256 2>/dev/null || true; }
+  state_digest() { find "$AI_GUARDRAIL_CLAUDE_TEST_STATE" -type f -name '*.json' -maxdepth 1 -print0 | sort -z | xargs -0 shasum -a 256 2>/dev/null || true; }
   managed_state() { python3 - "$AI_GUARDRAIL_CLAUDE_TEST_STATE" <<'PY'
 import json, pathlib, sys
 root=pathlib.Path(sys.argv[1]); rows=[]
@@ -100,6 +100,69 @@ PY
   export FAKE_CLAUDE_LIST_OUTPUT='{bad'
   ! verify_mode harness >/dev/null 2>&1 || fail 'malformed listing accepted by verifier'
   unset FAKE_CLAUDE_LIST_OUTPUT
+
+  reset_state; elsewhere="$tmp/elsewhere"; mkdir -p "$elsewhere"
+  export FAKE_CLAUDE_REQUIRE_PROJECT_CWD="$project"
+  (cd "$elsewhere" && select_mode harness >/dev/null)
+  unset FAKE_CLAUDE_REQUIRE_PROJECT_CWD
+  awk -F '\t' -v project="$project" '$1 != project { print "unexpected cwd: " $0 > "/dev/stderr"; exit 1 }' "$AI_GUARDRAIL_CLAUDE_TEST_STATE/calls.log" || fail 'Claude operation ran outside project cwd'
+
+  export FAKE_CLAUDE_LIST_OUTPUT='[{"id":"harness@ai-guardrail-kit","scope":"user","enabled":false}]'
+  ! verify_mode harness >/dev/null 2>&1 || fail 'named verifier accepted managed user scope'
+  ! verify_mode --no-managed-mode >/dev/null 2>&1 || fail 'empty verifier accepted managed user scope'
+  unset FAKE_CLAUDE_LIST_OUTPUT
+
+  bad_repo="$tmp/bad-repo"; cp -R "$repo" "$bad_repo"; printf '{bad\n' > "$bad_repo/claude/plugins/harness/hooks/hooks.json"
+  reset_state
+  ! "$bad_repo/scripts/select-claude-mode" harness "$project" >/dev/null 2>&1 || fail 'malformed package accepted'
+  [[ ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/calls.log ]] || ! grep -Eq $'\tplugin (install|update|uninstall|enable|disable) ' "$AI_GUARDRAIL_CLAUDE_TEST_STATE/calls.log" || fail 'malformed package reached lifecycle operation'
+  for defect in marketplace manifest registration resource; do
+    bad_repo="$tmp/bad-$defect"; cp -R "$repo" "$bad_repo"
+    case $defect in
+      marketplace) printf '{bad\n' > "$bad_repo/claude/.claude-plugin/marketplace.json";;
+      manifest) rm "$bad_repo/claude/plugins/harness/.claude-plugin/plugin.json";;
+      registration) printf '{"hooks":{}}\n' > "$bad_repo/claude/plugins/harness/hooks/hooks.json";;
+      resource) rm "$bad_repo/claude/plugins/harness/hooks/plan_gate.py";;
+    esac
+    reset_state
+    ! "$bad_repo/scripts/select-claude-mode" harness "$project" >/dev/null 2>&1 || fail "$defect package defect accepted"
+    [[ ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/calls.log ]] || ! grep -Eq $'\tplugin (install|update|uninstall|enable|disable) ' "$AI_GUARDRAIL_CLAUDE_TEST_STATE/calls.log" || fail "$defect package defect reached lifecycle operation"
+  done
+
+  reset_state; install harness project
+  export FAKE_CLAUDE_INSTALL_ENABLED=1 FAKE_CLAUDE_FAIL_INSTALL=integrated-harness
+  output=$(select_mode integrated-harness 2>&1) && fail 'disabled restoration setup accepted'
+  unset FAKE_CLAUDE_INSTALL_ENABLED FAKE_CLAUDE_FAIL_INSTALL
+  python3 - "$AI_GUARDRAIL_CLAUDE_TEST_STATE/project.json" <<'PY' || fail 'disabled tuple restored enabled'
+import json,sys
+x=json.load(open(sys.argv[1])); raise SystemExit(0 if len(x)==1 and x[0]['id'].startswith('harness@') and not x[0]['enabled'] else 1)
+PY
+
+  run_signal_case() { local phase=$1 sig=$2 expected=$3 output=$4 delay ready
+    [[ $phase == pre ]] && delay=uninstall || delay=post-commit
+    ready="$AI_GUARDRAIL_CLAUDE_TEST_STATE/delay.$delay.ready"
+    FAKE_CLAUDE_DELAY_OPERATION=$([[ $phase == pre ]] && printf uninstall || printf none) \
+    AI_GUARDRAIL_CLAUDE_TEST_PAUSE_AFTER_COMMIT=$([[ $phase == post ]] && printf '%s/delay.post-commit' "$AI_GUARDRAIL_CLAUDE_TEST_STATE" || printf '') \
+    python3 - "$repo/scripts/select-claude-mode" "$([[ $phase == pre ]] && printf integrated-harness || printf harness)" "$project" "$ready" "$AI_GUARDRAIL_CLAUDE_TEST_STATE/delay.$delay.release" "$sig" "$expected" "$output" <<'PY'
+import os,pathlib,signal,subprocess,sys,time
+cmd,mode,project,ready,release,sig,expected,out=sys.argv[1:]
+with open(out,'wb') as stream: p=subprocess.Popen([cmd,mode,project],stdout=stream,stderr=subprocess.STDOUT,env=os.environ.copy())
+for _ in range(200):
+ if pathlib.Path(ready).exists(): break
+ if p.poll() is not None: raise SystemExit(1)
+ time.sleep(.01)
+else: p.kill(); raise SystemExit(1)
+p.send_signal(getattr(signal,'SIG'+sig)); pathlib.Path(release).touch()
+raise SystemExit(0 if p.wait()==int(expected) else 1)
+PY
+  }
+  for sig_case in INT:130 TERM:143 HUP:129; do
+    sig=${sig_case%%:*}; expected=${sig_case#*:}; reset_state; install harness project; enable harness project
+    run_signal_case pre "$sig" "$expected" "$tmp/pre-$sig.out"; assert_effective harness
+    reset_state; install harness project; enable harness project
+    run_signal_case post "$sig" "$expected" "$tmp/post-$sig.out"
+    grep -Fq 'update applied but verification interrupted' "$tmp/post-$sig.out" || fail "$sig post-commit wording missing"
+  done
   printf 'PASS: transactional Claude mode switching\n'; exit 0
 fi
 

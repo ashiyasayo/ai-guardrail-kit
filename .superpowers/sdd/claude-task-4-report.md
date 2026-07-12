@@ -57,3 +57,37 @@ bash tests/claude_guardrail_test.sh
 - Rollback restores the specified logical tuples, not the prior fake/cache generation bytes; reinstalling can legitimately advance a cached generation.
 - The selector intentionally rejects managed installations reported in user scope because user scope is unsupported and silently changing it would violate scope ownership.
 - Scratch SDD briefs/reviews and the pre-existing `progress.md` modification were excluded from the implementation commit.
+
+## Review remediation
+
+All Task 4 review findings were addressed in a single test-first pass.
+
+### RED
+
+Regression tests and fake-CLI fault/observability support were added before production changes.
+
+```text
+$ bash tests/claude_mode_switch_test.sh lifecycle
+FAIL: Claude operation ran outside project cwd
+```
+
+This was the expected first behavioral failure: selector/verifier lifecycle inspection inherited the invoking shell's directory instead of executing at the selected project root.
+
+### Fixes
+
+- Canonicalize `project-dir` and execute every Claude list/install/update/uninstall/enable/disable call with that exact cwd. The fake CLI can require a project cwd, so this is behavioral rather than log-only coverage.
+- Reject every managed user-scope tuple, enabled or disabled, in both named and `--no-managed-mode` verification.
+- Added shared strict package validation for marketplace identity/source, target manifest identity, nonempty hook registration, command-hook structure, and every `${CLAUDE_PLUGIN_ROOT}` referenced file. Selector performs it before its first CLI inspection or lifecycle mutation. Tests independently corrupt the marketplace, remove the target manifest, empty hook registration, and remove a referenced hook, proving zero lifecycle calls.
+- Restoration now explicitly enables or disables every replayed tuple. The fake install default can be forced enabled, proving disabled snapshots remain disabled.
+- Added INT/TERM/HUP traps. Before the same-mode commit point, interruption replays the snapshot; after successful native update return, interruption preserves the update and prints `update applied but verification interrupted`. Deterministic pauses test all six signal/phase combinations and their 130/143/129 statuses.
+
+### GREEN
+
+```text
+PASS: Claude scope state adapter
+PASS: transactional Claude mode switching
+PASS: Claude marketplace packages are complete
+PASS: packaged Claude guardrails match legacy behavior
+```
+
+Static verification also completed with zero output/errors from `bash -n`, ShellCheck (when available), and `git diff --check`.

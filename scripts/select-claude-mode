@@ -15,14 +15,17 @@ agk_claude_validate_scope "$scope" >/dev/null 2>&1 || usage
 [[ $# -le 1 ]] || usage
 project=${1:-.}
 [[ -d $project ]] || { printf 'project directory does not exist: %s\n' "$project" >&2; exit 1; }
+project=$(cd "$project" && pwd -P) || exit 1
 command -v claude >/dev/null || { printf 'claude executable is unavailable\n' >&2; exit 1; }
 command -v python3 >/dev/null || { printf 'python3 executable is unavailable\n' >&2; exit 1; }
-[[ -f $repo/claude/.claude-plugin/marketplace.json ]] || { printf 'marketplace manifest is missing\n' >&2; exit 1; }
+if (( remove )); then package_target=''; else package_target=$target; fi
+agk_claude_validate_package "$repo" "$package_target" || { printf 'Claude package validation failed\n' >&2; exit 1; }
+ccli() { (cd "$project" && claude "$@"); }
 
 snapshot=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-claude-state.XXXXXX") || exit 1
 listing=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-claude-list.XXXXXX") || { rm -f "$snapshot"; exit 1; }
 trap 'rm -f "$snapshot" "$listing"' EXIT
-claude plugin list --json >"$listing" || { printf 'could not inspect Claude plugin state\n' >&2; exit 1; }
+ccli plugin list --json >"$listing" || { printf 'could not inspect Claude plugin state\n' >&2; exit 1; }
 python3 - "$listing" "$snapshot" "$AGK_CLAUDE_MARKETPLACE" "${AGK_CLAUDE_MODES[@]}" <<'PY' || { printf 'could not parse Claude plugin state\n' >&2; exit 1; }
 import json, pathlib, sys
 source, dest, market, *modes = sys.argv[1:]
@@ -42,19 +45,20 @@ PY
 plugin() { printf '%s@%s' "$1" "$AGK_CLAUDE_MARKETPLACE"; }
 remove_all() {
   local m s enabled failed=0
-  while IFS=$'\t' read -r m s enabled; do [[ -z $m ]] && continue; claude plugin uninstall "$(plugin "$m")" --scope "$s" >/dev/null || failed=1; done < <(sort -u "$snapshot")
+  while IFS=$'\t' read -r m s enabled; do [[ -z $m ]] && continue; ccli plugin uninstall "$(plugin "$m")" --scope "$s" >/dev/null || failed=1; done < <(sort -u "$snapshot")
   return "$failed"
 }
 restore() {
   local m s enabled
   # Clear whatever managed state remains, then replay the exact saved tuples.
-  for s in project local; do for m in "${AGK_CLAUDE_MODES[@]}"; do claude plugin uninstall "$(plugin "$m")" --scope "$s" >/dev/null 2>&1 || true; done; done
+  for s in project local; do for m in "${AGK_CLAUDE_MODES[@]}"; do ccli plugin uninstall "$(plugin "$m")" --scope "$s" >/dev/null 2>&1 || true; done; done
   while IFS=$'\t' read -r m s enabled; do
     [[ -z $m ]] && continue
-    claude plugin install "$(plugin "$m")" --scope "$s" >/dev/null 2>&1 || continue
-    [[ $enabled == 0 ]] || claude plugin enable "$(plugin "$m")" --scope "$s" >/dev/null 2>&1 || true
+    ccli plugin install "$(plugin "$m")" --scope "$s" >/dev/null 2>&1 || continue
+    if [[ $enabled == 1 ]]; then ccli plugin enable "$(plugin "$m")" --scope "$s" >/dev/null 2>&1 || true
+    else ccli plugin disable "$(plugin "$m")" --scope "$s" >/dev/null 2>&1 || true; fi
   done < "$snapshot"
-  claude plugin list --json >"$listing" 2>/dev/null || return 1
+  ccli plugin list --json >"$listing" 2>/dev/null || return 1
   if python3 - "$listing" "$snapshot" "$AGK_CLAUDE_MARKETPLACE" "${AGK_CLAUDE_MODES[@]}" <<'PY' >/dev/null 2>&1
 import json,pathlib,sys
 source,wanted,market,*modes=sys.argv[1:]; data=json.loads(pathlib.Path(source).read_text()); rows=[]
@@ -69,9 +73,26 @@ PY
 }
 fail_and_restore() { if restore; then printf 'selection failed; previous managed state restored\n' >&2; else printf 'selection failed; managed state restoration incomplete\n' >&2; fi; exit 1; }
 
+committed=0
+on_signal() {
+  local status=$1
+  trap - INT TERM HUP
+  if (( committed )); then printf 'update applied but verification interrupted\n' >&2
+  else restore >/dev/null 2>&1 || true; fi
+  exit "$status"
+}
+trap 'on_signal 130' INT
+trap 'on_signal 143' TERM
+trap 'on_signal 129' HUP
+
 if (( ! remove )) && [[ $(wc -l <"$snapshot" | tr -d ' ') == 1 ]] && grep -Fxq "$target"$'\t'"$scope"$'\t1' "$snapshot"; then
   "$script_dir/verify-claude-mode" "$target" "$project" >/dev/null || { printf 'selection failed; previous managed state restored\n' >&2; exit 1; }
-  claude plugin update "$(plugin "$target")" --scope "$scope" >/dev/null || { printf 'selection failed; previous managed state restored\n' >&2; exit 1; }
+  ccli plugin update "$(plugin "$target")" --scope "$scope" >/dev/null || { printf 'selection failed; previous managed state restored\n' >&2; exit 1; }
+  committed=1
+  if [[ -n ${AI_GUARDRAIL_CLAUDE_TEST_PAUSE_AFTER_COMMIT:-} ]]; then
+    : > "$AI_GUARDRAIL_CLAUDE_TEST_PAUSE_AFTER_COMMIT.ready"
+    while [[ ! -e $AI_GUARDRAIL_CLAUDE_TEST_PAUSE_AFTER_COMMIT.release ]]; do sleep 0.02; done
+  fi
   "$script_dir/verify-claude-mode" "$target" "$project" >/dev/null || { printf 'update applied but verification failed\n' >&2; exit 1; }
   printf 'Updated Claude mode %s (%s).\n' "$target" "$scope"; exit 0
 fi
@@ -79,8 +100,8 @@ fi
 changed=$(awk -F '\t' '{print $2}' "$snapshot" | sort -u | paste -sd, -)
 remove_all || fail_and_restore
 if (( ! remove )); then
-  claude plugin install "$(plugin "$target")" --scope "$scope" >/dev/null || fail_and_restore
-  claude plugin enable "$(plugin "$target")" --scope "$scope" >/dev/null || fail_and_restore
+  ccli plugin install "$(plugin "$target")" --scope "$scope" >/dev/null || fail_and_restore
+  ccli plugin enable "$(plugin "$target")" --scope "$scope" >/dev/null || fail_and_restore
   "$script_dir/verify-claude-mode" "$target" "$project" >/dev/null || fail_and_restore
   printf 'Selected Claude mode %s (%s).\n' "$target" "$scope"
 else

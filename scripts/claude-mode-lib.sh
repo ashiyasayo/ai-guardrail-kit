@@ -60,3 +60,38 @@ agk_claude_effective_modes() {
   local=$(agk_claude_list_scope local) || return 1
   printf '%s\n%s\n' "$project" "$local" | awk 'NF && !seen[$0]++' | sort
 }
+
+agk_claude_validate_package() {
+  local repo=${1:-} target=${2:-}
+  python3 - "$repo/claude/.claude-plugin/marketplace.json" "$repo/claude/plugins" "$target" "$AGK_CLAUDE_MARKETPLACE" <<'PY'
+import json, pathlib, re, sys
+market_path, plugins_name, target, identity = sys.argv[1:]
+try:
+    market = json.loads(pathlib.Path(market_path).read_text())
+    entries = market["plugins"]
+except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError):
+    raise SystemExit(1)
+if market.get("name") != identity or not isinstance(entries, list): raise SystemExit(1)
+wanted = [target] if target else ["decomposition-gate", "harness", "integrated-harness"]
+for mode in wanted:
+    matches=[x for x in entries if isinstance(x,dict) and x.get("name")==mode and x.get("source")==f"./plugins/{mode}"]
+    if len(matches)!=1: raise SystemExit(1)
+    root=pathlib.Path(plugins_name)/mode
+    try:
+        manifest=json.loads((root/".claude-plugin/plugin.json").read_text())
+        hooks=json.loads((root/"hooks/hooks.json").read_text())
+    except (OSError, UnicodeError, json.JSONDecodeError): raise SystemExit(1)
+    if manifest.get("name")!=mode or not isinstance(hooks.get("hooks"),dict) or not hooks["hooks"]: raise SystemExit(1)
+    registered=0
+    for group in hooks["hooks"].values():
+        if not isinstance(group,list): raise SystemExit(1)
+        for rule in group:
+            if not isinstance(rule,dict) or not isinstance(rule.get("hooks"),list): raise SystemExit(1)
+            for hook in rule["hooks"]:
+                if not isinstance(hook,dict) or hook.get("type")!="command" or not isinstance(hook.get("command"),str): raise SystemExit(1)
+                refs=re.findall(r'\$\{CLAUDE_PLUGIN_ROOT\}/([^"\s]+)',hook["command"])
+                if len(refs)!=1 or not (root/refs[0]).is_file(): raise SystemExit(1)
+                registered+=1
+    if not registered: raise SystemExit(1)
+PY
+}
