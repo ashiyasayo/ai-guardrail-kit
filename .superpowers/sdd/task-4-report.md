@@ -92,3 +92,10 @@ it prevalidates exact state, does not rewrite config or remove the target, and
 treats official add as the irreversible commit point. The fake CLI tracks content
 generations, proving failed add preserves old content and successful add advances
 it. Post-check failure reports an applied update without false rollback.
+
+Post-add signal handling now observes the same irreversible boundary. Once the
+official add command returns successfully, INT, TERM, and HUP exit with
+130/143/129, report that the update was applied but verification was
+interrupted, and preserve the new cached-content generation. Deterministic fake
+CLI delay markers cover all three signals without changing cross-mode or remove
+rollback behavior.

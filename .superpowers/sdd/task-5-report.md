@@ -85,3 +85,8 @@ exact safe remove/absence-verification commands. Refresh is irreversible after
 official add succeeds; transactional rollback remains for cross-mode switching
 and removal. The unexplained plugin-creator placeholder was removed from user
 documentation.
+
+Signal interruption after the refresh commit point is also modeled honestly:
+the selector preserves the applied generation and reports interrupted
+verification with conventional INT/TERM/HUP exit status instead of claiming or
+attempting rollback.

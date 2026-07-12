@@ -49,7 +49,18 @@ rollback() {
 }
 
 cleanup() { rm -rf "$snapshot"; }
-on_signal() { local sig=$1 status=$2; trap - INT TERM HUP; rollback >/dev/null 2>&1 || true; cleanup; exit "$status"; }
+refresh_committed=0
+on_signal() {
+  local sig=$1 status=$2
+  trap - INT TERM HUP
+  if (( refresh_committed )); then
+    agk_die 'update applied but verification interrupted'
+  else
+    rollback >/dev/null 2>&1 || true
+  fi
+  cleanup
+  exit "$status"
+}
 trap cleanup EXIT
 trap 'on_signal INT 130' INT
 trap 'on_signal TERM 143' TERM
@@ -67,6 +78,7 @@ if (( ! remove )) && [[ $(<"$snapshot/modes") == "$mode" ]]; then
     agk_die 'update failed; previous installed state remains'
     exit 1
   fi
+  refresh_committed=1
   if ! "$script_dir/verify-codex-mode" "$mode" "$project" >/dev/null; then
     agk_die 'update applied but verification failed'
     exit 1

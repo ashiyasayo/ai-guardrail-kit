@@ -12,7 +12,7 @@ mkdir -p "$AI_GUARDRAIL_TEST_STATE"
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 assert_file() { [[ -f $1 ]] || fail "missing $1"; }
 assert_mode() { "$repo/scripts/verify-codex-mode" "$1" "$2" >/dev/null || fail "verify $1"; }
-new_project() { local p=$1; mkdir -p "$p/.codex"; : > "$AI_GUARDRAIL_TEST_STATE/installed"; rm -f "$AI_GUARDRAIL_TEST_STATE"/*.count; }
+new_project() { local p=$1; mkdir -p "$p/.codex"; : > "$AI_GUARDRAIL_TEST_STATE/installed"; rm -f "$AI_GUARDRAIL_TEST_STATE"/*.count "$AI_GUARDRAIL_TEST_STATE"/delay.*.ready; }
 assert_bad_json() { export FAKE_CODEX_LIST_JSON=$1; ! "$repo/scripts/verify-codex-mode" decomposition-gate "$project" >/dev/null 2>&1 || fail 'bad listing accepted'; unset FAKE_CODEX_LIST_JSON; }
 
 project="$tmp/project"
@@ -56,6 +56,39 @@ unset FAKE_CODEX_FAIL_OPERATION
 grep -Fq 'update applied but verification failed' <<<"$output" || fail 'post-commit refresh failure message missing'
 ! grep -Fq 'rollback' <<<"$output" || fail 'post-commit refresh falsely claimed rollback'
 [[ $(<"$generation_file") -eq 3 ]] || fail 'post-check failure did not retain applied refresh'
+
+for signal_case in INT:130 TERM:143 HUP:129; do
+  signal=${signal_case%%:*}; expected=${signal_case#*:}
+  signal_project="$tmp/refresh-signal-$signal"
+  new_project "$signal_project"
+  "$repo/scripts/select-codex-mode" decomposition-gate "$signal_project" >/dev/null
+  signal_generation="$AI_GUARDRAIL_TEST_STATE/generation.decomposition-gate_ai-guardrail-kit"
+  generation_before_signal=$(<"$signal_generation")
+  signal_output="$tmp/refresh-signal-$signal.output"
+  delayed_list=$(( $(<"$AI_GUARDRAIL_TEST_STATE/list.count") + 3 ))
+  FAKE_CODEX_DELAY_OPERATION="list:$delayed_list" python3 - "$repo/scripts/select-codex-mode" "$signal_project" "$signal_output" "$AI_GUARDRAIL_TEST_STATE/delay.list.$delayed_list.ready" "$signal" "$expected" <<'PY' || fail "$signal post-add refresh signal status"
+import os, pathlib, signal, subprocess, sys, time
+command, project, output, ready, signal_name, expected = sys.argv[1:]
+with open(output, "wb") as stream:
+    process = subprocess.Popen(
+        [command, "decomposition-gate", project], stdout=stream, stderr=subprocess.STDOUT
+    )
+    for _ in range(200):
+        if pathlib.Path(ready).exists():
+            break
+        if process.poll() is not None:
+            raise SystemExit(1)
+        time.sleep(.01)
+    else:
+        process.kill()
+        raise SystemExit(1)
+    process.send_signal(getattr(signal, "SIG" + signal_name))
+    raise SystemExit(0 if process.wait() == int(expected) else 1)
+PY
+  [[ $(<"$signal_generation") -eq $((generation_before_signal + 1)) ]] || fail "$signal post-add refresh generation was rolled back"
+  grep -Fq 'update applied but verification interrupted' "$signal_output" || fail "$signal post-add refresh interruption message missing"
+  ! grep -Fq 'rollback' "$signal_output" || fail "$signal post-add refresh falsely claimed rollback"
+done
 
 sed -i.bak 's|decomposition-gate/hooks|harness/hooks|' "$project/.codex/config.toml"
 config_before=$(shasum -a 256 "$project/.codex/config.toml"); generation_before=$(<"$generation_file")
