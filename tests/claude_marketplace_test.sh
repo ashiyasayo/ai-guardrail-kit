@@ -65,5 +65,28 @@ integrated_root = root / "claude/plugins/integrated-harness"
 assert approval_command in (integrated_root / "orchestration-policy.md").read_text()
 assert approval_command in (integrated_root / "hooks/plan_gate.py").read_text()
 
+guide_path = root / "docs/claude-marketplace.md"
+assert guide_path.is_file(), f"missing {guide_path.relative_to(root)}"
+guide = guide_path.read_text()
+readme = (root / "README.md").read_text()
+assert "docs/claude-marketplace.md" in readme, "README does not link Claude marketplace guide"
+required_documentation = {
+    'claude plugin marketplace add "$(pwd)/claude" --scope project': "marketplace registration",
+    "./scripts/select-claude-mode decomposition-gate --scope project .": "decomposition selection",
+    "./scripts/select-claude-mode harness --scope project .": "harness selection",
+    "./scripts/select-claude-mode integrated-harness --scope project .": "integrated selection",
+    "./scripts/select-claude-mode decomposition-gate --scope local .": "local selection",
+    "./scripts/verify-claude-mode decomposition-gate .": "verification",
+    "./scripts/select-claude-mode --remove --scope project .": "removal",
+    "same mode": "same-mode update",
+    "new Claude Code session": "session restart",
+    "copy-in": "copy-in compatibility",
+    "user": "unsupported user scope",
+    "direct native commands": "native CLI bypass warning",
+    "mutual exclusion": "mutual exclusion warning",
+}
+for text, purpose in required_documentation.items():
+    assert text in guide, f"missing {purpose}: {text}"
+
 print("PASS: Claude marketplace packages are complete")
 PY

@@ -22,6 +22,11 @@ Python 3.9+，不可沿用下列 Claude copy-in 安裝步驟。
 
 ### Claude Code
 
+Claude also provides a repository marketplace with mutually exclusive project
+and local mode selection. See
+[`docs/claude-marketplace.md`](docs/claude-marketplace.md) for registration,
+selection, update, verification, removal, and scope behavior.
+
 三者皆為「複製即用（copy-in）」，沒有套件安裝或執行時相依，依需求擇一複製
 對應目錄下的 `.claude/` 到你的專案（若專案已有 `.claude/settings.json`，
 請手動合併 hooks 區塊，勿直接覆蓋）：
