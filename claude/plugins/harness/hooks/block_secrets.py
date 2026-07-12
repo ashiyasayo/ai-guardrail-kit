@@ -15,6 +15,7 @@ exit code 語意：0 = 放行；2 = 攔截（stderr 回饋給模型）
 import json
 import re
 import sys
+from typing import Optional
 
 # 疑似憑證的偵測樣式（規則名稱, 正規表示式）
 SECRET_PATTERNS = (
@@ -97,6 +98,25 @@ def find_secret(content: str):
     return None
 
 
+def check(hook_input: dict) -> Optional[str]:
+    """回傳攔截原因；None 表示放行。供 guard.py 匯入，不做任何 I/O。"""
+    content = extract_pending_content(hook_input.get("tool_input", {}))
+    if not content:
+        return None
+
+    hit = find_secret(content)
+    if hit is None:
+        return None
+
+    rule_name, _ = hit  # 刻意不輸出命中行內容，避免憑證出現在對話紀錄中
+    return (
+        f"憑證攔截：偵測到疑似硬寫的憑證（類型：{rule_name}），已攔截本次寫入。"
+        "依團隊規範，敏感設定值須透過環境變數或 Secret Manager 管理，"
+        "請改以環境變數引用（如 os.environ / IConfiguration / env()）重寫此段。"
+        "若該值為已洩漏的真實憑證，請立即通知人類撤銷並重新核發。"
+    )
+
+
 def main() -> None:
     try:
         hook_input = json.load(sys.stdin)
@@ -104,23 +124,10 @@ def main() -> None:
         print("block_secrets: 無法解析 hook 輸入 JSON，保守攔截。", file=sys.stderr)
         sys.exit(2)
 
-    content = extract_pending_content(hook_input.get("tool_input", {}))
-    if not content:
-        sys.exit(0)
-
-    hit = find_secret(content)
-    if hit is None:
-        sys.exit(0)
-
-    rule_name, _ = hit  # 刻意不輸出命中行內容，避免憑證出現在對話紀錄中
-    print(
-        f"憑證攔截：偵測到疑似硬寫的憑證（類型：{rule_name}），已攔截本次寫入。"
-        "依團隊規範，敏感設定值須透過環境變數或 Secret Manager 管理，"
-        "請改以環境變數引用（如 os.environ / IConfiguration / env()）重寫此段。"
-        "若該值為已洩漏的真實憑證，請立即通知人類撤銷並重新核發。",
-        file=sys.stderr,
-    )
-    sys.exit(2)
+    reason = check(hook_input)
+    if reason is not None:
+        print(reason, file=sys.stderr)
+        sys.exit(2)
 
 
 if __name__ == "__main__":

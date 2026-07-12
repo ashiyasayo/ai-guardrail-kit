@@ -3,6 +3,7 @@
 import json
 import re
 import sys
+from typing import Optional
 
 PATTERNS = (
     ("AWS Access Key", re.compile(r"AKIA[0-9A-Z]{16}"), None),
@@ -72,12 +73,8 @@ def safe_assignment_value(value: str) -> bool:
     return bool(PLACEHOLDER.fullmatch(value) or BASH_ENV_REFERENCE.fullmatch(value))
 
 
-def deny(kind: str) -> None:
-    print(json.dumps({"hookSpecificOutput": {
-        "hookEventName": "PreToolUse", "permissionDecision": "deny",
-        "permissionDecisionReason": f"憑證攔截：偵測到疑似硬編碼的{kind}；請改用環境變數或 Secret Manager。",
-    }}, ensure_ascii=False))
-    sys.exit(0)
+def deny_reason(kind: str) -> str:
+    return f"憑證攔截：偵測到疑似硬編碼的{kind}；請改用環境變數或 Secret Manager。"
 
 
 def pending_content(tool_name: str, tool_input: dict) -> str:
@@ -103,28 +100,21 @@ def pending_content(tool_name: str, tool_input: dict) -> str:
     return ""
 
 
-def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, ValueError):
-        print("block_secrets: 無法解析 hook 輸入，保守攔截。", file=sys.stderr)
-        sys.exit(2)
-    try:
-        if not isinstance(data, dict):
-            raise HookInputError("hook 輸入必須是物件")
-        tool_name = data.get("tool_name", "")
-        if not isinstance(tool_name, str):
-            raise HookInputError("tool_name 必須是文字")
-        content = pending_content(tool_name, data.get("tool_input", {}))
-    except HookInputError as exc:
-        print(f"block_secrets: 已知工具 schema 不符：{exc}。", file=sys.stderr)
-        sys.exit(2)
+def check(data: dict) -> Optional[str]:
+    """回傳攔截原因；None 表示放行。已知工具 schema 不符時拋出 HookInputError。
+    供 guard.py 匯入，不做任何 I/O。"""
+    if not isinstance(data, dict):
+        raise HookInputError("hook 輸入必須是物件")
+    tool_name = data.get("tool_name", "")
+    if not isinstance(tool_name, str):
+        raise HookInputError("tool_name 必須是文字")
+    content = pending_content(tool_name, data.get("tool_input", {}))
     for line in content.splitlines():
         safe_fallback_spans: list[tuple[int, int]] = []
         if tool_name == "Bash":
             for fallback in BASH_PARAMETER_FALLBACK_ASSIGNMENT.finditer(line):
                 if not safe_assignment_value(fallback.group(2)):
-                    deny("一般憑證指派")
+                    return deny_reason("一般憑證指派")
                 safe_fallback_spans.append(fallback.span())
         for kind, pattern, value_group in PATTERNS:
             for hit in pattern.finditer(line):
@@ -134,13 +124,13 @@ def main() -> None:
                 ):
                     continue
                 if value_group is None or not safe_assignment_value(hit.group(value_group)):
-                    deny(kind)
+                    return deny_reason(kind)
         if tool_name != "Bash":
             # Bash 已有專用的未加引號規則（含 ${VAR:-default} 處理）；
             # 其餘寫入工具（Write／Edit／MultiEdit／NotebookEdit）在此補上。
             for hit in UNQUOTED_ASSIGNMENT.finditer(line):
                 if looks_like_secret_literal(hit.group(1)):
-                    deny("未加引號的憑證指派")
+                    return deny_reason("未加引號的憑證指派")
         if tool_name == "Bash":
             for hit in BASH_UNQUOTED_ASSIGNMENT.finditer(line):
                 if any(
@@ -148,10 +138,28 @@ def main() -> None:
                     for start, end in safe_fallback_spans
                 ):
                     continue
-                if (
-                    not safe_assignment_value(hit.group(2))
-                ):
-                    deny("一般憑證指派")
+                if not safe_assignment_value(hit.group(2)):
+                    return deny_reason("一般憑證指派")
+    return None
+
+
+def main() -> None:
+    try:
+        data = json.load(sys.stdin)
+    except (json.JSONDecodeError, ValueError):
+        print("block_secrets: 無法解析 hook 輸入，保守攔截。", file=sys.stderr)
+        sys.exit(2)
+    try:
+        reason = check(data)
+    except HookInputError as exc:
+        print(f"block_secrets: 已知工具 schema 不符：{exc}。", file=sys.stderr)
+        sys.exit(2)
+    if reason is not None:
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse", "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }}, ensure_ascii=False))
+        sys.exit(0)
 
 
 if __name__ == "__main__":

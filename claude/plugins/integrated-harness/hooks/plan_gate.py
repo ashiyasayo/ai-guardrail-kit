@@ -7,6 +7,7 @@ import re
 import shlex
 import sys
 import time
+from typing import Optional
 
 PLAN_PATH = ".claude/plan/decomposition.md"
 APPROVAL_PATH = ".claude/.plan_approved"
@@ -254,13 +255,8 @@ def check_approval(root: str) -> tuple[bool, str]:
     return True, ""
 
 
-def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, ValueError):
-        print("plan_gate: 無法解析 hook 輸入，保守攔截。", file=sys.stderr)
-        sys.exit(2)
-
+def check(data: dict) -> Optional[str]:
+    """回傳攔截原因；None 表示放行。供 guard.py 匯入，不做任何 I/O。"""
     tool = data.get("tool_name", "")
     tool_input = data.get("tool_input", {})
     root = project_dir(data)
@@ -273,45 +269,58 @@ def main() -> None:
     if tool == "Bash":
         command = tool_input.get("command", "")
         if ".plan_approved" in command:
-            emit_deny("核准旗標只能由人類在自己的終端機操作，模型不得自我核准或撤銷。")
+            return "核准旗標只能由人類在自己的終端機操作，模型不得自我核准或撤銷。"
         if is_read_only_bash(command):
-            return
+            return None
         # 管理目錄不得透過 Bash 寫入，避免 glob、別名與路徑變形繞過保護。
         if ".claude" in command:
-            emit_deny(".claude 管理檔只能由人類或受管制的檔案工具修改；不得透過 Bash 變更。")
+            return ".claude 管理檔只能由人類或受管制的檔案工具修改；不得透過 Bash 變更。"
         if mode == "strict":
             prefixes, reason = parse_strict_bash_allowlist(root)
             if reason or not strict_bash_allowed(command, root, prefixes):
                 detail = reason or "命令不在 strict 測試與建置 allowlist。"
-                emit_deny(f"strict 模式禁止一般 Bash：{detail}")
+                return f"strict 模式禁止一般 Bash：{detail}"
     elif tool in FILE_TOOL_PATH_KEYS:
         path_key = FILE_TOOL_PATH_KEYS[tool]
         normalized = normalized_target(tool_input, root, path_key)
         if not normalized:
-            emit_deny(f"計畫閘門：{tool} 缺少目標路徑。")
+            return f"計畫閘門：{tool} 缺少目標路徑。"
         target = os.path.realpath(normalized)
         if target == approval:
-            emit_deny("核准旗標只能由人類操作。")
+            return "核准旗標只能由人類操作。"
         if target == policy:
-            emit_deny("編排政策檔只能由人類修改，模型不得變更核准模式或授權門檻。")
+            return "編排政策檔只能由人類修改，模型不得變更核准模式或授權門檻。"
         if target == plan:
-            return
+            return None
     elif tool in PRE_PLAN_SAFE_TOOLS:
-        return
+        return None
 
     passed, reason, scopes = check_plan(root, mode)
     if not passed:
-        emit_deny(f"計畫閘門：{reason} 請先完成任務拆解。")
+        return f"計畫閘門：{reason} 請先完成任務拆解。"
     if target and mode != "light" and not target_in_scope(target, scopes):
-        emit_deny("計畫閘門：目標不在計畫允許修改範圍。")
+        return "計畫閘門：目標不在計畫允許修改範圍。"
     if mode in {"standard", "light"}:
-        return
+        return None
     passed, reason = check_approval(root)
     if not passed:
-        emit_deny(
+        return (
             f"計畫閘門：{reason} 請由人類審查計畫後執行 "
             '`python3 "${CLAUDE_PLUGIN_ROOT}/hooks/approve_plan.py"`。'
         )
+    return None
+
+
+def main() -> None:
+    try:
+        data = json.load(sys.stdin)
+    except (json.JSONDecodeError, ValueError):
+        print("plan_gate: 無法解析 hook 輸入，保守攔截。", file=sys.stderr)
+        sys.exit(2)
+
+    reason = check(data)
+    if reason is not None:
+        emit_deny(reason)
 
 
 if __name__ == "__main__":

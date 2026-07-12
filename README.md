@@ -107,5 +107,8 @@ chmod +x your-project/.claude/hooks/*.py
   `block_dangerous_commands.py` 為同源分支：修補任一邊的繞過手法時，
   須檢查另一邊是否需同步移植（詳見
   [`integrated-harness/MAINTENANCE.md`](integrated-harness/MAINTENANCE.md)）。
+- `harness` 與 `integrated-harness` 的 `settings.json` 只掛載 `guard.py` 統一進入點，
+  由它在單一直譯器行程內依序執行三道檢查；hook 檔案須整組複製，
+  修改任一檢查腳本後應執行 `tests/claude_guard_test.sh` 回歸。
 - Regex hooks 是防線不是保證，無法涵蓋混淆、間接執行等所有變形；須搭配
   Claude Code 權限設定、SAST、Secret Manager 與人工審查。

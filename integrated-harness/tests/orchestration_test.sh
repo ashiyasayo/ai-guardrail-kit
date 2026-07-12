@@ -26,16 +26,12 @@ root = pathlib.Path(sys.argv[1])
 settings = json.loads((root / ".claude/settings.json").read_text(encoding="utf-8"))
 groups = settings["hooks"]["PreToolUse"]
 
-def group_for(script_name: str) -> dict:
-    for group in groups:
-        if any(script_name in hook.get("command", "") for hook in group.get("hooks", [])):
-            return group
-    raise AssertionError(f"找不到 hook：{script_name}")
-
-assert group_for("plan_gate.py")["matcher"] == "*"
-assert "Bash" in group_for("block_secrets.py")["matcher"].split("|")
-assert group_for("block_dangerous_commands.py")["matcher"] == "Bash"
-for script in ("plan_gate.py", "block_secrets.py", "block_dangerous_commands.py"):
+# 單一進入點契約：只註冊 guard.py 一條規則，三道檢查在 guard 內依序執行
+assert len(groups) == 1, groups
+assert groups[0]["matcher"] == "*"
+commands = [hook["command"] for hook in groups[0]["hooks"]]
+assert len(commands) == 1 and "guard.py" in commands[0], commands
+for script in ("guard.py", "plan_gate.py", "block_secrets.py", "block_dangerous_commands.py"):
     assert (root / ".claude/hooks" / script).is_file()
 PY
 then

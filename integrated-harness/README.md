@@ -37,7 +37,9 @@
 - `MAINTENANCE.md`：各章理由、被否決方案、修改時機與已知限制。
 - `.claude/reasoning-protocol*.md`：orchestrator 與 subagent 的推理／驗證協定。
 - `.claude/orchestration-policy.md`：由人類設定成本門檻與環境授權。
-- `.claude/hooks/`：計畫、人類核准、憑證及危險命令硬性關卡。
+- `.claude/hooks/`：計畫、人類核准、憑證及危險命令硬性關卡。`settings.json` 只掛載
+  `guard.py` 統一進入點，於單一直譯器行程內依序執行三道檢查（危險指令 → 憑證 →
+  計畫閘門），降低每次工具呼叫的啟動開銷；各檢查腳本仍可獨立執行驗證。
 - `CLAUDE.md`：載入上述規則的專案入口。
 
 ## 關卡順序

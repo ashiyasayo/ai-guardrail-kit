@@ -22,6 +22,7 @@ import re
 import shlex
 import sys
 import time
+from typing import Optional
 
 # 核准旗標檔的有效期（秒）：預設 60 分鐘，過期即失效，避免一次核准永久有效
 APPROVAL_TTL_SECONDS = 3600
@@ -93,14 +94,8 @@ def touches_approval_flag(command: str) -> bool:
     return bool(APPROVAL_FLAG_REFERENCE_PATTERN.search(command))
 
 
-def main() -> None:
-    try:
-        hook_input = json.load(sys.stdin)
-    except (json.JSONDecodeError, ValueError):
-        # 輸入異常時保守處理：攔截並要求人工確認
-        print("plan_gate: 無法解析 hook 輸入 JSON，保守攔截。", file=sys.stderr)
-        sys.exit(2)
-
+def check(hook_input: dict) -> Optional[str]:
+    """回傳攔截原因；None 表示放行。供 guard.py 匯入，不做任何 I/O。"""
     tool_name = hook_input.get("tool_name", "")
     tool_input = hook_input.get("tool_input", {})
     flag_path = os.path.join(get_project_dir(), APPROVAL_FLAG_RELATIVE_PATH)
@@ -110,16 +105,14 @@ def main() -> None:
 
         # 鐵則一：任何試圖操作旗標檔的指令，無論核准與否一律攔截
         if touches_approval_flag(command):
-            print(
+            return (
                 "計畫閘門：偵測到操作核准旗標檔的指令，已攔截。"
-                "核准只能由人類在自己的終端機執行，模型不得自我核准。",
-                file=sys.stderr,
+                "核准只能由人類在自己的終端機執行，模型不得自我核准。"
             )
-            sys.exit(2)
 
         # 唯讀指令放行（H 章節：計畫核准前只有讀取與分析權）
         if is_read_only_bash(command):
-            sys.exit(0)
+            return None
     else:
         # 鐵則一（檔案工具版）：即使核准有效，也不得以 Write/Edit 觸碰旗標檔，
         # 否則模型可藉改寫旗標更新 mtime、無限延長核准時間窗
@@ -127,25 +120,35 @@ def main() -> None:
         if target:
             target_real = os.path.realpath(os.path.join(get_project_dir(), target))
             if target_real == os.path.realpath(flag_path):
-                print(
+                return (
                     "計畫閘門：核准旗標檔只能由人類在自己的終端機操作，"
-                    "模型不得透過檔案工具建立、改寫或延長核准。",
-                    file=sys.stderr,
+                    "模型不得透過檔案工具建立、改寫或延長核准。"
                 )
-                sys.exit(2)
 
     # 寫入性操作（Write/Edit/MultiEdit/NotebookEdit 或非唯讀 Bash）：檢查核准
     if is_approval_valid(flag_path):
-        sys.exit(0)
+        return None
 
-    print(
+    return (
         "計畫閘門：本操作屬寫入性行為，但未偵測到有效的計畫核准。"
         "請先向人類提交執行計畫（任務分解、指派模型、驗收標準、風險點），"
         "由人類在其終端機執行 `touch .claude/.plan_approved` 核准後方可施作。"
-        f"核准有效期為 {APPROVAL_TTL_SECONDS // 60} 分鐘。",
-        file=sys.stderr,
+        f"核准有效期為 {APPROVAL_TTL_SECONDS // 60} 分鐘。"
     )
-    sys.exit(2)
+
+
+def main() -> None:
+    try:
+        hook_input = json.load(sys.stdin)
+    except (json.JSONDecodeError, ValueError):
+        # 輸入異常時保守處理：攔截並要求人工確認
+        print("plan_gate: 無法解析 hook 輸入 JSON，保守攔截。", file=sys.stderr)
+        sys.exit(2)
+
+    reason = check(hook_input)
+    if reason is not None:
+        print(reason, file=sys.stderr)
+        sys.exit(2)
 
 
 if __name__ == "__main__":

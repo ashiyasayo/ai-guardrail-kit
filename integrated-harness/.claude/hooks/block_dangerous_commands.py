@@ -211,13 +211,43 @@ def dangerous_pipeline(segments: list[list[str]], operators: list[str]) -> Optio
     return None
 
 
-def deny(name: str) -> None:
+def emit_deny(reason: str) -> None:
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
-        "permissionDecisionReason": f"危險指令攔截：命中「{name}」；此規則只涵蓋已知形式，操作仍須遵守平台權限。",
+        "permissionDecisionReason": reason,
     }}, ensure_ascii=False))
     sys.exit(0)
+
+
+def matched_rule(data: dict) -> Optional[str]:
+    if data.get("tool_name") != "Bash":
+        return None
+    command = data.get("tool_input", {}).get("command", "")
+    parsed = tokenized_commands(command)
+    if parsed is None:
+        if raw_rm_is_recursive_force(command):
+            return "遞迴強制刪除"
+        for name, pattern in PATTERNS:
+            if pattern.search(command):
+                return name
+        return None
+    segments, operators = parsed
+    if substitution_rm_is_recursive_force(command):
+        return "遞迴強制刪除"
+    for segment in segments:
+        name = dangerous_tokens(segment)
+        if name:
+            return name
+    return dangerous_pipeline(segments, operators)
+
+
+def check(data: dict) -> Optional[str]:
+    """回傳攔截原因；None 表示放行。供 guard.py 匯入，不做任何 I/O。"""
+    name = matched_rule(data)
+    if name is None:
+        return None
+    return f"危險指令攔截：命中「{name}」；此規則只涵蓋已知形式，操作仍須遵守平台權限。"
 
 
 def main() -> None:
@@ -226,27 +256,9 @@ def main() -> None:
     except (json.JSONDecodeError, ValueError):
         print("block_dangerous_commands: 無法解析 hook 輸入，保守攔截。", file=sys.stderr)
         sys.exit(2)
-    if data.get("tool_name") != "Bash":
-        return
-    command = data.get("tool_input", {}).get("command", "")
-    parsed = tokenized_commands(command)
-    if parsed is None:
-        if raw_rm_is_recursive_force(command):
-            deny("遞迴強制刪除")
-        for name, pattern in PATTERNS:
-            if pattern.search(command):
-                deny(name)
-        return
-    segments, operators = parsed
-    if substitution_rm_is_recursive_force(command):
-        deny("遞迴強制刪除")
-    for segment in segments:
-        name = dangerous_tokens(segment)
-        if name:
-            deny(name)
-    pipeline_name = dangerous_pipeline(segments, operators)
-    if pipeline_name:
-        deny(pipeline_name)
+    reason = check(data)
+    if reason is not None:
+        emit_deny(reason)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ exit code 語意：0 = 放行；2 = 攔截（stderr 回饋給模型）
 import json
 import re
 import sys
+from typing import Optional
 
 # 紅線指令樣式（規則名稱, 正規表示式）——命中即攔截，無核准豁免
 DANGEROUS_PATTERNS = (
@@ -42,6 +43,26 @@ DANGEROUS_PATTERNS = (
 )
 
 
+def check(hook_input: dict) -> Optional[str]:
+    """回傳攔截原因；None 表示放行。供 guard.py 匯入，不做任何 I/O。"""
+    if hook_input.get("tool_name") != "Bash":
+        return None
+
+    command = hook_input.get("tool_input", {}).get("command", "")
+    if not command:
+        return None
+
+    for rule_name, pattern in DANGEROUS_PATTERNS:
+        if pattern.search(command):
+            return (
+                f"危險指令攔截：命中紅線規則「{rule_name}」，已攔截。"
+                "此類操作不在模型授權範圍內（即使計畫已核准亦同），"
+                "請將該指令與理由回報給人類，由人類評估後親自執行。"
+                "涉及生產環境變更時，須先於測試環境驗證。"
+            )
+    return None
+
+
 def main() -> None:
     try:
         hook_input = json.load(sys.stdin)
@@ -49,25 +70,10 @@ def main() -> None:
         print("block_dangerous_commands: 無法解析 hook 輸入 JSON，保守攔截。", file=sys.stderr)
         sys.exit(2)
 
-    if hook_input.get("tool_name") != "Bash":
-        sys.exit(0)
-
-    command = hook_input.get("tool_input", {}).get("command", "")
-    if not command:
-        sys.exit(0)
-
-    for rule_name, pattern in DANGEROUS_PATTERNS:
-        if pattern.search(command):
-            print(
-                f"危險指令攔截：命中紅線規則「{rule_name}」，已攔截。"
-                "此類操作不在模型授權範圍內（即使計畫已核准亦同），"
-                "請將該指令與理由回報給人類，由人類評估後親自執行。"
-                "涉及生產環境變更時，須先於測試環境驗證。",
-                file=sys.stderr,
-            )
-            sys.exit(2)
-
-    sys.exit(0)
+    reason = check(hook_input)
+    if reason is not None:
+        print(reason, file=sys.stderr)
+        sys.exit(2)
 
 
 if __name__ == "__main__":
