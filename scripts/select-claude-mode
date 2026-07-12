@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+set -uo pipefail
+script_dir=$(cd "$(dirname "$0")" && pwd -P)
+repo=$(cd "$script_dir/.." && pwd -P)
+# shellcheck source=claude-mode-lib.sh
+source "$script_dir/claude-mode-lib.sh"
+
+usage() { printf 'usage: select-claude-mode <mode>|--remove [--scope project|local] [project-dir]\n' >&2; exit 2; }
+action=${1:-}; shift || true
+remove=0
+case $action in --remove) remove=1;; decomposition-gate|harness|integrated-harness) target=$action;; *) usage;; esac
+scope=project
+if [[ ${1:-} == --scope ]]; then [[ $# -ge 2 ]] || usage; scope=$2; shift 2; fi
+agk_claude_validate_scope "$scope" >/dev/null 2>&1 || usage
+[[ $# -le 1 ]] || usage
+project=${1:-.}
+[[ -d $project ]] || { printf 'project directory does not exist: %s\n' "$project" >&2; exit 1; }
+command -v claude >/dev/null || { printf 'claude executable is unavailable\n' >&2; exit 1; }
+command -v python3 >/dev/null || { printf 'python3 executable is unavailable\n' >&2; exit 1; }
+[[ -f $repo/claude/.claude-plugin/marketplace.json ]] || { printf 'marketplace manifest is missing\n' >&2; exit 1; }
+
+snapshot=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-claude-state.XXXXXX") || exit 1
+listing=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-claude-list.XXXXXX") || { rm -f "$snapshot"; exit 1; }
+trap 'rm -f "$snapshot" "$listing"' EXIT
+claude plugin list --json >"$listing" || { printf 'could not inspect Claude plugin state\n' >&2; exit 1; }
+python3 - "$listing" "$snapshot" "$AGK_CLAUDE_MARKETPLACE" "${AGK_CLAUDE_MODES[@]}" <<'PY' || { printf 'could not parse Claude plugin state\n' >&2; exit 1; }
+import json, pathlib, sys
+source, dest, market, *modes = sys.argv[1:]
+data=json.loads(pathlib.Path(source).read_text())
+if not isinstance(data,list): raise SystemExit(1)
+rows=[]
+for x in data:
+    if not isinstance(x,dict) or not isinstance(x.get('id'),str) or x.get('scope') not in ('project','local','user') or not isinstance(x.get('enabled'),bool): raise SystemExit(1)
+    if '@' in x['id']:
+        name, origin=x['id'].rsplit('@',1)
+        if origin==market and name in modes:
+            if x['scope']=='user': raise SystemExit(1)
+            rows.append((name,x['scope'],'1' if x['enabled'] else '0'))
+pathlib.Path(dest).write_text(''.join('\t'.join(x)+'\n' for x in sorted(rows)))
+PY
+
+plugin() { printf '%s@%s' "$1" "$AGK_CLAUDE_MARKETPLACE"; }
+remove_all() {
+  local m s enabled failed=0
+  while IFS=$'\t' read -r m s enabled; do [[ -z $m ]] && continue; claude plugin uninstall "$(plugin "$m")" --scope "$s" >/dev/null || failed=1; done < <(sort -u "$snapshot")
+  return "$failed"
+}
+restore() {
+  local m s enabled
+  # Clear whatever managed state remains, then replay the exact saved tuples.
+  for s in project local; do for m in "${AGK_CLAUDE_MODES[@]}"; do claude plugin uninstall "$(plugin "$m")" --scope "$s" >/dev/null 2>&1 || true; done; done
+  while IFS=$'\t' read -r m s enabled; do
+    [[ -z $m ]] && continue
+    claude plugin install "$(plugin "$m")" --scope "$s" >/dev/null 2>&1 || continue
+    [[ $enabled == 0 ]] || claude plugin enable "$(plugin "$m")" --scope "$s" >/dev/null 2>&1 || true
+  done < "$snapshot"
+  claude plugin list --json >"$listing" 2>/dev/null || return 1
+  if python3 - "$listing" "$snapshot" "$AGK_CLAUDE_MARKETPLACE" "${AGK_CLAUDE_MODES[@]}" <<'PY' >/dev/null 2>&1
+import json,pathlib,sys
+source,wanted,market,*modes=sys.argv[1:]; data=json.loads(pathlib.Path(source).read_text()); rows=[]
+for x in data:
+ if '@' in x.get('id',''):
+  n,o=x['id'].rsplit('@',1)
+  if o==market and n in modes and x.get('scope') in ('project','local'): rows.append((n,x['scope'],'1' if x.get('enabled') else '0'))
+actual=''.join('\t'.join(x)+'\n' for x in sorted(rows))
+raise SystemExit(0 if actual==pathlib.Path(wanted).read_text() else 1)
+PY
+  then return 0; else return 1; fi
+}
+fail_and_restore() { if restore; then printf 'selection failed; previous managed state restored\n' >&2; else printf 'selection failed; managed state restoration incomplete\n' >&2; fi; exit 1; }
+
+if (( ! remove )) && [[ $(wc -l <"$snapshot" | tr -d ' ') == 1 ]] && grep -Fxq "$target"$'\t'"$scope"$'\t1' "$snapshot"; then
+  "$script_dir/verify-claude-mode" "$target" "$project" >/dev/null || { printf 'selection failed; previous managed state restored\n' >&2; exit 1; }
+  claude plugin update "$(plugin "$target")" --scope "$scope" >/dev/null || { printf 'selection failed; previous managed state restored\n' >&2; exit 1; }
+  "$script_dir/verify-claude-mode" "$target" "$project" >/dev/null || { printf 'update applied but verification failed\n' >&2; exit 1; }
+  printf 'Updated Claude mode %s (%s).\n' "$target" "$scope"; exit 0
+fi
+
+changed=$(awk -F '\t' '{print $2}' "$snapshot" | sort -u | paste -sd, -)
+remove_all || fail_and_restore
+if (( ! remove )); then
+  claude plugin install "$(plugin "$target")" --scope "$scope" >/dev/null || fail_and_restore
+  claude plugin enable "$(plugin "$target")" --scope "$scope" >/dev/null || fail_and_restore
+  "$script_dir/verify-claude-mode" "$target" "$project" >/dev/null || fail_and_restore
+  printf 'Selected Claude mode %s (%s).\n' "$target" "$scope"
+else
+  "$script_dir/verify-claude-mode" --no-managed-mode "$project" >/dev/null || fail_and_restore
+  [[ -z $changed ]] && changed=none
+  printf 'Removed Claude managed modes; changed scopes: %s.\n' "$changed"
+fi

@@ -14,9 +14,94 @@ reset_state() { rm -f "$AI_GUARDRAIL_CLAUDE_TEST_STATE"/*.json; }
 install() { claude plugin install "$1@ai-guardrail-kit" --scope "$2" >/dev/null; }
 enable() { claude plugin enable "$1@ai-guardrail-kit" --scope "$2" >/dev/null; }
 
-[[ ${1:-state} == state ]] || fail "unknown test group: ${1:-}"
+group=${1:-state}
+[[ $group == state || $group == lifecycle ]] || fail "unknown test group: $group"
 # shellcheck source=../scripts/claude-mode-lib.sh
 source "$repo/scripts/claude-mode-lib.sh"
+
+if [[ $group == lifecycle ]]; then
+  project="$tmp/project"; mkdir -p "$project"
+  select_mode() { "$repo/scripts/select-claude-mode" "$@" "$project"; }
+  verify_mode() { "$repo/scripts/verify-claude-mode" "$@" "$project"; }
+  assert_effective() { verify_mode "$1" >/dev/null || fail "effective mode is not $1"; }
+  state_digest() { find "$AI_GUARDRAIL_CLAUDE_TEST_STATE" -type f -maxdepth 1 -print0 | sort -z | xargs -0 shasum -a 256 2>/dev/null || true; }
+  managed_state() { python3 - "$AI_GUARDRAIL_CLAUDE_TEST_STATE" <<'PY'
+import json, pathlib, sys
+root=pathlib.Path(sys.argv[1]); rows=[]
+for scope in ('project','local'):
+ p=root/f'{scope}.json'
+ for x in json.loads(p.read_text()) if p.exists() else []:
+  if x['id'].endswith('@ai-guardrail-kit') and x['id'].split('@')[0] in ('decomposition-gate','harness','integrated-harness'):
+   rows.append((x['id'],scope,x['enabled']))
+print(rows)
+PY
+  }
+
+  reset_state
+  before=$(state_digest)
+  ! select_mode bogus >/dev/null 2>&1 || fail 'invalid mode accepted'
+  ! select_mode harness --scope user >/dev/null 2>&1 || fail 'user scope accepted'
+  [[ $before == "$(state_digest)" ]] || fail 'invalid input mutated state'
+
+  select_mode decomposition-gate >/dev/null; assert_effective decomposition-gate
+  [[ -f $AI_GUARDRAIL_CLAUDE_TEST_STATE/project.json ]] || fail 'project was not the default scope'
+  before=$(state_digest); verify_mode decomposition-gate >/dev/null
+  [[ $before == "$(state_digest)" ]] || fail 'verifier mutated plugin state'
+  select_mode decomposition-gate >/dev/null; assert_effective decomposition-gate
+  for from in decomposition-gate harness integrated-harness; do
+    for to in decomposition-gate harness integrated-harness; do
+      [[ $from == "$to" ]] && continue
+      reset_state; select_mode "$from" >/dev/null; select_mode "$to" >/dev/null; assert_effective "$to"
+    done
+  done
+
+  reset_state; install harness project; enable harness project; install decomposition-gate local; enable decomposition-gate local
+  select_mode harness --scope project >/dev/null; assert_effective harness
+  [[ $(agk_claude_list_scope local) == '' ]] || fail 'local conflict survived project selection'
+  reset_state; install harness project; enable harness project; install decomposition-gate local; enable decomposition-gate local
+  select_mode decomposition-gate --scope local >/dev/null; assert_effective decomposition-gate
+  [[ $(agk_claude_list_scope project) == '' ]] || fail 'project conflict survived local selection'
+  install decomposition-gate project; enable decomposition-gate project
+  select_mode decomposition-gate --scope local >/dev/null
+  [[ $(agk_claude_list_scope project) == '' ]] || fail 'duplicate target copy survived'
+
+  install unrelated@elsewhere project; enable unrelated@elsewhere project
+  output=$(select_mode --remove)
+  verify_mode --no-managed-mode >/dev/null || fail 'remove did not reach empty effective state'
+  grep -Fq 'local' <<<"$output" || fail 'remove did not report changed local scope'
+  grep -q 'unrelated@elsewhere' "$AI_GUARDRAIL_CLAUDE_TEST_STATE/project.json" || fail 'unrelated plugin removed'
+
+  reset_state; install harness project; enable harness project
+  before=$(managed_state); export FAKE_CLAUDE_FAIL_INSTALL=integrated-harness
+  output=$(select_mode integrated-harness 2>&1) && fail 'install failure accepted'
+  unset FAKE_CLAUDE_FAIL_INSTALL
+  grep -Fq 'selection failed; previous managed state restored' <<<"$output" || fail 'successful restoration wording missing'
+  [[ $before == "$(managed_state)" ]] || fail 'install failure did not restore state'
+
+  reset_state; install harness project; enable harness project
+  before=$(managed_state); export FAKE_CLAUDE_FAIL_REMOVE=harness
+  output=$(select_mode integrated-harness 2>&1) && fail 'remove failure accepted'
+  unset FAKE_CLAUDE_FAIL_REMOVE
+  grep -Fq 'selection failed; previous managed state restored' <<<"$output" || fail 'remove restoration wording missing'
+  [[ $before == "$(managed_state)" ]] || fail 'remove failure did not restore state'
+
+  reset_state; install harness project; enable harness project
+  export FAKE_CLAUDE_FAIL_INSTALL=integrated-harness FAKE_CLAUDE_FAIL_ENABLE=harness
+  output=$(select_mode integrated-harness 2>&1) && fail 'incomplete restoration accepted'
+  unset FAKE_CLAUDE_FAIL_INSTALL FAKE_CLAUDE_FAIL_ENABLE
+  grep -Fq 'selection failed; managed state restoration incomplete' <<<"$output" || fail 'incomplete restoration wording missing'
+
+  reset_state; install harness project; enable harness project
+  export FAKE_CLAUDE_COMMIT_THEN_FAIL_VERIFY=1
+  output=$(select_mode harness 2>&1) && fail 'post-update verification failure accepted'
+  unset FAKE_CLAUDE_COMMIT_THEN_FAIL_VERIFY
+  grep -Fq 'update applied but verification failed' <<<"$output" || fail 'commit-point wording missing'
+
+  export FAKE_CLAUDE_LIST_OUTPUT='{bad'
+  ! verify_mode harness >/dev/null 2>&1 || fail 'malformed listing accepted by verifier'
+  unset FAKE_CLAUDE_LIST_OUTPUT
+  printf 'PASS: transactional Claude mode switching\n'; exit 0
+fi
 
 assert_output $'decomposition-gate\nharness\nintegrated-harness' agk_claude_modes
 agk_claude_validate_scope project || fail 'project scope rejected'

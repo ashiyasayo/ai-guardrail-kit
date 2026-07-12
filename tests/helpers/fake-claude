@@ -64,6 +64,7 @@ PY
     mode=${plugin%@*}
     if [[ $operation == install && ${FAKE_CLAUDE_FAIL_INSTALL:-} == "$mode" ]]; then exit 42; fi
     if [[ $operation == uninstall && ${FAKE_CLAUDE_FAIL_REMOVE:-} == "$mode" ]]; then exit 42; fi
+    if [[ $operation == enable && ${FAKE_CLAUDE_FAIL_ENABLE:-} == "$mode" ]]; then exit 42; fi
     mutate "$operation" "$plugin" "$SCOPE"
     ;;
   *) printf 'fake claude: unsupported plugin operation\n' >&2; exit 2;;
