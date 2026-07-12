@@ -11,9 +11,18 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from typing import NamedTuple, Optional
 
 root = Path(os.environ["ROOT"])
 fixtures = root / "tests/fixtures/claude"
+
+
+class RunResult(NamedTuple):
+    status: int
+    decision: Optional[str]
+    reason: Optional[str]
+    stdout: str
+    stderr: str
 
 
 def fixture(name):
@@ -40,17 +49,17 @@ def run(hook, data, project):
     specific = output["hookSpecificOutput"] if output else None
     decision = specific["permissionDecision"] if specific else None
     reason = specific["permissionDecisionReason"] if specific else None
-    return proc.returncode, decision, reason, proc.stderr
+    return RunResult(proc.returncode, decision, reason, proc.stdout, proc.stderr)
 
 
 def normalize(result):
-    status, decision, reason, stderr = result
+    status, decision, reason, stdout, stderr = result
     if reason is not None:
         reason = reason.replace(
             'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/approve_plan.py"',
             "python3 .claude/hooks/approve_plan.py",
         )
-    return status, decision, reason, stderr
+    return status, decision, reason, stdout, stderr
 
 
 def assert_pair(legacy, packaged, data, project):
@@ -59,12 +68,26 @@ def assert_pair(legacy, packaged, data, project):
     assert normalize(old)[:3] == normalize(new)[:3], (
         legacy, packaged, old[:3], new[:3]
     )
-    assert old[3] == new[3], (old[3], new[3])
+    assert old.stderr == new.stderr, (old.stderr, new.stderr)
     return old
 
 
 def assert_denied(result):
     assert result[0] == 2 or result[1] == "deny", result
+
+
+def assert_allowed(result):
+    assert result.status == 0 and result.decision != "deny", result
+
+
+# Guard the test harness itself: a hook process that crashes without emitting a
+# deny decision is not an allowed operation.
+try:
+    assert_allowed(RunResult(2, None, None, "", "hook failed"))
+except AssertionError:
+    pass
+else:
+    raise AssertionError("assert_allowed accepted a non-zero hook exit")
 
 
 with tempfile.TemporaryDirectory() as td:
@@ -78,7 +101,7 @@ with tempfile.TemporaryDirectory() as td:
     plan.write_text("## 已知資訊\n## 缺少的資訊\n")
     assert_denied(assert_pair(legacy_dg, packaged_dg, event(project), project))
     plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】none\n")
-    assert assert_pair(legacy_dg, packaged_dg, event(project), project)[1] is None
+    assert_allowed(assert_pair(legacy_dg, packaged_dg, event(project), project))
 
     for mode in ("harness", "integrated-harness"):
         legacy = root / mode / ".claude/hooks"
@@ -88,13 +111,13 @@ with tempfile.TemporaryDirectory() as td:
         ))
         allow = fixture("allow.json")
         allow["cwd"] = str(project)
-        assert assert_pair(
+        assert_allowed(assert_pair(
             legacy / "block_dangerous_commands.py",
             packaged / "block_dangerous_commands.py", allow, project,
-        )[1] is None
-        assert assert_pair(
+        ))
+        assert_allowed(assert_pair(
             legacy / "block_secrets.py", packaged / "block_secrets.py", allow, project,
-        )[1] is None
+        ))
         dangerous = fixture("dangerous-command.json")
         dangerous["cwd"] = str(project)
         assert_denied(assert_pair(
@@ -107,7 +130,10 @@ with tempfile.TemporaryDirectory() as td:
             legacy / "block_secrets.py", packaged / "block_secrets.py", secret, project
         )
         assert_denied(result)
-        assert "AKIA1234567890ABCDEF" not in json.dumps(result, ensure_ascii=False)
+        for hook in (legacy / "block_secrets.py", packaged / "block_secrets.py"):
+            raw = run(hook, secret, project)
+            assert "AKIA1234567890ABCDEF" not in raw.stdout, (hook, raw.stdout)
+            assert "AKIA1234567890ABCDEF" not in raw.stderr, (hook, raw.stderr)
 
     integrated_legacy = root / "integrated-harness/.claude/hooks"
     integrated_packaged = root / "claude/plugins/integrated-harness/hooks"
@@ -125,10 +151,10 @@ with tempfile.TemporaryDirectory() as td:
     digest = hashlib.sha256(plan.read_bytes()).hexdigest()
     approval = project / ".claude/.plan_approved"
     approval.write_text(json.dumps({"approved_at": time.time(), "plan_sha256": digest}))
-    assert assert_pair(
+    assert_allowed(assert_pair(
         integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py",
         event(project), project,
-    )[1] is None
+    ))
     plan.write_text(plan.read_text() + "changed\n")
     stale = assert_pair(
         integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py",
@@ -136,10 +162,10 @@ with tempfile.TemporaryDirectory() as td:
     )
     assert_denied(stale)
     policy.write_text(policy.read_text().replace("核准模式：strict", "核准模式：light", 1))
-    assert assert_pair(
+    assert_allowed(assert_pair(
         integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py",
         event(project), project,
-    )[1] is None
+    ))
 
 for mode in ("harness", "integrated-harness"):
     for name in ("block_dangerous_commands.py", "block_secrets.py"):
