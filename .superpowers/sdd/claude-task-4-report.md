@@ -150,3 +150,24 @@ PASS: Codex standalone guardrail mode checks
 ```
 
 The legacy decomposition and integrated-harness smoke/orchestration suites also completed with zero failures.
+
+## Marketplace source-resolution remediation
+
+### RED
+
+Source identity, malformed source, same-scope ambiguity, and cross-scope precedence regressions were added before production changes.
+
+```text
+$ bash tests/claude_mode_switch_test.sh lifecycle
+FAIL: wrong-source marketplace resolution accepted
+```
+
+### Fix
+
+The selector now canonicalizes `$repo/claude`, parses the Claude 2.1.207 marketplace `source` field, and requires the applicable `ai-guardrail-kit` record to resolve exactly to that directory. Scoped records use Claude's local-over-project precedence; duplicate applicable records, mixed scoped/unscoped ambiguity, missing or non-string sources, nonexistent paths, and wrong canonical sources fail before lifecycle state inspection or mutation. Tests cover the correct source, wrong source, missing/malformed source, duplicate same-scope identity, a wrong local registration shadowing the correct project registration, and a correct local registration shadowing a wrong project registration.
+
+### GREEN
+
+```text
+PASS: transactional Claude mode switching
+```

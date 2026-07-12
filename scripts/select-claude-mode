@@ -26,12 +26,26 @@ for capability in list install update uninstall enable disable; do
 done
 marketplaces=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-claude-marketplaces.XXXXXX") || exit 1
 if ! ccli plugin marketplace list --json >"$marketplaces"; then rm -f "$marketplaces"; printf 'required Claude marketplace capability is unavailable\n' >&2; exit 1; fi
-python3 - "$marketplaces" "$AGK_CLAUDE_MARKETPLACE" <<'PY' || { rm -f "$marketplaces"; printf 'ai-guardrail-kit marketplace is not registered or resolvable\n' >&2; exit 1; }
+expected_marketplace=$(cd "$repo/claude" && pwd -P) || { rm -f "$marketplaces"; exit 1; }
+python3 - "$marketplaces" "$AGK_CLAUDE_MARKETPLACE" "$expected_marketplace" <<'PY' || { rm -f "$marketplaces"; printf 'ai-guardrail-kit marketplace is not registered or resolvable\n' >&2; exit 1; }
 import json,pathlib,sys
 try: data=json.loads(pathlib.Path(sys.argv[1]).read_text())
 except (OSError,UnicodeError,json.JSONDecodeError): raise SystemExit(1)
-if not isinstance(data,list) or any(not isinstance(x,dict) or not isinstance(x.get('name'),str) for x in data): raise SystemExit(1)
-if not any(x['name']==sys.argv[2] for x in data): raise SystemExit(1)
+if not isinstance(data,list) or any(not isinstance(x,dict) or not isinstance(x.get('name'),str) or not isinstance(x.get('source'),str) for x in data): raise SystemExit(1)
+matches=[x for x in data if x['name']==sys.argv[2]]
+if not matches: raise SystemExit(1)
+if any('scope' in x and x['scope'] not in ('project','local') for x in matches): raise SystemExit(1)
+scoped=[x for x in matches if 'scope' in x]
+unscoped=[x for x in matches if 'scope' not in x]
+if scoped and unscoped: raise SystemExit(1)
+if scoped:
+    local=[x for x in scoped if x['scope']=='local']
+    applicable=local if local else [x for x in scoped if x['scope']=='project']
+else: applicable=unscoped
+if len(applicable)!=1: raise SystemExit(1)
+try: actual=pathlib.Path(applicable[0]['source']).expanduser().resolve(strict=True)
+except (OSError,RuntimeError): raise SystemExit(1)
+if actual != pathlib.Path(sys.argv[3]).resolve(strict=True): raise SystemExit(1)
 PY
 rm -f "$marketplaces"
 

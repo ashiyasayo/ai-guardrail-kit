@@ -139,6 +139,24 @@ PY
   unset FAKE_CLAUDE_UNREGISTERED_MARKETPLACE
   [[ ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/project.json && ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/local.json ]] || fail 'unregistered marketplace mutated lifecycle state'
 
+  expected_marketplace=$(cd "$repo/claude" && pwd -P)
+  assert_bad_marketplace_resolution() {
+    local label=$1 listing=$2
+    reset_state; export FAKE_CLAUDE_MARKETPLACE_LIST_OUTPUT=$listing
+    output=$(select_mode harness 2>&1) && fail "$label marketplace resolution accepted"
+    unset FAKE_CLAUDE_MARKETPLACE_LIST_OUTPUT
+    [[ ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/project.json && ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/local.json ]] || fail "$label marketplace resolution mutated lifecycle state"
+  }
+  assert_bad_marketplace_resolution wrong-source '[{"name":"ai-guardrail-kit","source":"/tmp/wrong","scope":"project"}]'
+  assert_bad_marketplace_resolution missing-source '[{"name":"ai-guardrail-kit","scope":"project"}]'
+  assert_bad_marketplace_resolution malformed-source '[{"name":"ai-guardrail-kit","source":7,"scope":"project"}]'
+  assert_bad_marketplace_resolution duplicate-same-scope "[{\"name\":\"ai-guardrail-kit\",\"source\":\"$expected_marketplace\",\"scope\":\"project\"},{\"name\":\"ai-guardrail-kit\",\"source\":\"$expected_marketplace\",\"scope\":\"project\"}]"
+  assert_bad_marketplace_resolution local-shadows-project "[{\"name\":\"ai-guardrail-kit\",\"source\":\"$expected_marketplace\",\"scope\":\"project\"},{\"name\":\"ai-guardrail-kit\",\"source\":\"/tmp/wrong\",\"scope\":\"local\"}]"
+  reset_state
+  export FAKE_CLAUDE_MARKETPLACE_LIST_OUTPUT="[{\"name\":\"ai-guardrail-kit\",\"source\":\"/tmp/wrong\",\"scope\":\"project\"},{\"name\":\"ai-guardrail-kit\",\"source\":\"$expected_marketplace\",\"scope\":\"local\"}]"
+  select_mode harness >/dev/null || fail 'correct local marketplace did not take precedence over project'
+  unset FAKE_CLAUDE_MARKETPLACE_LIST_OUTPUT
+
   bad_repo="$tmp/bad-repo"; cp -R "$repo" "$bad_repo"; printf '{bad\n' > "$bad_repo/claude/plugins/harness/hooks/hooks.json"
   reset_state
   ! "$bad_repo/scripts/select-claude-mode" harness "$project" >/dev/null 2>&1 || fail 'malformed package accepted'
