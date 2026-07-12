@@ -54,6 +54,27 @@ trap cleanup EXIT
 trap 'on_signal INT 130' INT
 trap 'on_signal TERM 143' TERM
 trap 'on_signal HUP 129' HUP
+
+# A same-mode refresh has a different commit boundary from a mode switch. The
+# official add command replaces cached content in place: failure preserves the
+# old install, while success cannot be rolled back to the prior content bytes.
+if (( ! remove )) && [[ $(<"$snapshot/modes") == "$mode" ]]; then
+  if ! "$script_dir/verify-codex-mode" "$mode" "$project" >/dev/null; then
+    agk_die 'current mode is not exact; run a normal mode switch to repair state'
+    exit 1
+  fi
+  if ! codex plugin add "$(agk_plugin_path "$mode")" >/dev/null; then
+    agk_die 'update failed; previous installed state remains'
+    exit 1
+  fi
+  if ! "$script_dir/verify-codex-mode" "$mode" "$project" >/dev/null; then
+    agk_die 'update applied but verification failed'
+    exit 1
+  fi
+  printf 'Refreshed Codex mode %s; start a new thread to activate it.\n' "$mode"
+  exit 0
+fi
+
 for other in "${AGK_MODES[@]}"; do
   if grep -Fxq "$other" "$snapshot/modes"; then
     codex plugin remove "$(agk_plugin_path "$other")" >/dev/null || { rollback; exit 1; }

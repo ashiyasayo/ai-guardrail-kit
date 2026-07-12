@@ -8,7 +8,7 @@ source "$script_dir/codex-mode-lib.sh"
 expected=''
 no_managed=0
 if [[ ${1:-} == --no-managed-mode ]]; then no_managed=1; shift; fi
-if [[ $# -gt 0 ]] && agk_valid_mode "$1"; then expected=$1; shift; fi
+if (( ! no_managed )) && [[ $# -gt 0 ]] && agk_valid_mode "$1"; then expected=$1; shift; fi
 [[ $# -le 1 ]] || { agk_die 'usage: verify-codex-mode [--no-managed-mode | expected-mode] [project-dir]'; exit 2; }
 project=$(agk_resolve_project "${1:-.}") || exit 1
 agk_validate_config "$project" || exit 1

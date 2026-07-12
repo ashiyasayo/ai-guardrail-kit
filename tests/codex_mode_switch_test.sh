@@ -27,6 +27,8 @@ assert_mode decomposition-gate "$project"
 grep -Fq 'prefix = "unchanged"' "$project/.codex/config.toml" || fail 'prefix changed'
 grep -Fq '# suffix stays too' "$project/.codex/config.toml" || fail 'suffix changed'
 first=$(shasum -a 256 "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")
+generation_file="$AI_GUARDRAIL_TEST_STATE/generation.decomposition-gate_ai-guardrail-kit"
+[[ $(<"$generation_file") -eq 1 ]] || fail 'initial install generation missing'
 assert_bad_json '{"installed":[{"pluginId":"decomposition-gate@ai-guardrail-kit","name":"decomposition-gate","marketplaceName":"ai-guardrail-kit","installed":true,"enabled":false}]}'
 assert_bad_json '{"installed":[{"pluginId":"wrong@ai-guardrail-kit","name":"decomposition-gate","marketplaceName":"ai-guardrail-kit","installed":true,"enabled":true}]}'
 assert_bad_json '{"installed":[{"pluginId":"decomposition-gate@ai-guardrail-kit","name":"decomposition-gate","marketplaceName":"ai-guardrail-kit","installed":true,"enabled":true},{"pluginId":"decomposition-gate@ai-guardrail-kit","name":"decomposition-gate","marketplaceName":"ai-guardrail-kit","installed":true,"enabled":true}]}'
@@ -38,12 +40,29 @@ assert_bad_json '{"installed":[{"pluginId":7,"name":"decomposition-gate","market
 "$repo/scripts/select-codex-mode" decomposition-gate "$project"
 [[ $(<"$AI_GUARDRAIL_TEST_STATE/add.count") -eq 2 ]] || fail 'same mode was not refreshed'
 [[ $first == "$(shasum -a 256 "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'refresh changed final state'
+[[ $(<"$generation_file") -eq 2 ]] || fail 'successful refresh did not advance generation'
 
 config_before=$(shasum -a 256 "$project/.codex/config.toml"); plugins_before=$(cat "$AI_GUARDRAIL_TEST_STATE/installed")
 export FAKE_CODEX_FAIL_OPERATION=add:3
 if "$repo/scripts/select-codex-mode" decomposition-gate "$project" >/dev/null 2>&1; then fail 'refresh add failure accepted'; fi
 unset FAKE_CODEX_FAIL_OPERATION
-[[ $config_before == "$(shasum -a 256 "$project/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'refresh add failure not rolled back'
+[[ $config_before == "$(shasum -a 256 "$project/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'failed refresh add changed old state'
+[[ $(<"$generation_file") -eq 2 ]] || fail 'failed refresh add changed installed generation'
+
+list_count=$(<"$AI_GUARDRAIL_TEST_STATE/list.count")
+export FAKE_CODEX_FAIL_OPERATION="list:$((list_count + 3))"
+output=$("$repo/scripts/select-codex-mode" decomposition-gate "$project" 2>&1) && fail 'refresh post-check failure accepted'
+unset FAKE_CODEX_FAIL_OPERATION
+grep -Fq 'update applied but verification failed' <<<"$output" || fail 'post-commit refresh failure message missing'
+! grep -Fq 'rollback' <<<"$output" || fail 'post-commit refresh falsely claimed rollback'
+[[ $(<"$generation_file") -eq 3 ]] || fail 'post-check failure did not retain applied refresh'
+
+sed -i.bak 's|decomposition-gate/hooks|harness/hooks|' "$project/.codex/config.toml"
+config_before=$(shasum -a 256 "$project/.codex/config.toml"); generation_before=$(<"$generation_file")
+output=$("$repo/scripts/select-codex-mode" decomposition-gate "$project" 2>&1) && fail 'mismatched same-mode state refreshed'
+grep -Fq 'run a normal mode switch to repair state' <<<"$output" || fail 'refresh mismatch repair guidance missing'
+[[ $config_before == "$(shasum -a 256 "$project/.codex/config.toml")" && $generation_before == "$(<"$generation_file")" ]] || fail 'refresh mismatch mutated state'
+sed -i.bak 's|harness/hooks|decomposition-gate/hooks|' "$project/.codex/config.toml"
 
 printf '%s\n' unrelated@elsewhere >> "$AI_GUARDRAIL_TEST_STATE/installed"
 before_bytes=$(shasum -a 256 "$project/.codex/config.toml")
@@ -56,6 +75,29 @@ grep -Fq '# suffix stays too' "$project/.codex/config.toml" || fail 'remove chan
 removed=$(shasum -a 256 "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")
 "$repo/scripts/select-codex-mode" --remove "$project"
 [[ $removed == "$(shasum -a 256 "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'remove not idempotent'
+
+if "$repo/scripts/verify-codex-mode" --no-managed-mode harness "$project" >/dev/null 2>&1; then fail 'contradictory verifier syntax accepted'; fi
+
+new_project "$tmp/remove-fail"; "$repo/scripts/select-codex-mode" harness "$tmp/remove-fail" >/dev/null
+remove_before=$(shasum -a 256 "$tmp/remove-fail/.codex/config.toml"); plugins_before=$(cat "$AI_GUARDRAIL_TEST_STATE/installed")
+export FAKE_CODEX_FAIL_OPERATION=remove
+output=$("$repo/scripts/select-codex-mode" --remove "$tmp/remove-fail" 2>&1) && fail 'uninstall remove failure accepted'
+unset FAKE_CODEX_FAIL_OPERATION
+grep -Fq 'rollback succeeded' <<<"$output" || fail 'uninstall failure rollback missing'
+[[ $remove_before == "$(shasum -a 256 "$tmp/remove-fail/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'uninstall failure changed state'
+
+export AI_GUARDRAIL_TEST_FAIL_CONFIG_WRITE=1
+output=$("$repo/scripts/select-codex-mode" --remove "$tmp/remove-fail" 2>&1) && fail 'uninstall config failure accepted'
+unset AI_GUARDRAIL_TEST_FAIL_CONFIG_WRITE
+grep -Fq 'rollback succeeded' <<<"$output" || fail 'uninstall config rollback missing'
+[[ $remove_before == "$(shasum -a 256 "$tmp/remove-fail/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'uninstall config failure changed state'
+
+list_count=$(<"$AI_GUARDRAIL_TEST_STATE/list.count")
+export FAKE_CODEX_FAIL_OPERATION="list:$((list_count + 2))"
+output=$("$repo/scripts/select-codex-mode" --remove "$tmp/remove-fail" 2>&1) && fail 'uninstall final verification failure accepted'
+unset FAKE_CODEX_FAIL_OPERATION
+grep -Fq 'rollback succeeded' <<<"$output" || fail 'uninstall final verification rollback missing'
+[[ $remove_before == "$(shasum -a 256 "$tmp/remove-fail/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'uninstall final verification changed state'
 
 for from in decomposition-gate harness integrated-harness; do
   for to in decomposition-gate harness integrated-harness; do

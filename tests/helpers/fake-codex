@@ -42,6 +42,9 @@ PY
   add)
     plugin=${3:?missing plugin}; count_operation add; fail_if_requested add "$plugin"
     grep -Fxq "$plugin" "$installed" || printf '%s\n' "$plugin" >> "$installed"
+    generation_file="$state/generation.${plugin//@/_}"
+    generation=0; [[ -f $generation_file ]] && read -r generation < "$generation_file"
+    printf '%s\n' "$((generation + 1))" > "$generation_file"
     if [[ ${FAKE_CODEX_DELAY_AFTER_OPERATION:-} == add ]]; then sleep 2; fi
     ;;
   remove)

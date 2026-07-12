@@ -87,5 +87,8 @@ forward or rollback filesystem mutation. A native helper using `openat(2)` and
 
 ## Blocking product-fix addendum
 
-Added transactional same-mode refresh and selector-owned `--remove`, including
-explicit no-managed-mode verification and preservation of unrelated state.
+Added selector-owned transactional `--remove` and corrected same-mode refresh:
+it prevalidates exact state, does not rewrite config or remove the target, and
+treats official add as the irreversible commit point. The fake CLI tracks content
+generations, proving failed add preserves old content and successful add advances
+it. Post-check failure reports an applied update without false rollback.

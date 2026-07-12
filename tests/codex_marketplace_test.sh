@@ -53,11 +53,15 @@ required = {
  'native Codex `ask`': 'native approval semantics',
  'codex plugin add/remove': 'direct CLI desynchronization boundary',
  'refresh': 'local update workflow',
+ 'update applied but verification failed': 'post-commit refresh failure',
+ 'irreversible update commit point': 'refresh commit point',
  'TOCTOU': 'selector race limitation',
 }
 for needle, label in required.items():
  check(needle in guide, f'Codex guide must document {label}')
 check('/Users/' not in guide, 'Codex guide must not contain a developer-machine path')
+check('removes and re-adds' not in guide, 'Codex guide retains obsolete refresh workaround')
+check('refreshes cached plugin content with transactional rollback' not in guide, 'Codex guide falsely promises refresh rollback')
 for name in names:
  skill=(root/f'codex/plugins/{name}/skills/{name}/SKILL.md').read_text()
  check('new thread' in skill, f'{name}: skill must require a new thread')

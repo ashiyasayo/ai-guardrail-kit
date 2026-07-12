@@ -109,12 +109,22 @@ Its operation is:
    remain.
 
 An invalid mode, marketplace, or uneditable project configuration causes no state
-change. If target installation or hook activation fails after another mode was
+change. Distinct-mode switches and removal are transactional. If target
+installation or hook activation fails after another mode was
 removed, the selector attempts to restore both the previous plugin and the
 previous managed hook block. Configuration writes use a temporary sibling file
 and atomic rename. The selector exits unsuccessfully and reports whether
 restoration succeeded; it never reports a successful switch unless final
 verification passes.
+
+Same-mode refresh does not remove the target or rewrite configuration. It first
+prevalidates the exact installed state, exact managed block, repository hook
+paths, and executable sources. A mismatch fails without mutation and directs the
+user to perform a normal switch repair. The official `codex plugin add
+<target>@ai-guardrail-kit` is then the final irreversible commit point. Per the
+CLI contract, add failure preserves the old installed content. Once add succeeds,
+the selector cannot restore the prior cached generation: a failed post-check is
+reported as `update applied but verification failed`, with no rollback claim.
 
 The verifier supports both human use and CI. It fails when more than one managed
 mode is installed, when the managed hook block does not match the installed mode,
@@ -191,7 +201,8 @@ Implementation follows test-first development. Automated tests cover:
 - exactly three correctly named marketplace entries;
 - no state mutation for an invalid mode;
 - all six transitions between distinct modes;
-- idempotent selection of the already active mode;
+- same-mode refresh generation advance, failed-add generation preservation, and
+  honest post-commit verification failure reporting;
 - restoration reporting after simulated installation failure;
 - atomic rollback after simulated hook-configuration failure;
 - conflict detection when two or more modes appear installed;

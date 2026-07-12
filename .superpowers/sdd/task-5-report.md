@@ -80,6 +80,8 @@ absolute path.
 
 ## Blocking product-fix addendum
 
-The manual workaround is superseded by transactional refresh and the exact safe
-remove/absence-verification commands. The unexplained plugin-creator placeholder
-was removed from user documentation.
+The manual workaround is superseded by prevalidated same-mode refresh and the
+exact safe remove/absence-verification commands. Refresh is irreversible after
+official add succeeds; transactional rollback remains for cross-mode switching
+and removal. The unexplained plugin-creator placeholder was removed from user
+documentation.

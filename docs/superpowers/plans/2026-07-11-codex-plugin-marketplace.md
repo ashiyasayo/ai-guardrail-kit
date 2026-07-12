@@ -239,6 +239,8 @@ git commit -m "feat: add transactional Codex mode switching"
 **Interfaces:**
 - Documents marketplace-add, select, verify, update, remove, approval, and new-thread workflows.
 - Explicitly documents that direct `codex plugin add/remove` can desynchronize hooks.
+- Separates transactional switching/removal from same-mode refresh, whose
+  official add is the final irreversible commit point.
 
 - [ ] **Step 1: Add failing documentation assertions**
 

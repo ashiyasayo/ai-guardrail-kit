@@ -72,23 +72,28 @@ safe.
 ## Local update workflow
 
 Codex caches installed local plugin content. During repository development,
-refresh the selected plugin transactionally through the selector:
+refresh the selected plugin through the selector:
 
 ```bash
 ./scripts/select-codex-mode <mode> .
 ./scripts/verify-codex-mode <mode> .
 ```
 
-The selector removes and re-adds an already selected target, so the same command
-refreshes cached plugin content with transactional rollback. Start a new thread
-afterward.
+For a same-mode refresh, the selector first requires the installed plugin,
+managed config block, repository hook paths, and executables to be exact. A
+mismatch is rejected without mutation; run a normal switch to another mode and
+back to repair it. The final `codex plugin add <mode>@ai-guardrail-kit` is the
+irreversible update commit point. If it fails, the old cached generation remains.
+If it succeeds but the post-check fails, the selector reports
+`update applied but verification failed` and does not claim rollback. Start a
+new thread afterward.
 
 ## Failure, rollback, and security boundaries
 
-Before mutation, the selector snapshots managed plugin state and the project
-config. A post-mutation error reports either `rollback succeeded` or `rollback
-also failed`; neither message means the requested switch succeeded. Inspect the
-reported state and rerun the verifier before continuing.
+Mode switches and removals snapshot managed plugin state and project config. A
+post-mutation error reports either `rollback succeeded` or `rollback also
+failed`; neither message means the requested operation succeeded. Same-mode
+refresh follows the distinct irreversible commit-point behavior described above.
 
 Atomic rename protects each config replacement, but validation and snapshotting
 cannot be atomic across an externally mutable project path. A TOCTOU window
