@@ -1,0 +1,21 @@
+{
+  "name": "ai-guardrail-kit",
+  "description": "Guardrail plugins for plan enforcement, secret protection, and safe command execution.",
+  "owner": {
+    "name": "ai-guardrail-kit"
+  },
+  "plugins": [
+    {
+      "name": "decomposition-gate",
+      "source": "./plugins/decomposition-gate"
+    },
+    {
+      "name": "harness",
+      "source": "./plugins/harness"
+    },
+    {
+      "name": "integrated-harness",
+      "source": "./plugins/integrated-harness"
+    }
+  ]
+}

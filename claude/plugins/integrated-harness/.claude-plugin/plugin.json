@@ -1,0 +1,8 @@
+{
+  "name": "integrated-harness",
+  "description": "Integrated plan approval, orchestration, command, and secret guardrails.",
+  "author": {
+    "name": "ai-guardrail-kit"
+  },
+  "version": "0.1.0"
+}

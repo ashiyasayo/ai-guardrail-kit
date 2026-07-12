@@ -1,0 +1,8 @@
+{
+  "name": "decomposition-gate",
+  "description": "Require decomposition plans before repository changes.",
+  "author": {
+    "name": "ai-guardrail-kit"
+  },
+  "version": "0.1.0"
+}

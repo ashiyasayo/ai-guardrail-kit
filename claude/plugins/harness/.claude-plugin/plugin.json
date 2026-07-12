@@ -1,0 +1,8 @@
+{
+  "name": "harness",
+  "description": "Guard repository changes with plan, command, and secret checks.",
+  "author": {
+    "name": "ai-guardrail-kit"
+  },
+  "version": "0.1.0"
+}
