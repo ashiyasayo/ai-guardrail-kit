@@ -54,9 +54,16 @@ for mode in modes:
 
     for runtime_file in plugin_root.rglob("*"):
         if runtime_file.is_file():
-            assert b"$CLAUDE_PROJECT_DIR/.claude/hooks/" not in runtime_file.read_bytes(), (
-                f"legacy hook path in {runtime_file.relative_to(root)}"
-            )
+            contents = runtime_file.read_bytes()
+            for legacy_path in (b"$CLAUDE_PROJECT_DIR/.claude/hooks/", b"python3 .claude/hooks/"):
+                assert legacy_path not in contents, (
+                    f"checkout-dependent hook path in {runtime_file.relative_to(root)}"
+                )
+
+approval_command = 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/approve_plan.py"'
+integrated_root = root / "claude/plugins/integrated-harness"
+assert approval_command in (integrated_root / "orchestration-policy.md").read_text()
+assert approval_command in (integrated_root / "hooks/plan_gate.py").read_text()
 
 print("PASS: Claude marketplace packages are complete")
 PY

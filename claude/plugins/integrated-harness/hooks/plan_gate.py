@@ -308,7 +308,10 @@ def main() -> None:
         return
     passed, reason = check_approval(root)
     if not passed:
-        emit_deny(f"計畫閘門：{reason} 請由人類審查計畫後執行 `python3 .claude/hooks/approve_plan.py`。")
+        emit_deny(
+            f"計畫閘門：{reason} 請由人類審查計畫後執行 "
+            '`python3 "${CLAUDE_PLUGIN_ROOT}/hooks/approve_plan.py"`。'
+        )
 
 
 if __name__ == "__main__":
