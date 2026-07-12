@@ -91,3 +91,28 @@ PASS: packaged Claude guardrails match legacy behavior
 ```
 
 Static verification also completed with zero output/errors from `bash -n`, ShellCheck (when available), and `git diff --check`.
+
+## Re-review remediation
+
+### RED
+
+The remaining marketplace and verifier regressions were added before production changes.
+
+```text
+$ bash tests/claude_mode_switch_test.sh lifecycle
+FAIL: malformed listing misdiagnosed
+```
+
+The malformed JSON path was incorrectly reported as an unsupported user-scope installation, demonstrating that schema validation and user-conflict detection were conflated.
+
+### Fixes
+
+- Marketplace validation now first gathers every entry with the managed name, requires exactly one such entry, and only then validates its source. Both a sole wrong-source entry and a duplicate managed name with a different source are rejected through selector and verifier; selector tests prove no lifecycle mutation occurs.
+- The verifier now invokes `claude plugin list --json` exactly once. One Python parse validates the complete schema and writes a normalized managed tuple snapshot. User-scope conflicts, supported-scope effective modes, enabled-target proof, and scope-qualified conflict diagnostics are all derived from that immutable snapshot.
+- Malformed JSON/schema now emits `malformed Claude plugin state`; user-scope diagnostics are emitted only after successful schema validation.
+
+### GREEN
+
+```text
+PASS: transactional Claude mode switching
+```

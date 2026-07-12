@@ -74,8 +74,8 @@ except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError):
 if market.get("name") != identity or not isinstance(entries, list): raise SystemExit(1)
 wanted = [target] if target else ["decomposition-gate", "harness", "integrated-harness"]
 for mode in wanted:
-    matches=[x for x in entries if isinstance(x,dict) and x.get("name")==mode and x.get("source")==f"./plugins/{mode}"]
-    if len(matches)!=1: raise SystemExit(1)
+    matches=[x for x in entries if isinstance(x,dict) and x.get("name")==mode]
+    if len(matches)!=1 or matches[0].get("source")!=f"./plugins/{mode}": raise SystemExit(1)
     root=pathlib.Path(plugins_name)/mode
     try:
         manifest=json.loads((root/".claude-plugin/plugin.json").read_text())

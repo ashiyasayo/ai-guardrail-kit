@@ -98,8 +98,13 @@ PY
   grep -Fq 'update applied but verification failed' <<<"$output" || fail 'commit-point wording missing'
 
   export FAKE_CLAUDE_LIST_OUTPUT='{bad'
-  ! verify_mode harness >/dev/null 2>&1 || fail 'malformed listing accepted by verifier'
+  output=$(verify_mode harness 2>&1) && fail 'malformed listing accepted by verifier'
+  grep -Fq 'malformed Claude plugin state' <<<"$output" || fail 'malformed listing misdiagnosed'
   unset FAKE_CLAUDE_LIST_OUTPUT
+
+  reset_state; install harness project; enable harness project; : > "$AI_GUARDRAIL_CLAUDE_TEST_STATE/calls.log"
+  verify_mode harness >/dev/null || fail 'single-snapshot verifier rejected valid state'
+  [[ $(grep -c $'\tplugin list --json$' "$AI_GUARDRAIL_CLAUDE_TEST_STATE/calls.log") -eq 1 ]] || fail 'verifier listed Claude state more than once'
 
   reset_state; elsewhere="$tmp/elsewhere"; mkdir -p "$elsewhere"
   export FAKE_CLAUDE_REQUIRE_PROJECT_CWD="$project"
@@ -127,6 +132,21 @@ PY
     reset_state
     ! "$bad_repo/scripts/select-claude-mode" harness "$project" >/dev/null 2>&1 || fail "$defect package defect accepted"
     [[ ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/calls.log ]] || ! grep -Eq $'\tplugin (install|update|uninstall|enable|disable) ' "$AI_GUARDRAIL_CLAUDE_TEST_STATE/calls.log" || fail "$defect package defect reached lifecycle operation"
+  done
+  for defect in wrong-source duplicate-name; do
+    bad_repo="$tmp/bad-$defect"; cp -R "$repo" "$bad_repo"
+    python3 - "$bad_repo/claude/.claude-plugin/marketplace.json" "$defect" <<'PY'
+import json,pathlib,sys
+p=pathlib.Path(sys.argv[1]); data=json.loads(p.read_text()); defect=sys.argv[2]
+entry=next(x for x in data['plugins'] if x['name']=='harness')
+if defect=='wrong-source': entry['source']='./plugins/integrated-harness'
+else: data['plugins'].append({'name':'harness','source':'./plugins/integrated-harness'})
+p.write_text(json.dumps(data))
+PY
+    reset_state
+    ! "$bad_repo/scripts/select-claude-mode" harness "$project" >/dev/null 2>&1 || fail "$defect selector package accepted"
+    [[ ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/calls.log ]] || ! grep -Eq $'\tplugin (install|update|uninstall|enable|disable) ' "$AI_GUARDRAIL_CLAUDE_TEST_STATE/calls.log" || fail "$defect selector reached lifecycle mutation"
+    ! "$bad_repo/scripts/verify-claude-mode" harness "$project" >/dev/null 2>&1 || fail "$defect verifier package accepted"
   done
 
   reset_state; install harness project

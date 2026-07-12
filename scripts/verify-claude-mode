@@ -19,33 +19,45 @@ project=$(cd "$project" && pwd -P) || exit 1
 if (( ! empty )); then agk_claude_validate_package "$repo" "$target" || { printf 'Claude package validation failed\n' >&2; exit 1; }; fi
 
 raw=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-claude-verify.XXXXXX") || exit 1
-trap 'rm -f "$raw"' EXIT
+tuples=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-claude-tuples.XXXXXX") || { rm -f "$raw"; exit 1; }
+trap 'rm -f "$raw" "$tuples"' EXIT
 (cd "$project" && claude plugin list --json) >"$raw" || { printf 'could not inspect Claude plugin state\n' >&2; exit 1; }
-python3 - "$raw" "$AGK_CLAUDE_MARKETPLACE" "${AGK_CLAUDE_MODES[@]}" <<'PY' || { printf 'unsupported managed user-scope installation\n' >&2; exit 1; }
+python3 - "$raw" "$tuples" "$AGK_CLAUDE_MARKETPLACE" "${AGK_CLAUDE_MODES[@]}" <<'PY'
 import json,pathlib,sys
-data=json.loads(pathlib.Path(sys.argv[1]).read_text()); market=sys.argv[2]; modes=set(sys.argv[3:])
+try: data=json.loads(pathlib.Path(sys.argv[1]).read_text())
+except (OSError,UnicodeError,json.JSONDecodeError): raise SystemExit(1)
+dest=pathlib.Path(sys.argv[2]); market=sys.argv[3]; modes=set(sys.argv[4:])
 if not isinstance(data,list): raise SystemExit(1)
+rows=[]
 for x in data:
  if not isinstance(x,dict) or not isinstance(x.get('id'),str) or x.get('scope') not in ('project','local','user') or not isinstance(x.get('enabled'),bool): raise SystemExit(1)
  if '@' in x['id']:
   n,o=x['id'].rsplit('@',1)
-  if n in modes and o==market and x['scope']=='user': raise SystemExit(1)
+  if n in modes and o==market: rows.append((n,x['scope'],'1' if x['enabled'] else '0'))
+if len(rows)!=len(set(rows)): raise SystemExit(1)
+dest.write_text(''.join('\t'.join(x)+'\n' for x in sorted(rows)))
 PY
+parse_status=$?
+[[ $parse_status -eq 0 ]] || { printf 'malformed Claude plugin state\n' >&2; exit 1; }
+if awk -F '\t' '$2=="user" { found=1 } END { exit !found }' "$tuples"; then
+  while IFS=$'\t' read -r mode scope enabled; do [[ $scope == user ]] && printf 'conflict: %s (user)\n' "$mode" >&2; done < "$tuples"
+  printf 'unsupported managed user-scope installation\n' >&2; exit 1
+fi
 
-effective=$(cd "$project" && agk_claude_effective_modes) || { printf 'could not inspect Claude plugin state\n' >&2; exit 1; }
+effective=$(awk -F '\t' '$2!="user" && $3==1 { print $1 }' "$tuples" | sort -u)
 if (( empty )); then
   [[ -z $effective ]] || { while IFS= read -r mode; do [[ -n $mode ]] && printf 'managed mode remains: %s\n' "$mode" >&2; done <<<"$effective"; exit 1; }
   printf 'Verified no managed Claude mode.\n'; exit 0
 fi
 if [[ $effective != "$target" ]]; then
   for scope in project local; do
-    modes=$(cd "$project" && agk_claude_list_scope "$scope") || { printf 'could not inspect %s scope\n' "$scope" >&2; exit 1; }
+    modes=$(awk -F '\t' -v scope="$scope" '$2==scope && $3==1 { print $1 }' "$tuples" | sort -u)
     while IFS= read -r mode; do [[ -n $mode && $mode != "$target" ]] && printf 'conflict: %s (%s)\n' "$mode" "$scope" >&2; done <<<"$modes"
   done
   printf 'effective mode is not exactly %s\n' "$target" >&2; exit 1
 fi
 found=0
-for scope in project local; do (cd "$project" && agk_claude_is_enabled "$target" "$scope") && found=1; done
+awk -F '\t' -v target="$target" '$1==target && $2!="user" && $3==1 { found=1 } END { exit !found }' "$tuples" && found=1
 (( found )) || { printf 'enabled target installation is missing\n' >&2; exit 1; }
 
 printf 'Verified Claude mode %s.\n' "$target"
