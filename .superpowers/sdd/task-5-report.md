@@ -43,18 +43,34 @@ The planned shell suites all exited 0:
 - `bash integrated-harness/tests/orchestration_test.sh` (0 failed)
 - `git diff --check`
 
-The three planned official validator invocations could not start because this
-environment lacks PyYAML. Each produced:
+The initial three planned official validator invocations could not start because
+the base environment lacked PyYAML. Each produced:
 
 ```text
 ModuleNotFoundError: No module named 'yaml'
 ```
 
-No validator pass is claimed for those invocations. As a no-install fallback, I
-ran the unchanged official `validate_plugin.py` with a temporary YAML shim that
-parses the flat scalar frontmatter used by these three skills. All three plugin
-validations passed. This exercises the official manifest/path/interface checks
-but is supporting evidence, not equivalent to running with PyYAML.
+No validator pass is claimed for those initial invocations. As a no-install
+fallback, I ran the unchanged official `validate_plugin.py` with a temporary YAML
+shim that parses the flat scalar frontmatter used by these three skills. All
+three plugin validations passed. This exercised the official
+manifest/path/interface checks but was supporting evidence, not equivalent to
+running with PyYAML.
+
+The dependency gap was subsequently resolved for validation by creating an
+isolated temporary virtual environment with PyYAML 6.0.3. The unmodified
+official `validate_plugin.py` was then run through that environment's Python
+interpreter on every repository plugin. Each invocation exited successfully and
+printed exactly:
+
+```text
+Plugin validation passed: /Users/saiko/git_root/ai-guardrail-kit/.worktrees/codex-plugin-marketplace/codex/plugins/decomposition-gate
+Plugin validation passed: /Users/saiko/git_root/ai-guardrail-kit/.worktrees/codex-plugin-marketplace/codex/plugins/harness
+Plugin validation passed: /Users/saiko/git_root/ai-guardrail-kit/.worktrees/codex-plugin-marketplace/codex/plugins/integrated-harness
+```
+
+These are official validator passes with its required YAML dependency present;
+validation is no longer blocked.
 
 ## Review and concerns
 
@@ -71,9 +87,6 @@ gaps, which Task 5 cannot truthfully paper over:
    it does not itself implement the design's install-or-update promise. The guide
    documents the official cachebuster/direct reinstall followed by selector and
    verifier reconciliation, and marks that sequence non-transactional.
-3. The official validator dependency gap remains unresolved without installing
-   PyYAML.
-
 The user-facing cachebuster example uses a portable
 `<plugin-creator-skill-root>` placeholder rather than a developer-specific
 absolute path.
