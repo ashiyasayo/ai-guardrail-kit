@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+state=${AI_GUARDRAIL_CLAUDE_TEST_STATE:?AI_GUARDRAIL_CLAUDE_TEST_STATE is required}
+mkdir -p "$state"
+
+scope_arg() {
+  local default=${1:-project}; shift || true
+  SCOPE=$default
+  while (($#)); do
+    if [[ $1 == --scope ]]; then SCOPE=${2:?missing scope}; shift 2; else shift; fi
+  done
+  case $SCOPE in project|local) :;; *) printf 'fake claude: unsupported scope %s\n' "$SCOPE" >&2; exit 2;; esac
+}
+
+mutate() {
+  local action=$1 plugin=$2 scope=$3 file
+  file="$state/$scope.json"
+  python3 - "$file" "$action" "$plugin" "$scope" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1]); action, plugin, scope = sys.argv[2:]
+try: data = json.loads(path.read_text()) if path.exists() else []
+except json.JSONDecodeError: raise SystemExit(1)
+items = {x["id"]: x for x in data}
+if action in {"install", "update"}:
+    old = items.get(plugin, {})
+    items[plugin] = {"id": plugin, "version": str(int(old.get("version", "0")) + 1), "scope": scope, "enabled": old.get("enabled", False)}
+elif action == "enable":
+    if plugin not in items: raise SystemExit(1)
+    items[plugin]["enabled"] = True
+elif action == "disable":
+    if plugin not in items: raise SystemExit(1)
+    items[plugin]["enabled"] = False
+elif action == "uninstall": items.pop(plugin, None)
+path.write_text(json.dumps(list(items.values()), sort_keys=True))
+PY
+  if [[ ${FAKE_CLAUDE_COMMIT_THEN_FAIL_VERIFY:-0} == 1 ]]; then : > "$state/corrupt-next-list"; fi
+}
+
+[[ ${1:-} == plugin ]] || { printf 'fake claude: unsupported command\n' >&2; exit 2; }
+case ${2:-} in
+  list)
+    [[ ${3:-} == --json ]] || exit 2
+    if [[ -n ${FAKE_CLAUDE_LIST_OUTPUT:-} ]]; then printf '%s\n' "$FAKE_CLAUDE_LIST_OUTPUT"; exit 0; fi
+    if [[ ${FAKE_CLAUDE_CORRUPT_LIST:-0} == 1 || -e $state/corrupt-next-list ]]; then rm -f "$state/corrupt-next-list"; printf '{corrupt\n'; exit 0; fi
+    python3 - "$state/project.json" "$state/local.json" <<'PY'
+import json, pathlib, sys
+out=[]
+for name in sys.argv[1:]:
+ p=pathlib.Path(name)
+ if p.exists(): out.extend(json.loads(p.read_text()))
+print(json.dumps(out, sort_keys=True))
+PY
+    ;;
+  marketplace)
+    [[ ${3:-} == add ]] || exit 2
+    scope_arg project "${@:4}"
+    printf '%s\n' "${4:-}" > "$state/marketplace.$SCOPE"
+    ;;
+  install|update|uninstall|enable|disable)
+    operation=$2; plugin=${3:?missing plugin}; scope_arg project "${@:4}"
+    mode=${plugin%@*}
+    if [[ $operation == install && ${FAKE_CLAUDE_FAIL_INSTALL:-} == "$mode" ]]; then exit 42; fi
+    if [[ $operation == uninstall && ${FAKE_CLAUDE_FAIL_REMOVE:-} == "$mode" ]]; then exit 42; fi
+    mutate "$operation" "$plugin" "$SCOPE"
+    ;;
+  *) printf 'fake claude: unsupported plugin operation\n' >&2; exit 2;;
+esac
