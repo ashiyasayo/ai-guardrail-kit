@@ -21,9 +21,12 @@ path = pathlib.Path(sys.argv[1]); action, plugin, scope = sys.argv[2:]
 try: data = json.loads(path.read_text()) if path.exists() else []
 except json.JSONDecodeError: raise SystemExit(1)
 items = {x["id"]: x for x in data}
-if action in {"install", "update"}:
+if action == "install":
     old = items.get(plugin, {})
     items[plugin] = {"id": plugin, "version": str(int(old.get("version", "0")) + 1), "scope": scope, "enabled": old.get("enabled", False)}
+elif action == "update":
+    if plugin not in items: raise SystemExit(1)
+    items[plugin]["version"] = str(int(items[plugin].get("version", "0")) + 1)
 elif action == "enable":
     if plugin not in items: raise SystemExit(1)
     items[plugin]["enabled"] = True
