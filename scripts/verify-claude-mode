@@ -49,6 +49,11 @@ if (( empty )); then
   [[ -z $effective ]] || { while IFS= read -r mode; do [[ -n $mode ]] && printf 'managed mode remains: %s\n' "$mode" >&2; done <<<"$effective"; exit 1; }
   printf 'Verified no managed Claude mode.\n'; exit 0
 fi
+disabled_conflict=0
+while IFS=$'\t' read -r mode scope enabled; do
+  if [[ $scope != user && $mode != "$target" ]]; then printf 'conflict: %s (%s)\n' "$mode" "$scope" >&2; disabled_conflict=1; fi
+done < "$tuples"
+(( ! disabled_conflict )) || exit 1
 if [[ $effective != "$target" ]]; then
   for scope in project local; do
     modes=$(awk -F '\t' -v scope="$scope" '$2==scope && $3==1 { print $1 }' "$tuples" | sort -u)

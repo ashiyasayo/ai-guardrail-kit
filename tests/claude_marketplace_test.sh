@@ -78,15 +78,18 @@ required_documentation = {
     "./scripts/select-claude-mode decomposition-gate --scope local .": "local selection",
     "./scripts/verify-claude-mode decomposition-gate .": "verification",
     "./scripts/select-claude-mode --remove --scope project .": "removal",
-    "same mode": "same-mode update",
-    "new Claude Code session": "session restart",
-    "copy-in": "copy-in compatibility",
-    "user": "unsupported user scope",
-    "direct native commands": "native CLI bypass warning",
-    "mutual exclusion": "mutual exclusion warning",
 }
 for text, purpose in required_documentation.items():
     assert text in guide, f"missing {purpose}: {text}"
+coupled_requirements = {
+    r"Selecting the same mode at the same scope is the update workflow": "same-mode update semantics",
+    r"Start a new Claude Code session after every successful selection, update, or\s+removal": "lifecycle session restart",
+    r"existing top-level `decomposition-gate/`,\s+`harness/`, and `integrated-harness/` copy-in distributions remain supported": "specific copy-in compatibility",
+    r"`user`-scope\s+installation is unsupported and the selector and verifier reject it as a\s+conflict": "unsupported user-scope behavior",
+    r"direct native commands such as `claude plugin install`,\s+`uninstall`, `enable`, or `disable` bypass selector mutual exclusion": "specific native CLI bypass",
+}
+for pattern, purpose in coupled_requirements.items():
+    assert re.search(pattern, guide), f"missing coupled requirement: {purpose}"
 
 print("PASS: Claude marketplace packages are complete")
 PY

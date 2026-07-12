@@ -18,9 +18,22 @@ project=${1:-.}
 project=$(cd "$project" && pwd -P) || exit 1
 command -v claude >/dev/null || { printf 'claude executable is unavailable\n' >&2; exit 1; }
 command -v python3 >/dev/null || { printf 'python3 executable is unavailable\n' >&2; exit 1; }
+ccli() { (cd "$project" && claude "$@"); }
 if (( remove )); then package_target=''; else package_target=$target; fi
 agk_claude_validate_package "$repo" "$package_target" || { printf 'Claude package validation failed\n' >&2; exit 1; }
-ccli() { (cd "$project" && claude "$@"); }
+for capability in list install update uninstall enable disable; do
+  ccli plugin "$capability" --help >/dev/null 2>&1 || { printf 'required Claude plugin capability is unavailable: %s\n' "$capability" >&2; exit 1; }
+done
+marketplaces=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-claude-marketplaces.XXXXXX") || exit 1
+if ! ccli plugin marketplace list --json >"$marketplaces"; then rm -f "$marketplaces"; printf 'required Claude marketplace capability is unavailable\n' >&2; exit 1; fi
+python3 - "$marketplaces" "$AGK_CLAUDE_MARKETPLACE" <<'PY' || { rm -f "$marketplaces"; printf 'ai-guardrail-kit marketplace is not registered or resolvable\n' >&2; exit 1; }
+import json,pathlib,sys
+try: data=json.loads(pathlib.Path(sys.argv[1]).read_text())
+except (OSError,UnicodeError,json.JSONDecodeError): raise SystemExit(1)
+if not isinstance(data,list) or any(not isinstance(x,dict) or not isinstance(x.get('name'),str) for x in data): raise SystemExit(1)
+if not any(x['name']==sys.argv[2] for x in data): raise SystemExit(1)
+PY
+rm -f "$marketplaces"
 
 snapshot=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-claude-state.XXXXXX") || exit 1
 listing=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-claude-list.XXXXXX") || { rm -f "$snapshot"; exit 1; }
@@ -94,7 +107,7 @@ if (( ! remove )) && [[ $(wc -l <"$snapshot" | tr -d ' ') == 1 ]] && grep -Fxq "
     while [[ ! -e $AI_GUARDRAIL_CLAUDE_TEST_PAUSE_AFTER_COMMIT.release ]]; do sleep 0.02; done
   fi
   "$script_dir/verify-claude-mode" "$target" "$project" >/dev/null || { printf 'update applied but verification failed\n' >&2; exit 1; }
-  printf 'Updated Claude mode %s (%s).\n' "$target" "$scope"; exit 0
+  printf 'Updated Claude mode %s (%s); start a new Claude Code session to activate it.\n' "$target" "$scope"; exit 0
 fi
 
 changed=$(awk -F '\t' '{print $2}' "$snapshot" | sort -u | paste -sd, -)
@@ -103,9 +116,9 @@ if (( ! remove )); then
   ccli plugin install "$(plugin "$target")" --scope "$scope" >/dev/null || fail_and_restore
   ccli plugin enable "$(plugin "$target")" --scope "$scope" >/dev/null || fail_and_restore
   "$script_dir/verify-claude-mode" "$target" "$project" >/dev/null || fail_and_restore
-  printf 'Selected Claude mode %s (%s).\n' "$target" "$scope"
+  printf 'Selected Claude mode %s (%s); start a new Claude Code session to activate it.\n' "$target" "$scope"
 else
   "$script_dir/verify-claude-mode" --no-managed-mode "$project" >/dev/null || fail_and_restore
   [[ -z $changed ]] && changed=none
-  printf 'Removed Claude managed modes; changed scopes: %s.\n' "$changed"
+  printf 'Removed Claude managed modes; changed scopes: %s; start a new Claude Code session to deactivate them.\n' "$changed"
 fi

@@ -21,6 +21,7 @@ source "$repo/scripts/claude-mode-lib.sh"
 
 if [[ $group == lifecycle ]]; then
   project="$tmp/project"; mkdir -p "$project"; project=$(cd "$project" && pwd -P)
+  (cd "$project" && claude plugin marketplace add "$repo/claude" --scope project >/dev/null)
   select_mode() { "$repo/scripts/select-claude-mode" "$@" "$project"; }
   verify_mode() { "$repo/scripts/verify-claude-mode" "$@" "$project"; }
   assert_effective() { verify_mode "$1" >/dev/null || fail "effective mode is not $1"; }
@@ -43,11 +44,13 @@ PY
   ! select_mode harness --scope user >/dev/null 2>&1 || fail 'user scope accepted'
   [[ $before == "$(state_digest)" ]] || fail 'invalid input mutated state'
 
-  select_mode decomposition-gate >/dev/null; assert_effective decomposition-gate
+  output=$(select_mode decomposition-gate); grep -Fq 'start a new Claude Code session' <<<"$output" || fail 'selection omitted session restart'
+  assert_effective decomposition-gate
   [[ -f $AI_GUARDRAIL_CLAUDE_TEST_STATE/project.json ]] || fail 'project was not the default scope'
   before=$(state_digest); verify_mode decomposition-gate >/dev/null
   [[ $before == "$(state_digest)" ]] || fail 'verifier mutated plugin state'
-  select_mode decomposition-gate >/dev/null; assert_effective decomposition-gate
+  output=$(select_mode decomposition-gate); grep -Fq 'start a new Claude Code session' <<<"$output" || fail 'update omitted session restart'
+  assert_effective decomposition-gate
   for from in decomposition-gate harness integrated-harness; do
     for to in decomposition-gate harness integrated-harness; do
       [[ $from == "$to" ]] && continue
@@ -67,6 +70,7 @@ PY
 
   install unrelated@elsewhere project; enable unrelated@elsewhere project
   output=$(select_mode --remove)
+  grep -Fq 'start a new Claude Code session' <<<"$output" || fail 'remove omitted session restart'
   verify_mode --no-managed-mode >/dev/null || fail 'remove did not reach empty effective state'
   grep -Fq 'local' <<<"$output" || fail 'remove did not report changed local scope'
   grep -q 'unrelated@elsewhere' "$AI_GUARDRAIL_CLAUDE_TEST_STATE/project.json" || fail 'unrelated plugin removed'
@@ -116,6 +120,24 @@ PY
   ! verify_mode harness >/dev/null 2>&1 || fail 'named verifier accepted managed user scope'
   ! verify_mode --no-managed-mode >/dev/null 2>&1 || fail 'empty verifier accepted managed user scope'
   unset FAKE_CLAUDE_LIST_OUTPUT
+
+  for conflict_scope in project local; do
+    export FAKE_CLAUDE_LIST_OUTPUT="[{\"id\":\"harness@ai-guardrail-kit\",\"scope\":\"project\",\"enabled\":true},{\"id\":\"decomposition-gate@ai-guardrail-kit\",\"scope\":\"$conflict_scope\",\"enabled\":false}]"
+    output=$(verify_mode harness 2>&1) && fail "disabled $conflict_scope non-target accepted"
+    grep -Fq "conflict: decomposition-gate ($conflict_scope)" <<<"$output" || fail "disabled $conflict_scope conflict diagnostic missing"
+    unset FAKE_CLAUDE_LIST_OUTPUT
+  done
+
+  for missing in list install update uninstall enable disable marketplace; do
+    reset_state; export FAKE_CLAUDE_MISSING_SUBCOMMAND=$missing
+    output=$(select_mode harness 2>&1) && fail "missing $missing capability accepted"
+    unset FAKE_CLAUDE_MISSING_SUBCOMMAND
+    [[ ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/project.json && ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/local.json ]] || fail "missing $missing capability mutated lifecycle state"
+  done
+  reset_state; export FAKE_CLAUDE_UNREGISTERED_MARKETPLACE=1
+  output=$(select_mode harness 2>&1) && fail 'unregistered marketplace accepted'
+  unset FAKE_CLAUDE_UNREGISTERED_MARKETPLACE
+  [[ ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/project.json && ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/local.json ]] || fail 'unregistered marketplace mutated lifecycle state'
 
   bad_repo="$tmp/bad-repo"; cp -R "$repo" "$bad_repo"; printf '{bad\n' > "$bad_repo/claude/plugins/harness/hooks/hooks.json"
   reset_state

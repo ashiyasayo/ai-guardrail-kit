@@ -49,6 +49,8 @@ PY
 }
 
 [[ ${1:-} == plugin ]] || { printf 'fake claude: unsupported command\n' >&2; exit 2; }
+[[ ${FAKE_CLAUDE_MISSING_SUBCOMMAND:-} != "${2:-}" ]] || { printf 'fake claude: unsupported plugin operation\n' >&2; exit 2; }
+[[ ${3:-} != --help ]] || exit 0
 case ${2:-} in
   list)
     [[ ${FAKE_CLAUDE_DELAY_OPERATION:-} != list ]] || delay_until_released list
@@ -65,10 +67,24 @@ print(json.dumps(out, sort_keys=True))
 PY
     ;;
   marketplace)
-    [[ ${3:-} == add ]] || exit 2
-    scope_arg project "${@:4}"
-    printf '%s\n' "${4:-}" > "$state/marketplace.$SCOPE"
+    case ${3:-} in
+      add) scope_arg project "${@:4}"; printf '%s\n' "${4:-}" > "$state/marketplace.$SCOPE";;
+      list)
+        [[ ${4:-} == --json ]] || exit 2
+        if [[ ${FAKE_CLAUDE_UNREGISTERED_MARKETPLACE:-0} == 1 ]]; then printf '[]\n'; exit 0; fi
+        python3 - "$state" <<'PY'
+import json,pathlib,sys
+root=pathlib.Path(sys.argv[1]); out=[]
+for scope in ('project','local'):
+ p=root/f'marketplace.{scope}'
+ if p.exists(): out.append({'name':'ai-guardrail-kit','source':p.read_text().strip(),'scope':scope})
+print(json.dumps(out))
+PY
+        ;;
+      *) exit 2;;
+    esac
     ;;
+  help) exit 0;;
   install|update|uninstall|enable|disable)
     operation=$2; plugin=${3:?missing plugin}; scope_arg project "${@:4}"
     [[ ${FAKE_CLAUDE_DELAY_OPERATION:-} != "$operation" ]] || delay_until_released "$operation"

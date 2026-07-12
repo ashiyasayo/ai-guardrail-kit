@@ -116,3 +116,37 @@ The malformed JSON path was incorrectly reported as an unsupported user-scope in
 ```text
 PASS: transactional Claude mode switching
 ```
+
+## Final branch remediation
+
+### RED
+
+The final disabled-conflict, lifecycle-message, native-capability, marketplace-registration, and documentation regressions were added before production changes.
+
+```text
+$ bash tests/claude_mode_switch_test.sh lifecycle
+FAIL: selection omitted session restart
+```
+
+### Fixes
+
+- Named verification now rejects every supported-scope non-target managed tuple, including disabled project and local installations, with scope-qualified conflict diagnostics.
+- Successful selection, same-mode update, and removal messages explicitly require starting a new Claude Code session.
+- Before its first lifecycle mutation, the selector checks the Claude 2.1.207 `list`, `install`, `update`, `uninstall`, `enable`, and `disable` capabilities through nonmutating `--help` calls, then parses `claude plugin marketplace list --json` and proves `ai-guardrail-kit` is registered/resolvable. All checks execute at the canonical project cwd. Missing capabilities and unregistered marketplace tests prove lifecycle state remains untouched.
+- Task 5 documentation assertions now couple distinctive wording to same-mode semantics, all lifecycle restart cases, the three named legacy distributions, unsupported user-scope behavior, and the exact native lifecycle commands that bypass mutual exclusion.
+
+### GREEN
+
+```text
+PASS: Claude scope state adapter
+PASS: transactional Claude mode switching
+PASS: Claude marketplace packages are complete
+PASS: packaged Claude guardrails match legacy behavior
+PASS: transactional Codex mode switching
+PASS: Codex marketplace and plugin skeletons
+PASS: Codex shared hook protocol and security checks
+PASS: Codex standalone guardrail mode checks
+✔ Validation passed
+```
+
+The legacy decomposition and integrated-harness smoke/orchestration suites also completed with zero failures.
