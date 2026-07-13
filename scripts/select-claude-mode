@@ -27,23 +27,18 @@ done
 marketplaces=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-claude-marketplaces.XXXXXX") || exit 1
 if ! ccli plugin marketplace list --json >"$marketplaces"; then rm -f "$marketplaces"; printf 'required Claude marketplace capability is unavailable\n' >&2; exit 1; fi
 expected_marketplace=$(cd "$repo" && pwd -P) || { rm -f "$marketplaces"; exit 1; }
-python3 - "$marketplaces" "$AGK_CLAUDE_MARKETPLACE" "$expected_marketplace" <<'PY' || { rm -f "$marketplaces"; printf 'ai-guardrail-kit marketplace is not registered or resolvable\n' >&2; exit 1; }
+python3 - "$marketplaces" "$AGK_CLAUDE_MARKETPLACE" "$expected_marketplace" <<'PY' || { rm -f "$marketplaces"; printf 'ai-guardrail-kit marketplace is not registered as a resolvable local directory source\n' >&2; exit 1; }
 import json,pathlib,sys
 try: data=json.loads(pathlib.Path(sys.argv[1]).read_text())
 except (OSError,UnicodeError,json.JSONDecodeError): raise SystemExit(1)
-if not isinstance(data,list) or any(not isinstance(x,dict) or not isinstance(x.get('name'),str) or not isinstance(x.get('source'),str) for x in data): raise SystemExit(1)
+if not isinstance(data,list) or any(not isinstance(x,dict) or not isinstance(x.get('name'),str) for x in data): raise SystemExit(1)
 matches=[x for x in data if x['name']==sys.argv[2]]
-if not matches: raise SystemExit(1)
-if any('scope' in x and x['scope'] not in ('project','local') for x in matches): raise SystemExit(1)
-scoped=[x for x in matches if 'scope' in x]
-unscoped=[x for x in matches if 'scope' not in x]
-if scoped and unscoped: raise SystemExit(1)
-if scoped:
-    local=[x for x in scoped if x['scope']=='local']
-    applicable=local if local else [x for x in scoped if x['scope']=='project']
-else: applicable=unscoped
-if len(applicable)!=1: raise SystemExit(1)
-try: actual=pathlib.Path(applicable[0]['source']).expanduser().resolve(strict=True)
+if len(matches)!=1: raise SystemExit(1)
+entry=matches[0]
+# 僅接受 directory 來源：selector 驗證的是本地 checkout 的套件內容，
+# git/github 來源安裝自遠端快取，與本地驗證結果無法對應
+if entry.get('source')!='directory' or not isinstance(entry.get('path'),str): raise SystemExit(1)
+try: actual=pathlib.Path(entry['path']).expanduser().resolve(strict=True)
 except (OSError,RuntimeError): raise SystemExit(1)
 if actual != pathlib.Path(sys.argv[3]).resolve(strict=True): raise SystemExit(1)
 PY
@@ -126,9 +121,23 @@ fi
 
 changed=$(awk -F '\t' '{print $2}' "$snapshot" | sort -u | paste -sd, -)
 remove_all || fail_and_restore
+already_enabled() {
+  # 實際 CLI 的 install 會自動 enable，對已啟用的 plugin 重複 enable 會回錯，
+  # 先查目前狀態決定是否需要 enable。回傳 0=已啟用、1=未啟用、2=無法判定
+  ccli plugin list --json >"$listing" || return 2
+  python3 - "$listing" "$(plugin "$target")" "$scope" <<'PY'
+import json,pathlib,sys
+try: data=json.loads(pathlib.Path(sys.argv[1]).read_text())
+except (OSError,UnicodeError,json.JSONDecodeError): raise SystemExit(2)
+if not isinstance(data,list): raise SystemExit(2)
+raise SystemExit(0 if any(isinstance(x,dict) and x.get('id')==sys.argv[2] and x.get('scope')==sys.argv[3] and x.get('enabled') is True for x in data) else 1)
+PY
+}
 if (( ! remove )); then
   ccli plugin install "$(plugin "$target")" --scope "$scope" >/dev/null || fail_and_restore
-  ccli plugin enable "$(plugin "$target")" --scope "$scope" >/dev/null || fail_and_restore
+  already_enabled; enabled_state=$?
+  (( enabled_state != 2 )) || fail_and_restore
+  if (( enabled_state == 1 )); then ccli plugin enable "$(plugin "$target")" --scope "$scope" >/dev/null || fail_and_restore; fi
   "$script_dir/verify-claude-mode" "$target" "$project" >/dev/null || fail_and_restore
   printf 'Selected Claude mode %s (%s); start a new Claude Code session to activate it.\n' "$target" "$scope"
 else

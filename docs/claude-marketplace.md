@@ -16,8 +16,10 @@ claude plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git
 `--sparse .claude-plugin claude/plugins` limits the checkout to the
 marketplace manifest and the plugin packages. The selector below still
 requires a local checkout of this repository registered as the marketplace
-source; from this repository root, register the marketplace and select a mode
-for the current project:
+source; it rejects a git- or github-sourced registration because it validates
+the local package content, which cannot be tied to a remote cache. From this
+repository root, register the marketplace and select a mode for the current
+project:
 
 ```bash
 claude plugin marketplace add "$(pwd)" --scope project

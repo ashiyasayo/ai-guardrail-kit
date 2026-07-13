@@ -37,10 +37,11 @@ elif action == "update":
     if plugin not in items: raise SystemExit(1)
     items[plugin]["version"] = str(int(items[plugin].get("version", "0")) + 1)
 elif action == "enable":
-    if plugin not in items: raise SystemExit(1)
+    # 實際 CLI 對已啟用的 plugin 重複 enable 會回錯，這裡比照模擬
+    if plugin not in items or items[plugin].get("enabled"): raise SystemExit(1)
     items[plugin]["enabled"] = True
 elif action == "disable":
-    if plugin not in items: raise SystemExit(1)
+    if plugin not in items or not items[plugin].get("enabled"): raise SystemExit(1)
     items[plugin]["enabled"] = False
 elif action == "uninstall": items.pop(plugin, None)
 path.write_text(json.dumps(list(items.values()), sort_keys=True))
@@ -75,10 +76,13 @@ PY
         if [[ ${FAKE_CLAUDE_UNREGISTERED_MARKETPLACE:-0} == 1 ]]; then printf '[]\n'; exit 0; fi
         python3 - "$state" <<'PY'
 import json,pathlib,sys
+# 模擬實際 CLI 的結構化來源格式：{"source":"directory","path":...}
 root=pathlib.Path(sys.argv[1]); out=[]
 for scope in ('project','local'):
  p=root/f'marketplace.{scope}'
- if p.exists(): out.append({'name':'ai-guardrail-kit','source':p.read_text().strip(),'scope':scope})
+ if p.exists():
+  path=p.read_text().strip()
+  out.append({'name':'ai-guardrail-kit','source':'directory','path':path,'installLocation':path})
 print(json.dumps(out))
 PY
         ;;

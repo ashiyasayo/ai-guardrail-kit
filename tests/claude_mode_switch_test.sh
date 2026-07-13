@@ -147,14 +147,15 @@ PY
     unset FAKE_CLAUDE_MARKETPLACE_LIST_OUTPUT
     [[ ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/project.json && ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/local.json ]] || fail "$label marketplace resolution mutated lifecycle state"
   }
-  assert_bad_marketplace_resolution wrong-source '[{"name":"ai-guardrail-kit","source":"/tmp/wrong","scope":"project"}]'
-  assert_bad_marketplace_resolution missing-source '[{"name":"ai-guardrail-kit","scope":"project"}]'
-  assert_bad_marketplace_resolution malformed-source '[{"name":"ai-guardrail-kit","source":7,"scope":"project"}]'
-  assert_bad_marketplace_resolution duplicate-same-scope "[{\"name\":\"ai-guardrail-kit\",\"source\":\"$expected_marketplace\",\"scope\":\"project\"},{\"name\":\"ai-guardrail-kit\",\"source\":\"$expected_marketplace\",\"scope\":\"project\"}]"
-  assert_bad_marketplace_resolution local-shadows-project "[{\"name\":\"ai-guardrail-kit\",\"source\":\"$expected_marketplace\",\"scope\":\"project\"},{\"name\":\"ai-guardrail-kit\",\"source\":\"/tmp/wrong\",\"scope\":\"local\"}]"
+  assert_bad_marketplace_resolution wrong-path '[{"name":"ai-guardrail-kit","source":"directory","path":"/tmp/wrong"}]'
+  assert_bad_marketplace_resolution missing-path '[{"name":"ai-guardrail-kit","source":"directory"}]'
+  assert_bad_marketplace_resolution malformed-path '[{"name":"ai-guardrail-kit","source":"directory","path":7}]'
+  assert_bad_marketplace_resolution git-source '[{"name":"ai-guardrail-kit","source":"git","url":"https://github.com/ashiyasayo/ai-guardrail-kit.git"}]'
+  assert_bad_marketplace_resolution github-source '[{"name":"ai-guardrail-kit","source":"github","repo":"ashiyasayo/ai-guardrail-kit"}]'
+  assert_bad_marketplace_resolution duplicate-registration "[{\"name\":\"ai-guardrail-kit\",\"source\":\"directory\",\"path\":\"$expected_marketplace\"},{\"name\":\"ai-guardrail-kit\",\"source\":\"directory\",\"path\":\"$expected_marketplace\"}]"
   reset_state
-  export FAKE_CLAUDE_MARKETPLACE_LIST_OUTPUT="[{\"name\":\"ai-guardrail-kit\",\"source\":\"/tmp/wrong\",\"scope\":\"project\"},{\"name\":\"ai-guardrail-kit\",\"source\":\"$expected_marketplace\",\"scope\":\"local\"}]"
-  select_mode harness >/dev/null || fail 'correct local marketplace did not take precedence over project'
+  export FAKE_CLAUDE_MARKETPLACE_LIST_OUTPUT="[{\"name\":\"claude-plugins-official\",\"source\":\"github\",\"repo\":\"anthropics/claude-plugins-official\"},{\"name\":\"ai-guardrail-kit\",\"source\":\"directory\",\"path\":\"$expected_marketplace\"}]"
+  select_mode harness >/dev/null || fail 'directory marketplace alongside other marketplaces rejected'
   unset FAKE_CLAUDE_MARKETPLACE_LIST_OUTPUT
 
   bad_repo="$tmp/bad-repo"; cp -R "$repo" "$bad_repo"; printf '{bad\n' > "$bad_repo/claude/plugins/harness/hooks/hooks.json"
@@ -197,6 +198,12 @@ PY
 import json,sys
 x=json.load(open(sys.argv[1])); raise SystemExit(0 if len(x)==1 and x[0]['id'].startswith('harness@') and not x[0]['enabled'] else 1)
 PY
+
+  # 實際 CLI 的 install 會自動 enable；selector 不得因重複 enable 而失敗
+  reset_state; export FAKE_CLAUDE_INSTALL_ENABLED=1
+  select_mode harness >/dev/null || fail 'auto-enabling install broke selection'
+  assert_effective harness
+  unset FAKE_CLAUDE_INSTALL_ENABLED
 
   run_signal_case() { local phase=$1 sig=$2 expected=$3 output=$4 delay ready
     [[ $phase == pre ]] && delay=uninstall || delay=post-commit
