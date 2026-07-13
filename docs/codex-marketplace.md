@@ -8,11 +8,22 @@ and policy semantics are platform-specific and are not claimed to be identical.
 
 ## Requirements and first installation
 
-Use Codex and Python 3.9 or newer. From this repository root, configure the local
-marketplace and select a mode for a project:
+Use Codex and Python 3.9 or newer. Register the GitHub marketplace, then select
+a mode for a project from a local checkout of this repository:
+
+```bash
+codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref main --sparse codex
+```
+
+For local development, register the local marketplace instead:
 
 ```bash
 codex plugin marketplace add "$(pwd)/codex"
+```
+
+Then select and verify a mode:
+
+```bash
 ./scripts/select-codex-mode decomposition-gate .
 ./scripts/verify-codex-mode decomposition-gate .
 ```
