@@ -31,8 +31,9 @@ except json.JSONDecodeError: raise SystemExit(1)
 items = {x["id"]: x for x in data}
 if action == "install":
     old = items.get(plugin, {})
-    default_enabled = os.environ.get("FAKE_CLAUDE_INSTALL_ENABLED", "0") == "1"
-    items[plugin] = {"id": plugin, "version": str(int(old.get("version", "0")) + 1), "scope": scope, "enabled": old.get("enabled", default_enabled)}
+    # 實際 CLI 安裝後即自動啟用；FAKE_CLAUDE_INSTALL_DISABLED 供測試模擬未自動啟用的 CLI
+    enabled = os.environ.get("FAKE_CLAUDE_INSTALL_DISABLED", "0") != "1"
+    items[plugin] = {"id": plugin, "version": str(int(old.get("version", "0")) + 1), "scope": scope, "enabled": enabled}
 elif action == "update":
     if plugin not in items: raise SystemExit(1)
     items[plugin]["version"] = str(int(items[plugin].get("version", "0")) + 1)
