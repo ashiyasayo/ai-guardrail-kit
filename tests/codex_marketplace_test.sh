@@ -10,15 +10,15 @@ def check(condition, message):
   raise SystemExit(1)
 
 root=pathlib.Path('.')
-data=json.loads((root/'codex/.agents/plugins/marketplace.json').read_text())
+data=json.loads((root/'.agents/plugins/marketplace.json').read_text())
 names=['decomposition-gate','harness','integrated-harness']
 check(data.get('name')=='ai-guardrail-kit', 'marketplace name must be ai-guardrail-kit')
 check([p.get('name') for p in data.get('plugins', [])]==names, f'plugin order must be {names}')
 for p,name in zip(data['plugins'],names):
- check(p.get('source')=={'source':'local','path':f'./plugins/{name}'}, f'{name}: invalid local source')
+ check(p.get('source')=={'source':'local','path':f'./codex/plugins/{name}'}, f'{name}: invalid local source')
  check(p.get('policy')=={'installation':'AVAILABLE','authentication':'ON_INSTALL'}, f'{name}: invalid policy')
  check(p.get('category')=='Security', f'{name}: category must be Security')
- base=root/'codex'/p['source']['path'].removeprefix('./')
+ base=root/p['source']['path'].removeprefix('./')
  manifest=json.loads((base/'.codex-plugin/plugin.json').read_text())
  check(base.name==manifest.get('name')==name, f'{name}: directory and manifest names must match')
  check(manifest.get('version')=='0.1.0', f'{name}: version must be 0.1.0')
@@ -41,7 +41,7 @@ check(guide_path.exists(), 'docs/codex-marketplace.md must exist')
 guide=guide_path.read_text()
 check('docs/codex-marketplace.md' in readme, 'README must link to the Codex marketplace guide')
 required = {
- 'codex plugin marketplace add "$(pwd)/codex"': 'marketplace add command',
+ 'codex plugin marketplace add "$(pwd)"': 'marketplace add command',
  './scripts/select-codex-mode decomposition-gate .': 'selector command',
  './scripts/verify-codex-mode decomposition-gate .': 'verifier command',
  './scripts/select-codex-mode --remove /path/to/project': 'safe remove command',

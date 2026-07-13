@@ -8,7 +8,7 @@
       "name": "decomposition-gate",
       "source": {
         "source": "local",
-        "path": "./plugins/decomposition-gate"
+        "path": "./codex/plugins/decomposition-gate"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -20,7 +20,7 @@
       "name": "harness",
       "source": {
         "source": "local",
-        "path": "./plugins/harness"
+        "path": "./codex/plugins/harness"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -32,7 +32,7 @@
       "name": "integrated-harness",
       "source": {
         "source": "local",
-        "path": "./plugins/integrated-harness"
+        "path": "./codex/plugins/integrated-harness"
       },
       "policy": {
         "installation": "AVAILABLE",

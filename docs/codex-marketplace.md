@@ -1,7 +1,7 @@
 # Codex guardrail marketplace
 
-The Codex implementation lives under `codex/`: one repository marketplace and
-three complete plugins named `decomposition-gate`, `harness`, and
+The Codex marketplace manifest is at `.agents/plugins/marketplace.json`, with
+three complete plugins under `codex/plugins/` named `decomposition-gate`, `harness`, and
 `integrated-harness`. Select exactly one. These plugins implement the same product
 intent as the top-level Claude packages, but Codex hook, approval, installation,
 and policy semantics are platform-specific and are not claimed to be identical.
@@ -12,13 +12,13 @@ Use Codex and Python 3.9 or newer. Register the GitHub marketplace, then select
 a mode for a project from a local checkout of this repository:
 
 ```bash
-codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref main --sparse codex
+codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref main --sparse .agents --sparse codex/plugins
 ```
 
 For local development, register the local marketplace instead:
 
 ```bash
-codex plugin marketplace add "$(pwd)/codex"
+codex plugin marketplace add "$(pwd)"
 ```
 
 Then select and verify a mode:
