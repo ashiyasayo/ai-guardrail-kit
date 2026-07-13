@@ -64,8 +64,35 @@ agk_claude_effective_modes() {
 agk_claude_validate_package() {
   local repo=${1:-} target=${2:-}
   python3 - "$repo/.claude-plugin/marketplace.json" "$repo/claude/plugins" "$target" "$AGK_CLAUDE_MARKETPLACE" <<'PY'
-import json, pathlib, re, sys
+import ast, importlib.util, json, pathlib, re, sys
 market_path, plugins_name, target, identity = sys.argv[1:]
+# find_spec 不得掃到呼叫端目前目錄的同名檔案，先自 sys.path 移除
+sys.path = [p for p in sys.path if p not in ("", str(pathlib.Path.cwd()))]
+
+def imports_resolvable(entry):
+    # guard 進入點以頂層 import 載入同目錄檢查模組，須連同驗證其存在
+    pending, seen = [entry], set()
+    while pending:
+        path = pending.pop()
+        if path in seen: continue
+        seen.add(path)
+        try: tree = ast.parse(path.read_text())
+        except (OSError, UnicodeError, SyntaxError, ValueError): return False
+        names = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import): names.update(alias.name.split(".")[0] for alias in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                if node.level: return False
+                if node.module: names.add(node.module.split(".")[0])
+        for name in names:
+            sibling = path.parent / f"{name}.py"
+            if sibling.is_file(): pending.append(sibling)
+            else:
+                try: spec = importlib.util.find_spec(name)
+                except (ImportError, ValueError): return False
+                if spec is None: return False
+    return True
+
 try:
     market = json.loads(pathlib.Path(market_path).read_text())
     entries = market["plugins"]
@@ -91,6 +118,7 @@ for mode in wanted:
                 if not isinstance(hook,dict) or hook.get("type")!="command" or not isinstance(hook.get("command"),str): raise SystemExit(1)
                 refs=re.findall(r'\$\{CLAUDE_PLUGIN_ROOT\}/([^"\s]+)',hook["command"])
                 if len(refs)!=1 or not (root/refs[0]).is_file(): raise SystemExit(1)
+                if not imports_resolvable(root/refs[0]): raise SystemExit(1)
                 registered+=1
     if not registered: raise SystemExit(1)
 PY
