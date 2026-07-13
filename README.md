@@ -20,12 +20,30 @@ Codex 使用 [`codex/`](codex/) 內的 repository marketplace、plugin 與專案
 [`docs/codex-marketplace.md`](docs/codex-marketplace.md)。Codex 三種模式皆需
 Python 3.9+，不可沿用下列 Claude copy-in 安裝步驟。
 
+從 GitHub 註冊 Codex marketplace：
+
+```bash
+codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref main --sparse codex
+```
+
+`--sparse codex` 指向 marketplace manifest 所在的子目錄。註冊後請依照
+[`docs/codex-marketplace.md`](docs/codex-marketplace.md) 使用 selector 選擇並啟用其中一種模式。
+
 ### Claude Code
 
 Claude also provides a repository marketplace with mutually exclusive project
 and local mode selection. See
 [`docs/claude-marketplace.md`](docs/claude-marketplace.md) for registration,
 selection, update, verification, removal, and scope behavior.
+
+從 GitHub 註冊 Claude Code marketplace（目前專案）：
+
+```bash
+claude plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --scope project --sparse .claude-plugin plugins
+```
+
+如需僅供本機使用，將 `--scope project` 改為 `--scope local`。註冊後請依照
+[`docs/claude-marketplace.md`](docs/claude-marketplace.md) 使用 selector 選擇並啟用其中一種模式。
 
 三者皆為「複製即用（copy-in）」，沒有套件安裝或執行時相依，依需求擇一複製
 對應目錄下的 `.claude/` 到你的專案（若專案已有 `.claude/settings.json`，
