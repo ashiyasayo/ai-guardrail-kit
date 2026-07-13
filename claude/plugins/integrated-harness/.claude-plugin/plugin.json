@@ -1,6 +1,6 @@
 {
   "name": "integrated-harness",
-  "description": "Integrated plan approval, orchestration, command, and secret guardrails.",
+  "description": "整合式護欄：計畫核准、任務編排、指令與機密資料防護。",
   "author": {
     "name": "ai-guardrail-kit"
   },

@@ -1,6 +1,6 @@
 {
   "name": "ai-guardrail-kit",
-  "description": "Guardrail plugins for plan enforcement, secret protection, and safe command execution.",
+  "description": "提供計畫強制執行、機密保護與安全指令執行的護欄 plugin 集合。",
   "owner": {
     "name": "ai-guardrail-kit"
   },

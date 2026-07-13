@@ -1,6 +1,6 @@
 {
   "name": "harness",
-  "description": "Guard repository changes with plan, command, and secret checks.",
+  "description": "以計畫、指令與機密檢查保護程式碼庫變更。",
   "author": {
     "name": "ai-guardrail-kit"
   },

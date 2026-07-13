@@ -1,6 +1,6 @@
 {
   "name": "decomposition-gate",
-  "description": "Require decomposition plans before repository changes.",
+  "description": "變更程式碼庫前，強制要求先提出任務分解計畫。",
   "author": {
     "name": "ai-guardrail-kit"
   },
