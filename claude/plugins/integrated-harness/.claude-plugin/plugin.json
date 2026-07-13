@@ -1,6 +1,6 @@
 {
   "name": "integrated-harness",
-  "description": "整合式護欄：計畫核准、任務編排、指令與機密資料防護。",
+  "description": "整合式護欄：計畫核准、任務編排、指令與機密資料防護。核准須由人類執行 hooks/approve_plan.py，以 SHA-256 綁定拆解文件（60 分鐘有效）；strict／light 核准模式須手動於專案 .claude/orchestration-policy.md 設定。需 Python 3.9+ 與 git；與其他兩種模式互斥，安裝或切換後須重新啟動 Claude Code session。",
   "author": {
     "name": "ai-guardrail-kit"
   },

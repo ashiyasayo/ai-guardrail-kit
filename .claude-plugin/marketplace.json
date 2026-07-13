@@ -1,6 +1,6 @@
 {
   "name": "ai-guardrail-kit",
-  "description": "提供計畫強制執行、機密保護與安全指令執行的護欄 plugin 集合。",
+  "description": "提供計畫強制執行、機密保護與安全指令執行的護欄 plugin 集合。三種模式互斥、擇一啟用：請以 scripts/select-claude-mode 選擇模式（勿直接 install/enable），安裝或切換後須重新啟動 Claude Code session。",
   "owner": {
     "name": "ai-guardrail-kit"
   },
