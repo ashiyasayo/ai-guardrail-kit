@@ -21,7 +21,7 @@ source "$repo/scripts/claude-mode-lib.sh"
 
 if [[ $group == lifecycle ]]; then
   project="$tmp/project"; mkdir -p "$project"; project=$(cd "$project" && pwd -P)
-  (cd "$project" && claude plugin marketplace add "$repo/claude" --scope project >/dev/null)
+  (cd "$project" && claude plugin marketplace add "$repo" --scope project >/dev/null)
   select_mode() { "$repo/scripts/select-claude-mode" "$@" "$project"; }
   verify_mode() { "$repo/scripts/verify-claude-mode" "$@" "$project"; }
   assert_effective() { verify_mode "$1" >/dev/null || fail "effective mode is not $1"; }
@@ -139,7 +139,7 @@ PY
   unset FAKE_CLAUDE_UNREGISTERED_MARKETPLACE
   [[ ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/project.json && ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/local.json ]] || fail 'unregistered marketplace mutated lifecycle state'
 
-  expected_marketplace=$(cd "$repo/claude" && pwd -P)
+  expected_marketplace=$(cd "$repo" && pwd -P)
   assert_bad_marketplace_resolution() {
     local label=$1 listing=$2
     reset_state; export FAKE_CLAUDE_MARKETPLACE_LIST_OUTPUT=$listing
@@ -164,7 +164,7 @@ PY
   for defect in marketplace manifest registration resource; do
     bad_repo="$tmp/bad-$defect"; cp -R "$repo" "$bad_repo"
     case $defect in
-      marketplace) printf '{bad\n' > "$bad_repo/claude/.claude-plugin/marketplace.json";;
+      marketplace) printf '{bad\n' > "$bad_repo/.claude-plugin/marketplace.json";;
       manifest) rm "$bad_repo/claude/plugins/harness/.claude-plugin/plugin.json";;
       registration) printf '{"hooks":{}}\n' > "$bad_repo/claude/plugins/harness/hooks/hooks.json";;
       resource) rm "$bad_repo/claude/plugins/harness/hooks/plan_gate.py";;
@@ -175,12 +175,12 @@ PY
   done
   for defect in wrong-source duplicate-name; do
     bad_repo="$tmp/bad-$defect"; cp -R "$repo" "$bad_repo"
-    python3 - "$bad_repo/claude/.claude-plugin/marketplace.json" "$defect" <<'PY'
+    python3 - "$bad_repo/.claude-plugin/marketplace.json" "$defect" <<'PY'
 import json,pathlib,sys
 p=pathlib.Path(sys.argv[1]); data=json.loads(p.read_text()); defect=sys.argv[2]
 entry=next(x for x in data['plugins'] if x['name']=='harness')
-if defect=='wrong-source': entry['source']='./plugins/integrated-harness'
-else: data['plugins'].append({'name':'harness','source':'./plugins/integrated-harness'})
+if defect=='wrong-source': entry['source']='./claude/plugins/integrated-harness'
+else: data['plugins'].append({'name':'harness','source':'./claude/plugins/integrated-harness'})
 p.write_text(json.dumps(data))
 PY
     reset_state

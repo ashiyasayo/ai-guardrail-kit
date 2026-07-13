@@ -63,7 +63,7 @@ agk_claude_effective_modes() {
 
 agk_claude_validate_package() {
   local repo=${1:-} target=${2:-}
-  python3 - "$repo/claude/.claude-plugin/marketplace.json" "$repo/claude/plugins" "$target" "$AGK_CLAUDE_MARKETPLACE" <<'PY'
+  python3 - "$repo/.claude-plugin/marketplace.json" "$repo/claude/plugins" "$target" "$AGK_CLAUDE_MARKETPLACE" <<'PY'
 import json, pathlib, re, sys
 market_path, plugins_name, target, identity = sys.argv[1:]
 try:
@@ -75,7 +75,7 @@ if market.get("name") != identity or not isinstance(entries, list): raise System
 wanted = [target] if target else ["decomposition-gate", "harness", "integrated-harness"]
 for mode in wanted:
     matches=[x for x in entries if isinstance(x,dict) and x.get("name")==mode]
-    if len(matches)!=1 or matches[0].get("source")!=f"./plugins/{mode}": raise SystemExit(1)
+    if len(matches)!=1 or matches[0].get("source")!=f"./claude/plugins/{mode}": raise SystemExit(1)
     root=pathlib.Path(plugins_name)/mode
     try:
         manifest=json.loads((root/".claude-plugin/plugin.json").read_text())

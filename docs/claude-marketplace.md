@@ -1,17 +1,26 @@
 # Claude guardrail marketplace
 
-The Claude implementation under `claude/` provides one repository marketplace
-with three complete plugins: `decomposition-gate`, `harness`, and
-`integrated-harness`. Use the repository selector to keep exactly one managed
-mode effective across project and local scope.
+The Claude marketplace manifest is at `.claude-plugin/marketplace.json`, with
+three complete plugins under `claude/plugins/` named `decomposition-gate`,
+`harness`, and `integrated-harness`. Use the repository selector to keep
+exactly one managed mode effective across project and local scope.
 
 ## Register and select
 
-From this repository root, register the marketplace and select a mode for the
-current project:
+Register the GitHub marketplace remotely:
 
 ```bash
-claude plugin marketplace add "$(pwd)/claude" --scope project
+claude plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --scope project --sparse .claude-plugin claude/plugins
+```
+
+`--sparse .claude-plugin claude/plugins` limits the checkout to the
+marketplace manifest and the plugin packages. The selector below still
+requires a local checkout of this repository registered as the marketplace
+source; from this repository root, register the marketplace and select a mode
+for the current project:
+
+```bash
+claude plugin marketplace add "$(pwd)" --scope project
 ./scripts/select-claude-mode decomposition-gate --scope project .
 ./scripts/verify-claude-mode decomposition-gate .
 ./scripts/select-claude-mode --remove --scope project .
@@ -29,7 +38,7 @@ For a local-scope installation, register the marketplace at local scope and
 select with the same scope:
 
 ```bash
-claude plugin marketplace add "$(pwd)/claude" --scope local
+claude plugin marketplace add "$(pwd)" --scope local
 ./scripts/select-claude-mode decomposition-gate --scope local .
 ```
 

@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 
 root = Path(os.environ["ROOT"])
-marketplace_path = root / "claude/.claude-plugin/marketplace.json"
+marketplace_path = root / ".claude-plugin/marketplace.json"
 assert marketplace_path.is_file(), f"missing {marketplace_path.relative_to(root)}"
 
 marketplace = json.loads(marketplace_path.read_text())
@@ -24,7 +24,7 @@ assert {entry["name"] for entry in plugins} == set(modes)
 
 for mode in modes:
     entry = next(item for item in plugins if item["name"] == mode)
-    assert entry["source"] == f"./plugins/{mode}"
+    assert entry["source"] == f"./claude/plugins/{mode}"
 
     plugin_root = root / "claude/plugins" / mode
     manifest_path = plugin_root / ".claude-plugin/plugin.json"
@@ -71,7 +71,8 @@ guide = guide_path.read_text()
 readme = (root / "README.md").read_text()
 assert "docs/claude-marketplace.md" in readme, "README does not link Claude marketplace guide"
 required_documentation = {
-    'claude plugin marketplace add "$(pwd)/claude" --scope project': "marketplace registration",
+    'claude plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --scope project --sparse .claude-plugin claude/plugins': "remote marketplace registration",
+    'claude plugin marketplace add "$(pwd)" --scope project': "marketplace registration",
     "./scripts/select-claude-mode decomposition-gate --scope project .": "decomposition selection",
     "./scripts/select-claude-mode harness --scope project .": "harness selection",
     "./scripts/select-claude-mode integrated-harness --scope project .": "integrated selection",

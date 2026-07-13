@@ -3,6 +3,7 @@
 .worktrees/
 .agent/
 .claude/skills/
+.claude/settings.json
 .codex/
 .shared/
 .superpowers/

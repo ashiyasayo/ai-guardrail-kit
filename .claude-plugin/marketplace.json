@@ -7,15 +7,15 @@
   "plugins": [
     {
       "name": "decomposition-gate",
-      "source": "./plugins/decomposition-gate"
+      "source": "./claude/plugins/decomposition-gate"
     },
     {
       "name": "harness",
-      "source": "./plugins/harness"
+      "source": "./claude/plugins/harness"
     },
     {
       "name": "integrated-harness",
-      "source": "./plugins/integrated-harness"
+      "source": "./claude/plugins/integrated-harness"
     }
   ]
 }

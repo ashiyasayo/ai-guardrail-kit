@@ -44,9 +44,10 @@ selection, update, verification, removal, and scope behavior.
 從 GitHub 註冊 Claude Code marketplace（目前專案）：
 
 ```bash
-claude plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --scope project --sparse .claude-plugin plugins
+claude plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --scope project --sparse .claude-plugin claude/plugins
 ```
 
+`--sparse .claude-plugin claude/plugins` 下載 marketplace manifest 與 plugin 套件。
 如需僅供本機使用，將 `--scope project` 改為 `--scope local`。註冊後請依照
 [`docs/claude-marketplace.md`](docs/claude-marketplace.md) 使用 selector 選擇並啟用其中一種模式。
 

@@ -26,7 +26,7 @@ for capability in list install update uninstall enable disable; do
 done
 marketplaces=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-claude-marketplaces.XXXXXX") || exit 1
 if ! ccli plugin marketplace list --json >"$marketplaces"; then rm -f "$marketplaces"; printf 'required Claude marketplace capability is unavailable\n' >&2; exit 1; fi
-expected_marketplace=$(cd "$repo/claude" && pwd -P) || { rm -f "$marketplaces"; exit 1; }
+expected_marketplace=$(cd "$repo" && pwd -P) || { rm -f "$marketplaces"; exit 1; }
 python3 - "$marketplaces" "$AGK_CLAUDE_MARKETPLACE" "$expected_marketplace" <<'PY' || { rm -f "$marketplaces"; printf 'ai-guardrail-kit marketplace is not registered or resolvable\n' >&2; exit 1; }
 import json,pathlib,sys
 try: data=json.loads(pathlib.Path(sys.argv[1]).read_text())
