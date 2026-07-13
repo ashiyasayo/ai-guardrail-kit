@@ -1,18 +1,18 @@
 {
   "name": "integrated-harness",
   "version": "0.1.0",
-  "description": "Integrated Harness plugin",
+  "description": "整合式護欄：任務分解、政策與範圍檢查、稽核脈絡，加上指令與機密資料防護。",
   "author": {
     "name": "Local developer"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "Integrated Harness",
-    "shortDescription": "Use Integrated Harness in Codex.",
-    "longDescription": "Integrated Harness adds a local Codex plugin scaffold.",
+    "shortDescription": "整合拆解、核准與安全底線的完整方案。",
+    "longDescription": "整合任務分解、政策、範圍與稽核脈絡：strict 模式在全部確定性檢查通過後回傳 Codex 原生 ask 由人類核准；light 模式可放行可證明範圍內的 apply_patch，但變更性 exec_command 仍會 ask。毀滅性指令與明文憑證一律攔截，核准不可豁免。需 Python 3.9+；與其他兩種模式互斥，請以 scripts/select-codex-mode 選擇模式（勿直接 codex plugin add/remove），安裝或切換後須開啟新的 thread 才會生效。",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": "Help me use Integrated Harness."
+    "defaultPrompt": "說明 Integrated Harness 的使用方式。"
   }
 }
