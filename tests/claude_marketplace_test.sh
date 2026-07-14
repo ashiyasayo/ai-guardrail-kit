@@ -34,7 +34,7 @@ for mode in modes:
 
     manifest = json.loads(manifest_path.read_text())
     assert manifest["name"] == mode
-    assert manifest["version"] == "0.1.0"
+    assert manifest["version"] == "0.1.1"
 
     registration = json.loads(hooks_path.read_text())
     commands = [
