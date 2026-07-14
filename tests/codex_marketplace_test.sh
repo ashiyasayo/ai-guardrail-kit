@@ -21,7 +21,8 @@ for p,name in zip(data['plugins'],names):
  base=root/p['source']['path'].removeprefix('./')
  manifest=json.loads((base/'.codex-plugin/plugin.json').read_text())
  check(base.name==manifest.get('name')==name, f'{name}: directory and manifest names must match')
- check(manifest.get('version')=='0.1.0', f'{name}: version must be 0.1.0')
+ expected_versions={'decomposition-gate':'0.1.1','harness':'0.1.1','integrated-harness':'0.1.1'}
+ check(manifest.get('version')==expected_versions[name], f'{name}: version must be {expected_versions[name]}')
  skills=list(base.glob('skills/*/SKILL.md'))
  check(len(skills)==1, f'{name}: expected exactly one skill, found {len(skills)}')
  text=skills[0].read_text()
@@ -53,6 +54,8 @@ required = {
  'native Codex `ask`': 'native approval semantics',
  'codex plugin add/remove': 'direct CLI desynchronization boundary',
  'refresh': 'local update workflow',
+ 'codex plugin marketplace upgrade ai-guardrail-kit': 'remote marketplace snapshot upgrade',
+ './scripts/select-codex-mode --update': 'selector remote update command',
  'update applied but verification failed': 'post-commit refresh failure',
  'irreversible update commit point': 'refresh commit point',
  'TOCTOU': 'selector race limitation',

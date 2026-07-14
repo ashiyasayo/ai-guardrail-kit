@@ -1,6 +1,6 @@
 {
   "name": "decomposition-gate",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "變更程式碼庫前，強制要求先在專案 .codex/guardrail/plan/decomposition.md 提出任務分解計畫。",
   "author": {
     "name": "Local developer"

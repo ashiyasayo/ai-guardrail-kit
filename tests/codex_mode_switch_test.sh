@@ -295,4 +295,30 @@ grep -Fxq unrelated@elsewhere "$AI_GUARDRAIL_TEST_STATE/installed" || fail 'unre
 sed -i.bak 's|decomposition-gate/hooks|harness/hooks|' "$tmp/rollback-write/.codex/config.toml"
 if "$repo/scripts/verify-codex-mode" decomposition-gate "$tmp/rollback-write" >/dev/null 2>&1; then fail 'hook mismatch not detected'; fi
 
+new_project "$tmp/update"
+"$repo/scripts/select-codex-mode" decomposition-gate "$tmp/update" >/dev/null
+if "$repo/scripts/select-codex-mode" --update bogus "$tmp/update" >/dev/null 2>&1; then fail 'update accepted invalid mode'; fi
+if "$repo/scripts/select-codex-mode" --update --remove "$tmp/update" >/dev/null 2>&1; then fail 'update accepted --remove combination'; fi
+if "$repo/scripts/select-codex-mode" --update "$tmp/update" >/dev/null 2>&1; then fail 'update accepted missing mode'; fi
+
+update_generation="$AI_GUARDRAIL_TEST_STATE/generation.decomposition-gate_ai-guardrail-kit"
+generation_before=$(<"$update_generation")
+config_before=$(shasum -a 256 "$tmp/update/.codex/config.toml"); plugins_before=$(cat "$AI_GUARDRAIL_TEST_STATE/installed")
+export FAKE_CODEX_FAIL_OPERATION=upgrade
+output=$("$repo/scripts/select-codex-mode" --update decomposition-gate "$tmp/update" 2>&1) && fail 'update accepted marketplace upgrade failure'
+unset FAKE_CODEX_FAIL_OPERATION
+grep -Fq 'marketplace upgrade failed' <<<"$output" || fail 'upgrade failure message missing'
+[[ $config_before == "$(shasum -a 256 "$tmp/update/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'upgrade failure mutated state'
+[[ $(<"$update_generation") -eq $generation_before ]] || fail 'upgrade failure advanced installed generation'
+
+"$repo/scripts/select-codex-mode" --update decomposition-gate "$tmp/update" >/dev/null
+[[ $(<"$AI_GUARDRAIL_TEST_STATE/upgrade.count") -eq 2 ]] || fail 'update did not call marketplace upgrade'
+[[ $(cat "$AI_GUARDRAIL_TEST_STATE/upgrade.args") == ai-guardrail-kit ]] || fail 'upgrade not scoped to this marketplace'
+[[ $(<"$update_generation") -eq $((generation_before + 1)) ]] || fail 'update did not refresh installed plugin'
+assert_mode decomposition-gate "$tmp/update"
+
+"$repo/scripts/select-codex-mode" --update harness "$tmp/update" >/dev/null
+[[ $(<"$AI_GUARDRAIL_TEST_STATE/upgrade.count") -eq 3 ]] || fail 'update switch did not call marketplace upgrade'
+assert_mode harness "$tmp/update"
+
 printf 'PASS: transactional Codex mode switching\n'

@@ -7,9 +7,25 @@ source "$script_dir/codex-mode-lib.sh"
 
 mode=${1:-}
 remove=0
-if [[ $mode == --remove ]]; then remove=1; else agk_valid_mode "$mode" || { agk_die "expected --remove or one of: decomposition-gate, harness, integrated-harness"; exit 2; }; fi
+update=0
+if [[ $mode == --update ]]; then update=1; shift; mode=${1:-}; fi
+if [[ $mode == --remove ]]; then
+  (( update )) && { agk_die '--update cannot be combined with --remove'; exit 2; }
+  remove=1
+else
+  agk_valid_mode "$mode" || { agk_die "expected --remove, --update <mode>, or one of: decomposition-gate, harness, integrated-harness"; exit 2; }
+fi
 project=$(agk_resolve_project "${2:-.}") || exit 1
 agk_validate_config "$project" || exit 1
+
+# 遠端更新：先重抓本 marketplace 的 Git 快照，失敗即中止且不動既有安裝；
+# 成功後沿用既有選擇／refresh 流程，由 codex plugin add 從新快照重裝。
+if (( update )); then
+  if ! codex plugin marketplace upgrade "$AGK_MARKETPLACE" >/dev/null; then
+    agk_die 'marketplace upgrade failed; installed state unchanged'
+    exit 1
+  fi
+fi
 
 config="$project/.codex/config.toml"
 snapshot=$(mktemp -d "${TMPDIR:-/tmp}/ai-guardrail-rollback.XXXXXX") || exit 1

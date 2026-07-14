@@ -57,5 +57,11 @@ PY
     grep -Fxv "$plugin" "$installed" > "$tmp" || true
     mv "$tmp" "$installed"
     ;;
+  marketplace)
+    [[ ${3:-} == upgrade ]] || { printf 'fake codex: unsupported marketplace operation\n' >&2; exit 2; }
+    count_operation upgrade
+    fail_if_requested upgrade "${4:-}"
+    printf '%s\n' "${4:-}" > "$state/upgrade.args"
+    ;;
   *) printf 'fake codex: unsupported plugin operation\n' >&2; exit 2 ;;
 esac

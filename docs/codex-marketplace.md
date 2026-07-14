@@ -80,6 +80,25 @@ Removal transactionally removes all managed plugins and only the selector-owned
 config block. Unrelated plugins and config bytes are preserved. Repeating it is
 safe.
 
+## Remote update workflow
+
+For a marketplace registered from GitHub, refresh this marketplace's Git
+snapshot and reinstall the selected mode in one selector command:
+
+```bash
+./scripts/select-codex-mode --update <mode> <project>
+./scripts/verify-codex-mode <mode> <project>
+```
+
+`--update` first runs `codex plugin marketplace upgrade ai-guardrail-kit`
+(scoped to this marketplace only). If the upgrade fails, the selector aborts
+before touching installed plugins or project config. On success it continues
+into the normal selection flow: a same-mode invocation follows the refresh
+semantics below (including the irreversible commit point), and a different
+mode performs a regular switch installed from the refreshed snapshot.
+`--update` cannot be combined with `--remove`. Start a new thread after a
+successful update.
+
 ## Local update workflow
 
 Codex caches installed local plugin content. During repository development,
