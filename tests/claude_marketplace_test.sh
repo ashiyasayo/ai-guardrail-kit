@@ -18,6 +18,11 @@ marketplace = json.loads(marketplace_path.read_text())
 assert marketplace["name"] == "ai-guardrail-kit"
 
 modes = ("decomposition-gate", "harness", "integrated-harness")
+expected_versions = {
+    "decomposition-gate": "0.1.1",
+    "harness": "0.1.1",
+    "integrated-harness": "0.1.2",
+}
 plugins = marketplace["plugins"]
 assert len(plugins) == len(modes)
 assert {entry["name"] for entry in plugins} == set(modes)
@@ -34,7 +39,7 @@ for mode in modes:
 
     manifest = json.loads(manifest_path.read_text())
     assert manifest["name"] == mode
-    assert manifest["version"] == "0.1.1"
+    assert manifest["version"] == expected_versions[mode]
 
     registration = json.loads(hooks_path.read_text())
     commands = [
