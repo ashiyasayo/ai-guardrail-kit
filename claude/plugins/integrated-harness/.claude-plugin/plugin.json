@@ -1,8 +1,8 @@
 {
   "name": "integrated-harness",
-  "description": "整合式護欄：計畫核准、任務編排、指令與機密資料防護。安裝後須將 plugin 內的 orchestration-policy.md 範本複製為專案 .claude/orchestration-policy.md，並由人類填寫單位與技術堆疊、成本門檻、環境授權與核准模式等〈由人類設定〉欄位（未建立時一律以最嚴格的 strict 模式運作且封鎖一般 Bash）。核准須由人類執行 hooks/approve_plan.py，以 SHA-256 綁定拆解文件（60 分鐘有效）。需 Python 3.9+ 與 git；與其他兩種模式互斥，安裝或切換後須重新啟動 Claude Code session。",
+  "description": "整合式護欄：計畫核准、任務編排、指令與機密資料防護。安裝後須將 plugin 內的 orchestration-policy.md 範本複製為專案 .claude/orchestration-policy.md，並由人類填寫單位與技術堆疊、成本門檻、環境授權與核准模式等〈由人類設定〉欄位；亦可放在個人層級 ~/.claude/orchestration-policy.md（專案檔永遠優先），兩處皆未建立時一律以最嚴格的 strict 模式運作且封鎖一般 Bash。核准須由人類執行 hooks/approve_plan.py，以 SHA-256 綁定拆解文件（60 分鐘有效）。需 Python 3.9+ 與 git；與其他兩種模式互斥，安裝或切換後須重新啟動 Claude Code session。",
   "author": {
     "name": "ai-guardrail-kit"
   },
-  "version": "0.1.2"
+  "version": "0.1.3"
 }

@@ -87,6 +87,13 @@ their commands, files, settings, and approval behavior are unchanged. Do not
 combine a legacy copy-in mode with a marketplace mode without manually checking
 the resulting hooks.
 
+Policy resolution order for `integrated-harness`: the project
+`.claude/orchestration-policy.md` always wins; only when it does not exist is
+the personal-level `~/.claude/orchestration-policy.md` consulted. A permissive
+personal policy (`standard`/`light`) loosens every project without its own
+policy file, so keep per-project policies for high-risk work. With neither
+file present, the gate fails closed to `strict`.
+
 These hooks are defense layers, not a security sandbox. Command and secret
 detection cannot prove the absence of obfuscation, indirect effects, or every
 credential format. Combine them with Claude Code permissions, isolation, secret

@@ -38,9 +38,11 @@ def event(project, tool="Write", tool_input=None):
     }
 
 
-def run(hook, data, project):
+def run(hook, data, project, home=None):
     env = os.environ.copy()
     env["CLAUDE_PROJECT_DIR"] = str(project)
+    if home is not None:
+        env["HOME"] = str(home)
     proc = subprocess.run(
         ["python3", str(hook)], input=json.dumps(data), text=True,
         capture_output=True, env=env,
@@ -62,9 +64,9 @@ def normalize(result):
     return status, decision, reason, stdout, stderr
 
 
-def assert_pair(legacy, packaged, data, project):
-    old = run(legacy, data, project)
-    new = run(packaged, data, project)
+def assert_pair(legacy, packaged, data, project, home=None):
+    old = run(legacy, data, project, home=home)
+    new = run(packaged, data, project, home=home)
     assert normalize(old)[:3] == normalize(new)[:3], (
         legacy, packaged, old[:3], new[:3]
     )
@@ -166,6 +168,53 @@ with tempfile.TemporaryDirectory() as td:
         integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py",
         event(project), project,
     ))
+
+# 個人層級政策檔 fallback：專案檔不存在時讀取 ~/.claude/orchestration-policy.md
+with tempfile.TemporaryDirectory() as td:
+    project = Path(td) / "project"
+    (project / ".claude/plan").mkdir(parents=True)
+    home = Path(td) / "home"
+    (home / ".claude").mkdir(parents=True)
+    plan = project / ".claude/plan/decomposition.md"
+    plan.write_text(
+        "## 已知資訊\n## 缺少的資訊\n【假設】none\n"
+        "## 允許修改範圍\n- `src/`\n"
+    )
+    gates = (integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py")
+    template = (root / "integrated-harness/.claude/orchestration-policy.md").read_text()
+
+    # 兩處皆無政策檔：維持 strict fail closed，一般 Bash 攔截（防退化）
+    bash_event = event(project, tool="Bash", tool_input={"command": "echo hi"})
+    assert_denied(assert_pair(*gates, bash_event, project, home=home))
+
+    # 僅個人層級政策檔（standard）：免核准放行範圍內寫入
+    personal = home / ".claude/orchestration-policy.md"
+    personal.write_text(template.replace("核准模式：strict", "核准模式：standard", 1))
+    assert_allowed(assert_pair(*gates, event(project), project, home=home))
+
+    # 模型修改個人政策檔：以政策檔保護理由攔截
+    protect = assert_pair(
+        *gates,
+        event(project, tool_input={"file_path": str(personal), "content": "x"}),
+        project, home=home,
+    )
+    assert_denied(protect)
+    assert "政策檔" in (protect.reason or ""), protect
+
+    # 專案政策檔永遠優先：專案 strict 蓋過個人 standard，仍要求人工核准
+    (project / ".claude/orchestration-policy.md").write_text(template)
+    assert_denied(assert_pair(*gates, event(project), project, home=home))
+
+    # 範本 allowlist 於 strict 模式可用（回歸：範本必須能被解析器接受）
+    digest = hashlib.sha256(plan.read_bytes()).hexdigest()
+    (project / ".claude/.plan_approved").write_text(
+        json.dumps({"approved_at": time.time(), "plan_sha256": digest})
+    )
+    allowed_bash = event(
+        project, tool="Bash",
+        tool_input={"command": "bash tests/claude_guard_test.sh"},
+    )
+    assert_allowed(assert_pair(*gates, allowed_bash, project, home=home))
 
 for mode in ("harness", "integrated-harness"):
     for name in ("block_dangerous_commands.py", "block_secrets.py"):

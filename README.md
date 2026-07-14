@@ -107,7 +107,9 @@ chmod +x your-project/.claude/hooks/*.py
 完整的編排層（`ORCHESTRATOR.md`：任務分解、模型路由、任務委派、驗收、
 授權邊界）與維護說明（`MAINTENANCE.md`）。核准以
 `python3 .claude/hooks/approve_plan.py` 綁定拆解文件的 SHA-256，並提供
-`strict`／`light` 兩種核准模式（由人類在政策檔設定，模型不得修改）。
+`strict`／`light` 兩種核准模式（由人類在政策檔設定，模型不得修改）。政策檔以
+專案 `.claude/orchestration-policy.md` 優先，專案檔不存在時讀取個人層級
+`~/.claude/orchestration-policy.md`，兩處皆無一律回落 `strict`。
 
 - 適用：多人協作、高風險資料、正式系統，以及需要稽核軌跡的專案。
 - 附自動化回歸測試（`tests/`），是三者中唯一有自動化測試的目錄。

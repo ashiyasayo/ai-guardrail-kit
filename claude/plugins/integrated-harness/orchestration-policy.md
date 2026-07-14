@@ -5,6 +5,11 @@
 `.claude` 時會攔截。未知或新增工具必須另行檢查 matcher、tool input／path schema、
 permissions 與 hook 支援，不會自動受到同等保護。
 
+政策檔查找順序：專案 `.claude/orchestration-policy.md` 永遠優先；僅在專案檔完全
+不存在時，才讀取個人層級 `~/.claude/orchestration-policy.md`。注意：個人層級檔
+若設為較寬鬆模式（standard／light），會一併放寬「所有沒有專案政策檔的專案」，
+高風險專案請務必建立專案層級政策檔；兩處皆無時一律以 strict 運作。
+
 ## 核准模式
 
 - 核准模式：strict
@@ -17,6 +22,10 @@ permissions 與 hook 支援，不會自動受到同等保護。
 `strict` 下由人類執行 `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/approve_plan.py"`；核准紀錄綁定
 目前拆解文件的 SHA-256，有效期間為 60 分鐘。三種模式均不豁免憑證與危險命令 hooks。
 
+下方 allowlist 只允許啟動列出的測試／建置入口；不得包含 pipe、redirect、多命令串接、
+command substitution 或環境變數指派前綴。入口內部仍受 permissions、sandbox 與
+程式碼審查約束。清單區段內只能放置反引號清單項目，直到下一個 `## ` 標題為止。
+
 ## Strict Bash 測試與建置 Allowlist
 
 - `bash tests/`
@@ -24,10 +33,6 @@ permissions 與 hook 支援，不會自動受到同等保護。
 - `dotnet build`
 - `npm test`
 - `npm run build`
-
-本清單只允許啟動列出的測試／建置入口；不得包含 pipe、redirect、多命令串接、
-command substitution 或環境變數指派前綴。入口內部仍受 permissions、sandbox 與
-程式碼審查約束。
 
 ## 單位與技術堆疊
 

@@ -21,7 +21,7 @@ modes = ("decomposition-gate", "harness", "integrated-harness")
 expected_versions = {
     "decomposition-gate": "0.1.1",
     "harness": "0.1.1",
-    "integrated-harness": "0.1.2",
+    "integrated-harness": "0.1.3",
 }
 plugins = marketplace["plugins"]
 assert len(plugins) == len(modes)

@@ -70,6 +70,21 @@ def exact_path(root: str, relative: str) -> str:
     return os.path.normpath(os.path.join(root, relative))
 
 
+def personal_policy_path() -> str:
+    return os.path.expanduser(os.path.join("~", ".claude", "orchestration-policy.md"))
+
+
+def resolve_policy_path(root: str) -> str:
+    """專案政策檔永遠優先；專案檔存在但無法讀取時不 fallback，維持 fail closed。"""
+    project_policy = exact_path(root, POLICY_PATH)
+    if os.path.exists(project_policy):
+        return project_policy
+    personal = personal_policy_path()
+    if os.path.isfile(personal):
+        return personal
+    return project_policy
+
+
 def is_read_only_bash(command: str) -> bool:
     if not command.strip() or UNSAFE_SHELL_PATTERN.search(command):
         return False
@@ -92,7 +107,7 @@ def is_read_only_bash(command: str) -> bool:
 
 def approval_mode(root: str) -> str:
     try:
-        with open(exact_path(root, POLICY_PATH), encoding="utf-8") as handle:
+        with open(resolve_policy_path(root), encoding="utf-8") as handle:
             content = handle.read()
     except (OSError, UnicodeDecodeError):
         # 讀取失敗或非 UTF-8 內容一律 fail closed，退回最嚴格模式
@@ -104,7 +119,7 @@ def approval_mode(root: str) -> str:
 
 def parse_strict_bash_allowlist(root: str) -> tuple[list[list[str]], str]:
     try:
-        with open(exact_path(root, POLICY_PATH), encoding="utf-8") as handle:
+        with open(resolve_policy_path(root), encoding="utf-8") as handle:
             lines = handle.read().splitlines()
     except (OSError, UnicodeDecodeError) as exc:
         return [], f"無法讀取 strict Bash allowlist：{exc}。"
@@ -262,7 +277,10 @@ def check(data: dict) -> Optional[str]:
     root = project_dir(data)
     approval = os.path.realpath(exact_path(root, APPROVAL_PATH))
     plan = os.path.realpath(exact_path(root, PLAN_PATH))
-    policy = os.path.realpath(exact_path(root, POLICY_PATH))
+    policies = {
+        os.path.realpath(exact_path(root, POLICY_PATH)),
+        os.path.realpath(personal_policy_path()),
+    }
 
     mode = approval_mode(root)
     target = ""
@@ -288,7 +306,7 @@ def check(data: dict) -> Optional[str]:
         target = os.path.realpath(normalized)
         if target == approval:
             return "核准旗標只能由人類操作。"
-        if target == policy:
+        if target in policies:
             return "編排政策檔只能由人類修改，模型不得變更核准模式或授權門檻。"
         if target == plan:
             return None
