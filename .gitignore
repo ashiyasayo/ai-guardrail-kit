@@ -1,5 +1,6 @@
 .DS_Store
 .claude/.plan_approved
+.claude/plan/
 .worktrees/
 .agent/
 .claude/skills/
@@ -8,7 +9,7 @@
 .codex/
 .shared/
 .superpowers/
-docs/
+docs/superpowers/
 __pycache__/
 *.pyc
 .venv/
