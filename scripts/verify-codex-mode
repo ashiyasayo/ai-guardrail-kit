@@ -24,6 +24,9 @@ fi
 [[ $count -eq 1 ]] || { agk_die "expected exactly one installed managed plugin, found $count"; exit 1; }
 mode=$(printf '%s\n' "$installed" | awk 'NF { print; exit }')
 [[ -z $expected || $expected == "$mode" ]] || { agk_die "installed mode $mode does not match expected $expected"; exit 1; }
+if [[ $mode == integrated-harness ]]; then
+  agk_validate_personal_policy || exit 1
+fi
 
 config="$project/.codex/config.toml"
 [[ -f $config ]] || { agk_die 'managed config block is missing'; exit 1; }

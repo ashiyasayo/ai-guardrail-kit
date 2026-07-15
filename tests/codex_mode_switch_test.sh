@@ -8,6 +8,7 @@ ln -s "$repo/tests/helpers/fake-codex" "$tmp/bin/codex"
 export PATH="$tmp/bin:$PATH"
 export AI_GUARDRAIL_TEST_STATE="$tmp/state"
 mkdir -p "$AI_GUARDRAIL_TEST_STATE"
+export HOME="$tmp/home"
 
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 assert_file() { [[ -f $1 ]] || fail "missing $1"; }
@@ -24,6 +25,7 @@ if "$repo/scripts/select-codex-mode" bogus "$project" >/dev/null 2>&1; then fail
 
 "$repo/scripts/select-codex-mode" decomposition-gate "$project"
 assert_mode decomposition-gate "$project"
+[[ ! -e "$HOME/.codex/guardrail/orchestration-policy.md" ]] || fail 'non-integrated mode installed personal policy'
 grep -Fq 'prefix = "unchanged"' "$project/.codex/config.toml" || fail 'prefix changed'
 grep -Fq '# suffix stays too' "$project/.codex/config.toml" || fail 'suffix changed'
 first=$(shasum -a 256 "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")
@@ -141,6 +143,16 @@ for from in decomposition-gate harness integrated-harness; do
     assert_mode "$to" "$tmp/trans-$from-$to"
   done
 done
+
+personal_policy="$HOME/.codex/guardrail/orchestration-policy.md"
+assert_file "$personal_policy"
+cmp -s "$repo/codex/plugins/integrated-harness/orchestration-policy.md" "$personal_policy" || fail 'personal policy differs from bundled default'
+printf 'custom-policy\n' > "$personal_policy"
+new_project "$tmp/personal-policy"
+"$repo/scripts/select-codex-mode" integrated-harness "$tmp/personal-policy" >/dev/null
+[[ $(cat "$personal_policy") == custom-policy ]] || fail 'selector overwrote personal policy'
+"$repo/scripts/select-codex-mode" --remove "$tmp/personal-policy" >/dev/null
+[[ $(cat "$personal_policy") == custom-policy ]] || fail 'selector removed personal policy'
 
 new_project "$tmp/malformed"
 printf '# ai-guardrail-kit:begin\n# ai-guardrail-kit:begin\n# ai-guardrail-kit:end\n' > "$tmp/malformed/.codex/config.toml"

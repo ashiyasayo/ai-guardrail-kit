@@ -34,6 +34,11 @@ codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git 
 codex plugin add decomposition-gate@ai-guardrail-kit
 ```
 
+使用 selector 選擇 `integrated-harness` 時，若個人政策檔不存在，會建立
+`~/.codex/guardrail/orchestration-policy.md`；既有個人政策不會被覆寫或在移除
+模式時刪除。完整政策語意請見
+[`codex/plugins/integrated-harness/README.md`](codex/plugins/integrated-harness/README.md)。
+
 ### Claude Code
 
 Claude also provides a repository marketplace with mutually exclusive project

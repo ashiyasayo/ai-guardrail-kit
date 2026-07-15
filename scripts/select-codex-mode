@@ -55,6 +55,7 @@ rollback() {
     grep -Fxq "$old" <<<"$current" || codex plugin add "$(agk_plugin_path "$old")" >/dev/null 2>&1 || failed=1
   done < "$snapshot/modes"
   agk_restore_config "$project" "$snapshot/config" "$config_existed" || failed=1
+  agk_remove_created_personal_policy "$repo" || failed=1
   original=$(<"$snapshot/modes")
   if ! current=$(agk_installed_modes 2>/dev/null) || [[ $original != "$current" ]] ||
      { [[ $config_existed == 1 ]] && ! cmp -s "$snapshot/config" "$config"; } ||
@@ -90,7 +91,11 @@ if (( ! remove )) && [[ $(<"$snapshot/modes") == "$mode" ]]; then
     agk_die 'current mode is not exact; run a normal mode switch to repair state'
     exit 1
   fi
+  if [[ $mode == integrated-harness ]] && ! agk_install_personal_policy "$repo"; then
+    exit 1
+  fi
   if ! codex plugin add "$(agk_plugin_path "$mode")" >/dev/null; then
+    agk_remove_created_personal_policy "$repo" || true
     agk_die 'update failed; previous installed state remains'
     exit 1
   fi
@@ -110,6 +115,9 @@ for other in "${AGK_MODES[@]}"; do
 done
 if (( ! remove )); then
   codex plugin add "$(agk_plugin_path "$mode")" >/dev/null || { rollback; exit 1; }
+  if [[ $mode == integrated-harness ]]; then
+    agk_install_personal_policy "$repo" || { rollback; exit 1; }
+  fi
 fi
 
 if (( remove )); then

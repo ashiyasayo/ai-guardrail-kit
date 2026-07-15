@@ -5,6 +5,7 @@ AGK_MODES=(decomposition-gate harness integrated-harness)
 AGK_MARKETPLACE=ai-guardrail-kit
 AGK_BEGIN='# ai-guardrail-kit:begin'
 AGK_END='# ai-guardrail-kit:end'
+AGK_PERSONAL_POLICY_CREATED=0
 
 agk_die() { printf 'codex mode: %s\n' "$*" >&2; return 1; }
 
@@ -37,6 +38,61 @@ if b and (lines.count(sys.argv[2]) != 1 or lines.count(sys.argv[3]) != 1):
 if b and s.index(sys.argv[2]) > s.index(sys.argv[3]):
     raise SystemExit("codex mode: managed block end precedes begin")
 PY
+}
+
+agk_personal_policy_path() {
+  printf '%s\n' "$HOME/.codex/guardrail/orchestration-policy.md"
+}
+
+agk_validate_personal_policy() {
+  local policy
+  policy=$(agk_personal_policy_path)
+  [[ ! -L $policy && -f $policy && -r $policy ]] || {
+    agk_die "personal orchestration policy must be a readable regular file: $policy"
+    return 1
+  }
+}
+
+agk_install_personal_policy() {
+  local repo=$1 source policy directory tmp
+  source="$repo/codex/plugins/integrated-harness/orchestration-policy.md"
+  policy=$(agk_personal_policy_path)
+  directory=$(dirname "$policy")
+
+  [[ -f $source && -r $source ]] || {
+    agk_die "bundled orchestration policy is unavailable: $source"
+    return 1
+  }
+  if [[ -e $policy || -L $policy ]]; then
+    agk_validate_personal_policy
+    return
+  fi
+  if [[ -e $directory && ( -L $directory || ! -d $directory ) ]]; then
+    agk_die "personal guardrail directory must be a real directory: $directory"
+    return 1
+  fi
+  mkdir -p "$directory" || return 1
+  [[ -d $directory && ! -L $directory && -w $directory ]] || {
+    agk_die "personal guardrail directory is not writable: $directory"
+    return 1
+  }
+  tmp=$(mktemp "$directory/.orchestration-policy.XXXXXX") || return 1
+  if ! cp -p "$source" "$tmp" || ! mv "$tmp" "$policy"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  AGK_PERSONAL_POLICY_CREATED=1
+}
+
+agk_remove_created_personal_policy() {
+  local repo=$1 source policy
+  (( AGK_PERSONAL_POLICY_CREATED )) || return 0
+  source="$repo/codex/plugins/integrated-harness/orchestration-policy.md"
+  policy=$(agk_personal_policy_path)
+  [[ ! -L $policy && -f $policy && -f $source ]] || return 1
+  cmp -s "$source" "$policy" || return 1
+  rm -f "$policy" || return 1
+  AGK_PERSONAL_POLICY_CREATED=0
 }
 
 agk_installed_modes() {

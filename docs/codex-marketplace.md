@@ -55,6 +55,9 @@ does the hook read the personal policy at
 the project file cannot be read, the hook fails closed to `strict` with an empty
 allowlist. A permissive personal policy therefore affects every project without
 its own policy file; create a project policy for high-risk repositories.
+Selecting `integrated-harness` creates the personal policy from the bundled
+default when it is absent. The selector never overwrites or removes an existing
+personal policy, including when the managed mode is later removed.
 
 Native `ask` delegates the approval prompt to Codex; no approval file, nonce, or
 repository command substitutes for a human response. If approvals are disabled
