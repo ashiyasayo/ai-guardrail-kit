@@ -1,6 +1,6 @@
 {
   "name": "integrated-harness",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "整合式護欄：任務分解、政策與範圍檢查、稽核脈絡，加上指令與機密資料防護。",
   "author": {
     "name": "Local developer"

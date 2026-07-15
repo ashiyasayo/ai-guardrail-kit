@@ -48,6 +48,14 @@ reliably reload newly installed skills and hooks.
   mode asks after all deterministic checks pass. Light mode may allow a provably
   scoped `apply_patch`, but mutating `exec_command` still asks.
 
+For `integrated-harness`, the project policy at
+`.codex/guardrail/orchestration-policy.md` always wins. Only when it is absent
+does the hook read the personal policy at
+`~/.codex/guardrail/orchestration-policy.md`. If neither file is available, or
+the project file cannot be read, the hook fails closed to `strict` with an empty
+allowlist. A permissive personal policy therefore affects every project without
+its own policy file; create a project policy for high-risk repositories.
+
 Native `ask` delegates the approval prompt to Codex; no approval file, nonce, or
 repository command substitutes for a human response. If approvals are disabled
 by the Codex host or execution policy, these plugins cannot turn them back on or

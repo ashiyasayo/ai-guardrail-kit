@@ -21,7 +21,7 @@ for p,name in zip(data['plugins'],names):
  base=root/p['source']['path'].removeprefix('./')
  manifest=json.loads((base/'.codex-plugin/plugin.json').read_text())
  check(base.name==manifest.get('name')==name, f'{name}: directory and manifest names must match')
- expected_versions={'decomposition-gate':'0.1.1','harness':'0.1.1','integrated-harness':'0.1.1'}
+ expected_versions={'decomposition-gate':'0.1.1','harness':'0.1.1','integrated-harness':'0.1.2'}
  check(manifest.get('version')==expected_versions[name], f'{name}: version must be {expected_versions[name]}')
  skills=list(base.glob('skills/*/SKILL.md'))
  check(len(skills)==1, f'{name}: expected exactly one skill, found {len(skills)}')

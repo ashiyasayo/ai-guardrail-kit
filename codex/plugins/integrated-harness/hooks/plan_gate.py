@@ -23,8 +23,19 @@ def section(text, heading):
         if line.strip().startswith("- "): values.append(line.strip()[2:].strip().strip("`"))
     return values
 
+def personal_policy_path():
+    return Path.home() / ".codex/guardrail/orchestration-policy.md"
+
+def resolve_policy_path(root):
+    """Project policy wins; an unreadable project policy must not fall back."""
+    project_policy = root / POLICY
+    if project_policy.exists(): return project_policy
+    personal = personal_policy_path()
+    if personal.is_file(): return personal
+    return project_policy
+
 def policy(root):
-    try: text = (root / POLICY).read_text()
+    try: text = resolve_policy_path(root).read_text()
     except (OSError, UnicodeError): return "strict", []
     match = MODE.search(text)
     return (match.group(1) if match else "strict"), section(text, "## Strict Bash 測試與建置 Allowlist")

@@ -189,18 +189,20 @@ def event(cwd, tool="apply_patch", tool_input=None):
             "permission_mode": "default", "session_id": "s", "tool_input": tool_input or {"patch": "*** Begin Patch\n*** Add File: src/app.py\n+x\n*** End Patch"},
             "tool_name": tool, "tool_use_id": "u", "transcript_path": "", "turn_id": "t"}
 
-def run(hook, data):
-    proc = subprocess.run(["python3", str(hook)], input=json.dumps(data), text=True, capture_output=True)
+def run(hook, data, home=None):
+    env = os.environ.copy()
+    if home is not None: env["HOME"] = str(home)
+    proc = subprocess.run(["python3", str(hook)], input=json.dumps(data), text=True, capture_output=True, env=env)
     assert proc.returncode == 0, (hook, proc.stderr)
     return json.loads(proc.stdout)["hookSpecificOutput"] if proc.stdout.strip() else None
 
-def denied(hook, data):
-    result = run(hook, data)
+def denied(hook, data, home=None):
+    result = run(hook, data, home)
     assert result and result["permissionDecision"] == "deny", (hook, result)
     return result["permissionDecisionReason"]
 
-def asked(hook, data):
-    result = run(hook, data)
+def asked(hook, data, home=None):
+    result = run(hook, data, home)
     assert result and result["permissionDecision"] == "ask", (hook, result)
     return result["permissionDecisionReason"]
 
@@ -296,6 +298,14 @@ with tempfile.TemporaryDirectory() as td:
         denied(ip, event(project, "exec_command", {"cmd": command}))
     policy.unlink()
     asked(ip, event(project))
+    home = td / "home"
+    personal_policy = home / ".codex/guardrail/orchestration-policy.md"
+    personal_policy.parent.mkdir(parents=True)
+    shutil.copy(install / "integrated-harness/orchestration-policy.md", personal_policy)
+    personal_policy.write_text(personal_policy.read_text().replace("strict", "light", 1))
+    assert run(ip, event(project), home=home) is None
+    shutil.copy(install / "integrated-harness/orchestration-policy.md", policy)
+    asked(ip, event(project), home=home)
 
     # Packaged runtime is the exact audited shared runtime.
     for plugin in ("decomposition-gate", "harness", "integrated-harness"):
