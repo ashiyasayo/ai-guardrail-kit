@@ -189,9 +189,10 @@ def event(cwd, tool="apply_patch", tool_input=None):
             "permission_mode": "default", "session_id": "s", "tool_input": tool_input or {"patch": "*** Begin Patch\n*** Add File: src/app.py\n+x\n*** End Patch"},
             "tool_name": tool, "tool_use_id": "u", "transcript_path": "", "turn_id": "t"}
 
-def run(hook, data, home=None):
+def run(hook, data, home=None, global_default=False):
     env = os.environ.copy()
     if home is not None: env["HOME"] = str(home)
+    if global_default: env["AI_GUARDRAIL_GLOBAL_DEFAULT"] = "1"
     proc = subprocess.run(["python3", str(hook)], input=json.dumps(data), text=True, capture_output=True, env=env)
     assert proc.returncode == 0, (hook, proc.stderr)
     return json.loads(proc.stdout)["hookSpecificOutput"] if proc.stdout.strip() else None
@@ -266,6 +267,9 @@ with tempfile.TemporaryDirectory() as td:
     denied(secrets, event(project, tool_input={"patch": "*** Begin Patch\n*** Add File: x\n+AWS=AKIA1234567890ABCDEF\n*** End Patch"}))
 
     ip = install / "integrated-harness/hooks/plan_gate.py"
+    global_project = td / "global-no-plan"; global_project.mkdir()
+    assert run(ip, event(global_project, "exec_command", {"cmd": "git status"}), global_default=True) is None
+    denied(ip, event(global_project, "exec_command", {"cmd": "git status"}))
     policy = guard / "orchestration-policy.md"
     shutil.copy(install / "integrated-harness/orchestration-policy.md", policy)
     plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】x\n## 允許修改範圍\n- `src/`\n")

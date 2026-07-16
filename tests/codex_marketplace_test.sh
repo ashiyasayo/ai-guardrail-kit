@@ -44,6 +44,9 @@ check('docs/codex-marketplace.md' in readme, 'README must link to the Codex mark
 required = {
  'codex plugin marketplace add "$(pwd)"': 'marketplace add command',
  './scripts/select-codex-mode decomposition-gate .': 'selector command',
+ './scripts/install-codex-global-integrated-harness': 'global installer command',
+ './scripts/verify-codex-global-integrated-harness': 'global verifier command',
+ '~/.codex/hooks.json': 'global hook configuration path',
  './scripts/verify-codex-mode decomposition-gate .': 'verifier command',
  './scripts/select-codex-mode --remove /path/to/project': 'safe remove command',
  './scripts/verify-codex-mode --no-managed-mode /path/to/project': 'removed-state verifier command',

@@ -39,6 +39,24 @@ codex plugin add decomposition-gate@ai-guardrail-kit
 模式時刪除。完整政策語意請見
 [`codex/plugins/integrated-harness/README.md`](codex/plugins/integrated-harness/README.md)。
 
+若要將 `integrated-harness` 設為所有 Codex 專案的全域預設，註冊 marketplace 後於
+本儲存庫執行一次：
+
+```bash
+./scripts/install-codex-global-integrated-harness
+./scripts/verify-codex-global-integrated-harness
+```
+
+此操作只管理 `~/.codex/hooks.json` 中帶有 ai-guardrail-kit 標記的三個 hooks，
+保留既有的其他全域 hooks。解除安裝與驗證：
+
+```bash
+./scripts/install-codex-global-integrated-harness --remove
+./scripts/verify-codex-global-integrated-harness --no-installed
+```
+
+完整行為與限制請見 [`docs/codex-marketplace.md`](docs/codex-marketplace.md)。
+
 ### Claude Code
 
 Claude also provides a repository marketplace with mutually exclusive project

@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+script_dir=$(cd "$(dirname "$0")" && pwd -P)
+repo=$(cd "$script_dir/.." && pwd -P)
+# shellcheck source=codex-mode-lib.sh
+source "$script_dir/codex-mode-lib.sh"
+
+no_installed=0
+if [[ ${1:-} == --no-installed ]]; then no_installed=1; shift; fi
+[[ $# -le 1 ]] || { agk_die 'usage: verify-codex-global-integrated-harness [--no-installed] [repo-dir]'; exit 2; }
+[[ $# -eq 0 ]] || repo=$(cd "$1" && pwd -P)
+hooks="$HOME/.codex/hooks.json"
+installed=$(agk_installed_modes) || { agk_die 'could not inspect installed plugins'; exit 1; }
+count=$(printf '%s\n' "$installed" | awk 'NF { n++ } END { print n+0 }')
+if (( no_installed )); then
+  [[ $count -eq 0 ]] || { agk_die "expected no installed managed plugin, found $count"; exit 1; }
+  if [[ -e $hooks ]]; then
+    python3 - "$hooks" <<'PY' || { agk_die 'managed global hooks remain'; exit 1; }
+import json, pathlib, sys
+hooks = json.loads(pathlib.Path(sys.argv[1]).read_text()).get("hooks", {})
+for group in hooks.get("PreToolUse", []):
+    for hook in group.get("hooks", []):
+        if isinstance(hook, dict) and str(hook.get("command", "")).startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 python3 -- "):
+            raise SystemExit(1)
+PY
+  fi
+  printf 'Verified no global Codex integrated-harness hooks.\n'; exit 0
+fi
+[[ $count -eq 1 && $installed == integrated-harness ]] || { agk_die 'expected only integrated-harness to be installed'; exit 1; }
+agk_validate_personal_policy || exit 1
+[[ -f $hooks && ! -L $hooks ]] || { agk_die "global hooks are missing: $hooks"; exit 1; }
+python3 - "$hooks" "$repo/codex/plugins/integrated-harness/hooks" <<'PY' || { agk_die 'global integrated-harness hooks do not match'; exit 1; }
+import json, pathlib, shlex, sys
+path, root = map(pathlib.Path, sys.argv[1:])
+data = json.loads(path.read_text())
+hooks = data.get("hooks")
+if not isinstance(hooks, dict): raise SystemExit(1)
+commands = []
+for group in hooks.get("PreToolUse", []):
+    if not isinstance(group, dict): raise SystemExit(1)
+    for hook in group.get("hooks", []):
+        if isinstance(hook, dict): commands.append((group.get("matcher"), hook.get("command")))
+expected = [
+    ("exec_command|apply_patch", root / "plan_gate.py"),
+    ("exec_command", root / "block_dangerous_commands.py"),
+    ("exec_command|apply_patch", root / "block_secrets.py"),
+]
+for matcher, target in expected:
+    wanted = "AI_GUARDRAIL_GLOBAL_DEFAULT=1 python3 -- " + shlex.quote(str(target))
+    if commands.count((matcher, wanted)) != 1 or not target.is_file(): raise SystemExit(1)
+if sum(1 for _, command in commands if isinstance(command, str) and command.startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 python3 -- ")) != 3:
+    raise SystemExit(1)
+PY
+command -v python3 >/dev/null || { agk_die 'python3 executable is unavailable'; exit 1; }
+printf 'Verified global Codex integrated-harness hooks.\n'

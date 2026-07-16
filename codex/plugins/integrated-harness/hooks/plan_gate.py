@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import hashlib
+import os
 import re
 import shlex
 import sys
@@ -106,6 +107,7 @@ def strict_command(cmd, allowlist, root):
 
 def main():
     event = load_event(sys.stdin); root = project_root(event)
+    if os.environ.get("AI_GUARDRAIL_GLOBAL_DEFAULT") == "1" and not (root / PLAN).exists(): return
     tool, data = event["tool_name"], event["tool_input"]
     mode, allowlist = policy(root)
     text = plan(root); allowed = scopes(text, root)
