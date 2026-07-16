@@ -38,6 +38,32 @@ provide mutual exclusion, and plugin installation alone does not activate hooks.
 After every selection or reinstall, start a new thread. Existing threads do not
 reliably reload newly installed skills and hooks.
 
+## Global integrated-harness default
+
+To make `integrated-harness` the default guardrail for every Codex project, run
+this once after registering the marketplace from a local checkout:
+
+```bash
+./scripts/install-codex-global-integrated-harness
+./scripts/verify-codex-global-integrated-harness
+```
+
+The installer installs only `integrated-harness`, copies the bundled personal
+policy only when absent, and adds three tagged `PreToolUse` commands to
+`~/.codex/hooks.json`. Unrelated global hooks are retained. A first installation
+keeps a private pre-install backup so `--remove` can restore the original hooks
+file byte-for-byte:
+
+```bash
+./scripts/install-codex-global-integrated-harness --remove
+./scripts/verify-codex-global-integrated-harness --no-installed
+```
+
+Global mode keeps the dangerous-command and secret checks active in every
+project. Its plan gate is intentionally inactive only until a project creates
+`.codex/guardrail/plan/decomposition.md`; once that file exists, the normal
+integrated-harness policy, scope, and native approval checks apply. Project
+selection remains strict and still requires the plan file from the start.
 ## Choosing a mode
 
 - `decomposition-gate` requires `.codex/guardrail/plan/decomposition.md` before

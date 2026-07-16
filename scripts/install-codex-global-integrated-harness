@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+set -euo pipefail
+script_dir=$(cd "$(dirname "$0")" && pwd -P)
+repo=$(cd "$script_dir/.." && pwd -P)
+# shellcheck source=codex-mode-lib.sh
+source "$script_dir/codex-mode-lib.sh"
+
+remove=0
+if [[ ${1:-} == --remove ]]; then remove=1; shift; fi
+[[ $# -le 1 ]] || { agk_die 'usage: install-codex-global-integrated-harness [--remove] [repo-dir]'; exit 2; }
+[[ $# -eq 0 ]] || repo=$(cd "$1" && pwd -P)
+hooks="$HOME/.codex/hooks.json"
+backup="$HOME/.codex/guardrail/global-integrated-harness-hooks.json"
+backup_missing="$backup.missing"
+backup_created=0
+snapshot=$(mktemp -d "${TMPDIR:-/tmp}/ai-guardrail-global.XXXXXX")
+trap 'rm -rf "$snapshot"' EXIT
+hooks_existed=0
+if [[ -e $hooks ]]; then
+  [[ -f $hooks && ! -L $hooks ]] || { agk_die "global hooks must be a regular file: $hooks"; exit 1; }
+  cp -p "$hooks" "$snapshot/hooks"; hooks_existed=1
+fi
+agk_installed_modes > "$snapshot/modes" || { agk_die 'could not inspect installed plugins'; exit 1; }
+if (( ! remove )) && [[ ! -e $backup && ! -e $backup_missing ]]; then
+  mkdir -p "$(dirname "$backup")" || exit 1
+  if [[ $hooks_existed == 1 ]]; then cp -p "$snapshot/hooks" "$backup" || exit 1
+  else : > "$backup_missing" || exit 1; fi
+  backup_created=1
+fi
+
+restore() {
+  local failed=0 current
+  if [[ $hooks_existed == 1 ]]; then
+    mkdir -p "$(dirname "$hooks")" && cp -p "$snapshot/hooks" "$hooks" || failed=1
+  else
+    rm -f "$hooks" || failed=1
+  fi
+  if ! current=$(agk_installed_modes 2>/dev/null); then failed=1; current=''; fi
+  if ! grep -Fxq integrated-harness <<<"$current" && grep -Fxq integrated-harness "$snapshot/modes"; then
+    codex plugin add "$(agk_plugin_path integrated-harness)" >/dev/null 2>&1 || failed=1
+  elif grep -Fxq integrated-harness <<<"$current" && ! grep -Fxq integrated-harness "$snapshot/modes"; then
+    codex plugin remove "$(agk_plugin_path integrated-harness)" >/dev/null 2>&1 || failed=1
+  fi
+  agk_remove_created_personal_policy "$repo" || failed=1
+  return "$failed"
+}
+
+update_hooks() {
+  local action=$1 root="$repo/codex/plugins/integrated-harness/hooks"
+  mkdir -p "$(dirname "$hooks")" || return 1
+  python3 - "$hooks" "$action" "$root" <<'PY'
+import json, os, pathlib, shlex, sys, tempfile
+path, action, root = map(pathlib.Path if False else str, sys.argv[1:4])
+path = pathlib.Path(path)
+try:
+    data = json.loads(path.read_text()) if path.exists() else {"hooks": {}}
+except (OSError, UnicodeError, json.JSONDecodeError) as error:
+    raise SystemExit(f"invalid global hooks JSON: {error}")
+if not isinstance(data, dict) or not isinstance(data.get("hooks", {}), dict):
+    raise SystemExit("invalid global hooks JSON")
+hooks = data.setdefault("hooks", {})
+managed = "AI_GUARDRAIL_GLOBAL_DEFAULT=1 python3 -- "
+def is_managed(entry):
+    return isinstance(entry, dict) and isinstance(entry.get("command"), str) and entry["command"].startswith(managed)
+old = hooks.get("PreToolUse", [])
+if not isinstance(old, list): raise SystemExit("hooks.PreToolUse must be an array")
+new = []
+for group in old:
+    if not isinstance(group, dict) or not isinstance(group.get("hooks"), list): raise SystemExit("invalid PreToolUse hook group")
+    remaining = [entry for entry in group["hooks"] if not is_managed(entry)]
+    if remaining:
+        copy = dict(group); copy["hooks"] = remaining; new.append(copy)
+if action == "remove" and new == old: raise SystemExit(0)
+if action == "install":
+    for matcher, filename in (("exec_command|apply_patch", "plan_gate.py"), ("exec_command", "block_dangerous_commands.py"), ("exec_command|apply_patch", "block_secrets.py")):
+        command = managed + shlex.quote(str(pathlib.Path(root) / filename))
+        new.append({"matcher": matcher, "hooks": [{"type": "command", "command": command}]})
+hooks["PreToolUse"] = new
+payload = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+fd, temporary = tempfile.mkstemp(prefix=".hooks.ai-guardrail.", dir=path.parent)
+try:
+    with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as out: out.write(payload)
+    os.replace(temporary, path)
+except BaseException:
+    try: os.unlink(temporary)
+    except OSError: pass
+    raise
+PY
+}
+
+if (( remove )); then
+  if [[ -f $backup && ! -L $backup ]]; then
+    mkdir -p "$(dirname "$hooks")" && cp -p "$backup" "$hooks" || exit 1
+    rm -f "$backup"
+  elif [[ -f $backup_missing && ! -L $backup_missing ]]; then
+    rm -f "$hooks" "$backup_missing" || exit 1
+  else
+    update_hooks remove || exit 1
+  fi
+  codex plugin remove "$(agk_plugin_path integrated-harness)" >/dev/null || { restore || true; exit 1; }
+  "$script_dir/verify-codex-global-integrated-harness" --no-installed "$repo" >/dev/null || { restore || true; exit 1; }
+  printf 'Removed global Codex integrated-harness hooks; start a new thread to deactivate them.\n'
+  exit 0
+fi
+
+codex plugin add "$(agk_plugin_path integrated-harness)" >/dev/null || exit 1
+agk_install_personal_policy "$repo" || { restore || true; exit 1; }
+update_hooks install || { restore || true; exit 1; }
+if [[ ${AI_GUARDRAIL_TEST_FAIL_GLOBAL_VERIFY:-0} == 1 ]] || ! "$script_dir/verify-codex-global-integrated-harness" "$repo" >/dev/null; then
+  restore || true
+  agk_die 'global installation failed verification; rollback attempted'
+  exit 1
+fi
+printf 'Installed global Codex integrated-harness hooks; start a new thread to activate them.\n'
