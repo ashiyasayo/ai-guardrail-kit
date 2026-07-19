@@ -25,7 +25,9 @@ def section(text, heading):
     return values
 
 def personal_policy_path():
-    return Path.home() / ".codex/guardrail/orchestration-policy.md"
+    # Windows 的 Path.home() 不理會 HOME 環境變數，明確優先採用 HOME 以維持跨平台一致
+    home = os.environ.get("HOME")
+    return (Path(home) if home else Path.home()) / ".codex/guardrail/orchestration-policy.md"
 
 def resolve_policy_path(root):
     """Project policy wins; an unreadable project policy must not fall back."""

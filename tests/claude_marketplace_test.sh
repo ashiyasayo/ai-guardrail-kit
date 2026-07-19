@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Windows（Git Bash）環境通常只有 python 而沒有可用的 python3，實際探測後回退
+if ! python3 -V >/dev/null 2>&1 && python -V >/dev/null 2>&1; then
+  python3() { python "$@"; }
+fi
+# Windows 預設編碼為 cp950，強制 Python 使用 UTF-8 避免中文讀寫失敗
+export PYTHONUTF8=${PYTHONUTF8:-1}
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 export ROOT
@@ -49,10 +55,16 @@ for mode in modes:
         for hook in group["hooks"]
     ]
     assert commands, f"no hook commands registered for {mode}"
-    prefix = 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/'
+    # 跨平台命令：依序探測 python3 / python / py，取第一個可執行者
+    prefix = (
+        'for interpreter in python3 python py; do "$interpreter" -V >/dev/null 2>&1 '
+        '&& exec env PYTHONUTF8=1 "$interpreter" "${CLAUDE_PLUGIN_ROOT}/hooks/'
+    )
     for command in commands:
         assert command.startswith(prefix), f"non-plugin-root command: {command}"
-        match = re.fullmatch(r'python3 "\$\{CLAUDE_PLUGIN_ROOT\}/hooks/([^"/]+\.py)"', command)
+        match = re.fullmatch(
+            re.escape(prefix) + r'([^"/]+\.py)"; done; exit 127', command
+        )
         assert match, f"unexpected hook command: {command}"
         executable = plugin_root / "hooks" / match.group(1)
         assert executable.is_file(), f"missing executable {executable.relative_to(root)}"

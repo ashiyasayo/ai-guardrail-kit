@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Windows（Git Bash）環境通常只有 python 而沒有可用的 python3，實際探測後回退
+if ! python3 -V >/dev/null 2>&1 && python -V >/dev/null 2>&1; then
+  python3() { python "$@"; }
+fi
+# Windows 預設編碼為 cp950，強制 Python 使用 UTF-8 避免中文讀寫失敗
+export PYTHONUTF8=${PYTHONUTF8:-1}
+# 原生 Windows 無法對 bash 子行程傳遞 POSIX 訊號，訊號測試僅在類 Unix 環境執行
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) agk_windows=1;; *) agk_windows=0;; esac
 repo=$(cd "$(dirname "$0")/.." && pwd -P)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -11,6 +19,8 @@ mkdir -p "$AI_GUARDRAIL_TEST_STATE"
 export HOME="$tmp/home"
 
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
+# BSD 與 GNU stat 的檔案模式參數不同，依序嘗試以支援 macOS/Linux/Git Bash
+file_mode() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" 2>/dev/null; }
 assert_file() { [[ -f $1 ]] || fail "missing $1"; }
 assert_mode() { "$repo/scripts/verify-codex-mode" "$1" "$2" >/dev/null || fail "verify $1"; }
 new_project() { local p=$1; mkdir -p "$p/.codex"; : > "$AI_GUARDRAIL_TEST_STATE/installed"; rm -f "$AI_GUARDRAIL_TEST_STATE"/*.count "$AI_GUARDRAIL_TEST_STATE"/delay.*.ready; }
@@ -61,6 +71,8 @@ grep -Fq 'update applied but verification failed' <<<"$output" || fail 'post-com
 
 for signal_case in INT:130 TERM:143 HUP:129; do
   signal=${signal_case%%:*}; expected=${signal_case#*:}
+  (( agk_windows )) && { printf 'skip %s refresh signal test on Windows
+' "$signal"; continue; }
   signal_project="$tmp/refresh-signal-$signal"
   new_project "$signal_project"
   "$repo/scripts/select-codex-mode" decomposition-gate "$signal_project" >/dev/null
@@ -162,16 +174,29 @@ new_project "$tmp/nonregular"
 mkdir "$tmp/nonregular/.codex/config.toml"
 if "$repo/scripts/select-codex-mode" harness "$tmp/nonregular" >/dev/null 2>&1; then fail 'non-regular config accepted'; fi
 
-new_project "$tmp/symlink"
+# Windows（Git Bash）未開啟開發人員模式時 ln -s 會退化成複製（目錄則遞迴複製），
+# symlink 拒絕測試無法成立；先以探測檔確認能力，不支援時整段跳過
 printf 'outside\n' > "$tmp/outside"
-rm "$tmp/symlink/.codex/config.toml" 2>/dev/null || true
-ln -s "$tmp/outside" "$tmp/symlink/.codex/config.toml"
-if "$repo/scripts/select-codex-mode" harness "$tmp/symlink" >/dev/null 2>&1; then fail 'symlink accepted'; fi
-[[ $(cat "$tmp/outside") == outside ]] || fail 'symlink target changed'
-new_project "$tmp/codex-symlink"; rm -rf "$tmp/codex-symlink/.codex"; ln -s "$tmp" "$tmp/codex-symlink/.codex"
-if "$repo/scripts/select-codex-mode" harness "$tmp/codex-symlink" >/dev/null 2>&1; then fail '.codex symlink accepted'; fi
+if ln -s "$tmp/outside" "$tmp/.symlink-probe" 2>/dev/null && [[ -L "$tmp/.symlink-probe" ]]; then
+  rm -f "$tmp/.symlink-probe"
+  new_project "$tmp/symlink"
+  rm "$tmp/symlink/.codex/config.toml" 2>/dev/null || true
+  ln -s "$tmp/outside" "$tmp/symlink/.codex/config.toml"
+  if "$repo/scripts/select-codex-mode" harness "$tmp/symlink" >/dev/null 2>&1; then fail 'symlink accepted'; fi
+  [[ $(cat "$tmp/outside") == outside ]] || fail 'symlink target changed'
+  new_project "$tmp/codex-symlink"; rm -rf "$tmp/codex-symlink/.codex"; ln -s "$tmp" "$tmp/codex-symlink/.codex"
+  if "$repo/scripts/select-codex-mode" harness "$tmp/codex-symlink" >/dev/null 2>&1; then fail '.codex symlink accepted'; fi
+else
+  rm -rf "$tmp/.symlink-probe"
+  printf 'skip symlink tests (no symlink support)\n'
+fi
 
-special="$tmp/repo space 'quote' \\backslash \$(touch INJECTED) \`touch ALSO\`;touch SEMI"
+# Windows 檔名不允許反斜線（視為路徑分隔符），該字元僅在類 Unix 環境測試
+if (( agk_windows )); then
+  special="$tmp/repo space 'quote' \$(touch INJECTED) \`touch ALSO\`;touch SEMI"
+else
+  special="$tmp/repo space 'quote' \\backslash \$(touch INJECTED) \`touch ALSO\`;touch SEMI"
+fi
 cp -R "$repo" "$special"; new_project "$tmp/meta"
 (cd "$tmp" && "$special/scripts/select-codex-mode" decomposition-gate "$tmp/meta" >/dev/null)
 [[ ! -e "$tmp/INJECTED" && ! -e "$tmp/ALSO" && ! -e "$tmp/SEMI" ]] || fail 'path injection executed'
@@ -264,8 +289,10 @@ unset FAKE_CODEX_FAIL_OPERATION AI_GUARDRAIL_TEST_FAIL_CONFIG_WRITE
 grep -Fq 'rollback also failed' <<<"$output" || fail 'rollback mutation failure not reported'
 
 new_project "$tmp/mode"; printf 'mode-original\n' > "$tmp/mode/.codex/config.toml"; chmod 640 "$tmp/mode/.codex/config.toml"
+# Windows（Git Bash）的權限映射無法完整表示 640，以 chmod 後實際生效的模式為比較基準
+expected_mode=$(file_mode "$tmp/mode/.codex/config.toml")
 "$repo/scripts/select-codex-mode" harness "$tmp/mode" >/dev/null
-[[ $(stat -f '%Lp' "$tmp/mode/.codex/config.toml") == 640 ]] || fail 'forward write changed mode'
+[[ $(file_mode "$tmp/mode/.codex/config.toml") == "$expected_mode" ]] || fail 'forward write changed mode'
 
 config_before=$(shasum -a 256 "$tmp/mode/.codex/config.toml"); plugins_before=$(cat "$AI_GUARDRAIL_TEST_STATE/installed")
 export AI_GUARDRAIL_TEST_FAIL_MODE_COPY=1
@@ -273,7 +300,7 @@ if "$repo/scripts/select-codex-mode" integrated-harness "$tmp/mode" >/dev/null 2
 unset AI_GUARDRAIL_TEST_FAIL_MODE_COPY
 [[ $config_before == "$(shasum -a 256 "$tmp/mode/.codex/config.toml")" ]] || fail 'mode failure changed config'
 [[ $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'mode failure changed plugins'
-[[ $(stat -f '%Lp' "$tmp/mode/.codex/config.toml") == 640 ]] || fail 'mode failure rollback changed mode'
+[[ $(file_mode "$tmp/mode/.codex/config.toml") == "$expected_mode" ]] || fail 'mode failure rollback changed mode'
 
 new_project "$tmp/order"; printf 'harness@ai-guardrail-kit\ndecomposition-gate@ai-guardrail-kit\n' > "$AI_GUARDRAIL_TEST_STATE/installed"
 export FAKE_CODEX_FAIL_OPERATION='remove:2'
@@ -283,6 +310,8 @@ grep -Fq 'rollback succeeded' <<<"$output" || fail 'set-equivalent rollback orde
 
 for signal_case in TERM:143 HUP:129; do
   signal=${signal_case%%:*}; expected=${signal_case#*:}
+  (( agk_windows )) && { printf 'skip %s signal test on Windows
+' "$signal"; continue; }
   new_project "$tmp/signal-$signal"; printf 'harness@ai-guardrail-kit\n' > "$AI_GUARDRAIL_TEST_STATE/installed"; printf 'signal-original\n' > "$tmp/signal-$signal/.codex/config.toml"
   FAKE_CODEX_DELAY_OPERATION=remove "$repo/scripts/select-codex-mode" integrated-harness "$tmp/signal-$signal" >/dev/null 2>&1 & pid=$!
   sleep 0.2; kill -"$signal" "$pid"; set +e; wait "$pid"; status=$?; set -e
@@ -291,15 +320,17 @@ for signal_case in TERM:143 HUP:129; do
   [[ $(cat "$tmp/signal-$signal/.codex/config.toml") == signal-original ]] || fail "$signal config rollback failed"
 done
 
-new_project "$tmp/signal-INT"; printf 'harness@ai-guardrail-kit\n' > "$AI_GUARDRAIL_TEST_STATE/installed"; printf 'signal-original\n' > "$tmp/signal-INT/.codex/config.toml"
-FAKE_CODEX_DELAY_OPERATION=remove python3 - "$repo/scripts/select-codex-mode" "$tmp/signal-INT" <<'PY' || fail 'INT status or rollback failed'
+if (( ! agk_windows )); then
+  new_project "$tmp/signal-INT"; printf 'harness@ai-guardrail-kit\n' > "$AI_GUARDRAIL_TEST_STATE/installed"; printf 'signal-original\n' > "$tmp/signal-INT/.codex/config.toml"
+  FAKE_CODEX_DELAY_OPERATION=remove python3 - "$repo/scripts/select-codex-mode" "$tmp/signal-INT" <<'PY' || fail 'INT status or rollback failed'
 import os, signal, subprocess, sys, time
 p = subprocess.Popen([sys.argv[1], "integrated-harness", sys.argv[2]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 time.sleep(.2); p.send_signal(signal.SIGINT)
 raise SystemExit(0 if p.wait() == 130 else 1)
 PY
-grep -Fxq harness@ai-guardrail-kit "$AI_GUARDRAIL_TEST_STATE/installed" || fail 'INT plugin rollback failed'
-[[ $(cat "$tmp/signal-INT/.codex/config.toml") == signal-original ]] || fail 'INT config rollback failed'
+  grep -Fxq harness@ai-guardrail-kit "$AI_GUARDRAIL_TEST_STATE/installed" || fail 'INT plugin rollback failed'
+  [[ $(cat "$tmp/signal-INT/.codex/config.toml") == signal-original ]] || fail 'INT config rollback failed'
+fi
 
 printf 'unrelated@elsewhere\n' >> "$AI_GUARDRAIL_TEST_STATE/installed"
 "$repo/scripts/select-codex-mode" decomposition-gate "$tmp/rollback-write" >/dev/null

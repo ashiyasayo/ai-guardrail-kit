@@ -19,7 +19,7 @@ permissions 與 hook 支援，不會自動受到同等保護。
 `light`：基本拆解，免人工核准；只提供思考紀律，不提供授權控制。
 缺少本欄位或值無法辨識時，一律視為 `strict`。
 
-`strict` 下由人類執行 `python3 .claude/hooks/approve_plan.py`；核准紀錄綁定
+`strict` 下由人類執行 `python3 .claude/hooks/approve_plan.py`（Windows 環境無 `python3` 時改用 `python`）；核准紀錄綁定
 目前拆解文件的 SHA-256，有效期間為 60 分鐘。三種模式均不豁免憑證與危險命令 hooks。
 
 下方 allowlist 只允許啟動列出的測試／建置入口；不得包含 pipe、redirect、多命令串接、

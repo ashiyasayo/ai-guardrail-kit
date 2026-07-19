@@ -1,0 +1,7 @@
+# Bash 腳本、Python hooks 與設定檔在 Windows checkout 時必須維持 LF，
+# 否則 heredoc 與 shell 解析會因 CRLF 失敗（覆蓋 core.autocrlf 設定）
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
+*.pdf binary

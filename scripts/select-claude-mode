@@ -17,7 +17,7 @@ project=${1:-.}
 [[ -d $project ]] || { printf 'project directory does not exist: %s\n' "$project" >&2; exit 1; }
 project=$(cd "$project" && pwd -P) || exit 1
 command -v claude >/dev/null || { printf 'claude executable is unavailable\n' >&2; exit 1; }
-command -v python3 >/dev/null || { printf 'python3 executable is unavailable\n' >&2; exit 1; }
+command -v python3 >/dev/null || { printf 'python3 (or python) executable is unavailable\n' >&2; exit 1; }
 ccli() { (cd "$project" && claude "$@"); }
 if (( remove )); then package_target=''; else package_target=$target; fi
 agk_claude_validate_package "$repo" "$package_target" || { printf 'Claude package validation failed\n' >&2; exit 1; }
@@ -61,7 +61,8 @@ for x in data:
         if origin==market and name in modes:
             if x['scope']=='user': raise SystemExit(1)
             rows.append((name,x['scope'],'1' if x['enabled'] else '0'))
-pathlib.Path(dest).write_text(''.join('\t'.join(x)+'\n' for x in sorted(rows)))
+# 快照檔供 bash grep 逐行比對，位元組寫入避免 Windows 換行翻譯成 CRLF
+pathlib.Path(dest).write_bytes(''.join('\t'.join(x)+'\n' for x in sorted(rows)).encode())
 PY
 
 plugin() { printf '%s@%s' "$1" "$AGK_CLAUDE_MARKETPLACE"; }

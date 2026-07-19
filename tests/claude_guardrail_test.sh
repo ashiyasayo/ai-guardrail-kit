@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Windows（Git Bash）環境通常只有 python 而沒有可用的 python3，實際探測後回退
+if ! python3 -V >/dev/null 2>&1 && python -V >/dev/null 2>&1; then
+  python3() { python "$@"; }
+fi
+# Windows 預設編碼為 cp950，強制 Python 使用 UTF-8 避免中文讀寫失敗
+export PYTHONUTF8=${PYTHONUTF8:-1}
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ROOT="$ROOT" python3 - <<'PY'
@@ -8,6 +14,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -44,7 +51,7 @@ def run(hook, data, project, home=None):
     if home is not None:
         env["HOME"] = str(home)
     proc = subprocess.run(
-        ["python3", str(hook)], input=json.dumps(data), text=True,
+        [sys.executable, str(hook)], input=json.dumps(data), text=True,
         capture_output=True, env=env,
     )
     output = json.loads(proc.stdout) if proc.stdout.strip() else None

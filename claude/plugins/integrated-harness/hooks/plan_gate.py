@@ -71,7 +71,9 @@ def exact_path(root: str, relative: str) -> str:
 
 
 def personal_policy_path() -> str:
-    return os.path.expanduser(os.path.join("~", ".claude", "orchestration-policy.md"))
+    # Windows 的 expanduser 不理會 HOME 環境變數，明確優先採用 HOME 以維持跨平台一致
+    home = os.environ.get("HOME") or os.path.expanduser("~")
+    return os.path.join(home, ".claude", "orchestration-policy.md")
 
 
 def resolve_policy_path(root: str) -> str:
@@ -324,7 +326,7 @@ def check(data: dict) -> Optional[str]:
     if not passed:
         return (
             f"計畫閘門：{reason} 請由人類審查計畫後執行 "
-            '`python3 "${CLAUDE_PLUGIN_ROOT}/hooks/approve_plan.py"`。'
+            '`python3 "${CLAUDE_PLUGIN_ROOT}/hooks/approve_plan.py"`。（Windows 環境無 python3 時改用 python）'
         )
     return None
 

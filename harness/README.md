@@ -77,6 +77,7 @@ Hook 從 stdin 接收 JSON、以 exit code 回應（0 放行、2 攔截），
 因此可直接用 echo 模擬：
 
 ```bash
+# Windows（Git Bash）環境若無 python3，以下命令請改用 python 執行
 # 應攔截（exit 2）：未核准的寫入
 echo '{"tool_name":"Write","tool_input":{"content":"hi"}}' \
   | python3 .claude/hooks/plan_gate.py; echo "exit=$?"

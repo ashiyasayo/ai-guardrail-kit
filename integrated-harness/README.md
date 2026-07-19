@@ -48,7 +48,7 @@
 2. Claude 依核准模式建立 `.claude/plan/decomposition.md`；`strict`／`standard` 計畫
    必須列出 `## 允許修改範圍`，`light` 只要求基本拆解。
 3. `standard`／`light` 在計畫通過關卡後即可施作；`strict` 必須等待人類審查，
-   由人類在自己的終端執行 `python3 .claude/hooks/approve_plan.py`。
+   由人類在自己的終端執行 `python3 .claude/hooks/approve_plan.py`（Windows 環境無 `python3` 時改用 `python`）。
 4. `strict` 核准紀錄只在 60 分鐘內有效，且 SHA-256 必須符合目前拆解文件；
    檔案工具在 `strict`／`standard` 下不得修改允許範圍外路徑。
 5. 憑證與危險命令 hooks 獨立於計畫與人工核准關卡，三種模式都不豁免。

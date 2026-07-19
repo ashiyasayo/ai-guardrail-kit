@@ -49,7 +49,7 @@ update_hooks() {
   local action=$1 root="$repo/codex/plugins/integrated-harness/hooks"
   mkdir -p "$(dirname "$hooks")" || return 1
   python3 - "$hooks" "$action" "$root" <<'PY'
-import json, os, pathlib, shlex, sys, tempfile
+import json, os, pathlib, shlex, subprocess, sys, tempfile
 path, action, root = map(pathlib.Path if False else str, sys.argv[1:4])
 path = pathlib.Path(path)
 try:
@@ -59,7 +59,15 @@ except (OSError, UnicodeError, json.JSONDecodeError) as error:
 if not isinstance(data, dict) or not isinstance(data.get("hooks", {}), dict):
     raise SystemExit("invalid global hooks JSON")
 hooks = data.setdefault("hooks", {})
-managed = "AI_GUARDRAIL_GLOBAL_DEFAULT=1 python3 -- "
+# 管理標記僅比對環境變數前綴，直譯器名稱在安裝當下以 -V 實際探測解析
+#（WSL 與 Windows 皆可，避免選到 Windows 上不能執行的 python3 別名 stub）
+managed = "AI_GUARDRAIL_GLOBAL_DEFAULT=1 "
+def interpreter_is_usable(name):
+    try:
+        return subprocess.run([name, "-V"], capture_output=True).returncode == 0
+    except OSError:
+        return False
+interpreter = "python3" if interpreter_is_usable("python3") else "python"
 def is_managed(entry):
     return isinstance(entry, dict) and isinstance(entry.get("command"), str) and entry["command"].startswith(managed)
 old = hooks.get("PreToolUse", [])
@@ -73,7 +81,7 @@ for group in old:
 if action == "remove" and new == old: raise SystemExit(0)
 if action == "install":
     for matcher, filename in (("exec_command|apply_patch", "plan_gate.py"), ("exec_command", "block_dangerous_commands.py"), ("exec_command|apply_patch", "block_secrets.py")):
-        command = managed + shlex.quote(str(pathlib.Path(root) / filename))
+        command = managed + interpreter + " -- " + shlex.quote(str(pathlib.Path(root) / filename))
         new.append({"matcher": matcher, "hooks": [{"type": "command", "command": command}]})
 hooks["PreToolUse"] = new
 payload = json.dumps(data, ensure_ascii=False, indent=2) + "\n"

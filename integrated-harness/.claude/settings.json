@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\"",
+            "command": "for interpreter in python3 python py; do \"$interpreter\" -V >/dev/null 2>&1 && exec env PYTHONUTF8=1 \"$interpreter\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\"; done; exit 127",
             "timeout": 10
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/inject_protocol.py\"",
+            "command": "for interpreter in python3 python py; do \"$interpreter\" -V >/dev/null 2>&1 && exec env PYTHONUTF8=1 \"$interpreter\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/inject_protocol.py\"; done; exit 127",
             "timeout": 10
           }
         ]

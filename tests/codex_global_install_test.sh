@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Windows（Git Bash）環境通常只有 python 而沒有可用的 python3，實際探測後回退
+if ! python3 -V >/dev/null 2>&1 && python -V >/dev/null 2>&1; then
+  python3() { python "$@"; }
+fi
+# Windows 預設編碼為 cp950，強制 Python 使用 UTF-8 避免中文讀寫失敗
+export PYTHONUTF8=${PYTHONUTF8:-1}
 
 repo=$(cd "$(dirname "$0")/.." && pwd -P)
 tmp=$(mktemp -d)
@@ -49,7 +55,7 @@ assert "python3 -- /opt/unrelated.py" in commands
 for name in ("plan_gate.py", "block_dangerous_commands.py", "block_secrets.py"):
     matches = [command for command in commands if name in command]
     assert len(matches) == 1, (name, matches)
-    assert matches[0].startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 python3 -- "), matches[0]
+    assert matches[0].startswith(("AI_GUARDRAIL_GLOBAL_DEFAULT=1 python3 -- ", "AI_GUARDRAIL_GLOBAL_DEFAULT=1 python -- ")), matches[0]
 assert data["hooks"]["PermissionRequest"][0]["hooks"][0]["command"] == "python3 -- /opt/approval.py"
 PY
 }

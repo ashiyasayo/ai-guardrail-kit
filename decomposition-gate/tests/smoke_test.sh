@@ -4,6 +4,12 @@
 # 用法：bash tests/smoke_test.sh
 #
 set -euo pipefail
+# Windows（Git Bash）環境通常只有 python 而沒有可用的 python3，實際探測後回退
+if ! python3 -V >/dev/null 2>&1 && python -V >/dev/null 2>&1; then
+  python3() { python "$@"; }
+fi
+# Windows 預設編碼為 cp950，強制 Python 使用 UTF-8 避免中文讀寫失敗
+export PYTHONUTF8=${PYTHONUTF8:-1}
 
 HOOK="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.claude/hooks/decomposition_gate.py"
 WORKDIR="$(mktemp -d)"

@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Windows（Git Bash）環境通常只有 python 而沒有可用的 python3，實際探測後回退
+if ! python3 -V >/dev/null 2>&1 && python -V >/dev/null 2>&1; then
+  python3() { python "$@"; }
+fi
+# Windows 預設編碼為 cp950，強制 Python 使用 UTF-8 避免中文讀寫失敗
+export PYTHONUTF8=${PYTHONUTF8:-1}
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 section="${1:-all}"
@@ -178,7 +184,7 @@ fi
 
 if [[ "$section" == modes || "$section" == all ]]; then
 ROOT="$ROOT" python3 - <<'PY'
-import ast, hashlib, json, os, shutil, subprocess, tempfile, time
+import ast, hashlib, json, os, shutil, subprocess, sys, tempfile, time
 from pathlib import Path
 
 root = Path(os.environ["ROOT"])
@@ -193,7 +199,7 @@ def run(hook, data, home=None, global_default=False):
     env = os.environ.copy()
     if home is not None: env["HOME"] = str(home)
     if global_default: env["AI_GUARDRAIL_GLOBAL_DEFAULT"] = "1"
-    proc = subprocess.run(["python3", str(hook)], input=json.dumps(data), text=True, capture_output=True, env=env)
+    proc = subprocess.run([sys.executable, str(hook)], input=json.dumps(data), text=True, capture_output=True, env=env)
     assert proc.returncode == 0, (hook, proc.stderr)
     return json.loads(proc.stdout)["hookSpecificOutput"] if proc.stdout.strip() else None
 

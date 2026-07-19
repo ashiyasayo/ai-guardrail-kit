@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # Scope-aware Claude Code plugin state helpers.
 
+# Windows（Git Bash）環境通常只有 python 而沒有可用的 python3
+#（WindowsApps 的 python3 別名 stub 找得到卻不能執行），故以實際執行 -V 探測後回退
+if ! python3 -V >/dev/null 2>&1 && python -V >/dev/null 2>&1; then
+  python3() { python "$@"; }
+fi
+# Windows 預設編碼為 cp950，強制 Python 使用 UTF-8 避免中文讀寫失敗
+export PYTHONUTF8=${PYTHONUTF8:-1}
+
 AGK_CLAUDE_MARKETPLACE=ai-guardrail-kit
 AGK_CLAUDE_MODES=(decomposition-gate harness integrated-harness)
 
@@ -17,6 +25,8 @@ agk_claude_list_scope() {
   if ! claude plugin list --json >"$listing"; then rm -f "$listing"; return 1; fi
   python3 - "$listing" "$scope" "$AGK_CLAUDE_MARKETPLACE" "${AGK_CLAUDE_MODES[@]}" <<'PY'
 import json, pathlib, sys
+# Windows 上 stdout 預設會將換行翻譯為 CRLF，重設為 LF 供 bash 讀取
+sys.stdout.reconfigure(newline=chr(10))
 path, wanted_scope, marketplace, *managed_names = sys.argv[1:]
 try:
     data = json.loads(pathlib.Path(path).read_text())

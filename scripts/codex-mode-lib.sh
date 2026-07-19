@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # Shared implementation for select-codex-mode and verify-codex-mode.
 
+# Windows（Git Bash）環境通常只有 python 而沒有可用的 python3
+#（WindowsApps 的 python3 別名 stub 找得到卻不能執行），故以實際執行 -V 探測後回退
+if ! python3 -V >/dev/null 2>&1 && python -V >/dev/null 2>&1; then
+  python3() { python "$@"; }
+fi
+# Windows 預設編碼為 cp950，強制 Python 使用 UTF-8 避免中文讀寫失敗
+export PYTHONUTF8=${PYTHONUTF8:-1}
+
 AGK_MODES=(decomposition-gate harness integrated-harness)
 AGK_MARKETPLACE=ai-guardrail-kit
 AGK_BEGIN='# ai-guardrail-kit:begin'
@@ -101,6 +109,8 @@ agk_installed_modes() {
   if ! codex plugin list --json > "$listing"; then rm -f "$listing"; return 1; fi
   python3 - "$AGK_MARKETPLACE" "$listing" <<'PY'
 import json, pathlib, sys
+# Windows 上 stdout 預設會將換行翻譯為 CRLF，重設為 LF 供 bash 讀取
+sys.stdout.reconfigure(newline=chr(10))
 market = sys.argv[1]
 managed = {"decomposition-gate", "harness", "integrated-harness"}
 data = json.loads(pathlib.Path(sys.argv[2]).read_text())
@@ -159,8 +169,18 @@ agk_render_block() {
 
 agk_command_value() {
   python3 - "$1" <<'PY'
-import json, shlex, sys
-print(json.dumps("python3 -- " + shlex.quote(sys.argv[1])))
+import json, shlex, subprocess, sys
+# Windows 上 stdout 預設會將換行翻譯為 CRLF，重設為 LF 供 bash 讀取
+sys.stdout.reconfigure(newline=chr(10))
+# 安裝當下解析可用的直譯器名稱，讓產生的 config 在 WSL 與 Windows 都能執行；
+# 以實際執行 -V 探測，避免選到 Windows 上不能執行的 python3 別名 stub
+def interpreter_is_usable(name):
+    try:
+        return subprocess.run([name, "-V"], capture_output=True).returncode == 0
+    except OSError:
+        return False
+interpreter = "python3" if interpreter_is_usable("python3") else "python"
+print(json.dumps(interpreter + " -- " + shlex.quote(sys.argv[1])))
 PY
 }
 

@@ -67,7 +67,7 @@ decomposition-gate/
    cp decomposition-gate/CLAUDE.md your-project/     # 若已有，改為合併
    ```
 
-2. 確認 hook 有執行權限、且 `python3` 在 PATH 中：
+2. 確認 hook 有執行權限、且 `python3` 在 PATH 中（Windows 環境無 `python3` 時改用 `python`）：
 
    ```bash
    chmod +x your-project/.claude/hooks/decomposition_gate.py

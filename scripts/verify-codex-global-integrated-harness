@@ -20,7 +20,7 @@ import json, pathlib, sys
 hooks = json.loads(pathlib.Path(sys.argv[1]).read_text()).get("hooks", {})
 for group in hooks.get("PreToolUse", []):
     for hook in group.get("hooks", []):
-        if isinstance(hook, dict) and str(hook.get("command", "")).startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 python3 -- "):
+        if isinstance(hook, dict) and str(hook.get("command", "")).startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 "):
             raise SystemExit(1)
 PY
   fi
@@ -30,8 +30,15 @@ fi
 agk_validate_personal_policy || exit 1
 [[ -f $hooks && ! -L $hooks ]] || { agk_die "global hooks are missing: $hooks"; exit 1; }
 python3 - "$hooks" "$repo/codex/plugins/integrated-harness/hooks" <<'PY' || { agk_die 'global integrated-harness hooks do not match'; exit 1; }
-import json, pathlib, shlex, sys
+import json, pathlib, shlex, subprocess, sys
 path, root = map(pathlib.Path, sys.argv[1:])
+# 與安裝腳本相同的直譯器解析邏輯，確保驗證與安裝結果一致
+def interpreter_is_usable(name):
+    try:
+        return subprocess.run([name, "-V"], capture_output=True).returncode == 0
+    except OSError:
+        return False
+interpreter = "python3" if interpreter_is_usable("python3") else "python"
 data = json.loads(path.read_text())
 hooks = data.get("hooks")
 if not isinstance(hooks, dict): raise SystemExit(1)
@@ -46,10 +53,10 @@ expected = [
     ("exec_command|apply_patch", root / "block_secrets.py"),
 ]
 for matcher, target in expected:
-    wanted = "AI_GUARDRAIL_GLOBAL_DEFAULT=1 python3 -- " + shlex.quote(str(target))
+    wanted = "AI_GUARDRAIL_GLOBAL_DEFAULT=1 " + interpreter + " -- " + shlex.quote(str(target))
     if commands.count((matcher, wanted)) != 1 or not target.is_file(): raise SystemExit(1)
-if sum(1 for _, command in commands if isinstance(command, str) and command.startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 python3 -- ")) != 3:
+if sum(1 for _, command in commands if isinstance(command, str) and command.startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 ")) != 3:
     raise SystemExit(1)
 PY
-command -v python3 >/dev/null || { agk_die 'python3 executable is unavailable'; exit 1; }
+command -v python3 >/dev/null || { agk_die 'python3 (or python) executable is unavailable'; exit 1; }
 printf 'Verified global Codex integrated-harness hooks.\n'
