@@ -1,4 +1,6 @@
 .DS_Store
+# VS Code Copilot 擴充自動產生的 todos 檔，與本專案無關
+.github/instructions/todos.instructions.md
 .claude/.plan_approved
 .claude/plan/
 .worktrees/

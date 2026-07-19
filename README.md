@@ -136,7 +136,9 @@ chmod +x your-project/.claude/hooks/*.py
 `~/.claude/orchestration-policy.md`，兩處皆無一律回落 `strict`。
 
 - 適用：多人協作、高風險資料、正式系統，以及需要稽核軌跡的專案。
-- 附自動化回歸測試（`tests/`），是三者中唯一有自動化測試的目錄。
+- 除本目錄自帶的 `tests/` 外，儲存庫根層 `tests/` 的回歸測試涵蓋
+  全部三種模式與兩個平台（`decomposition-gate` 另有
+  `tests/smoke_test.sh`）。
 
 ## 如何選擇
 
@@ -156,7 +158,11 @@ chmod +x your-project/.claude/hooks/*.py
 - `harness` 與 `integrated-harness` 的 `block_secrets.py`、
   `block_dangerous_commands.py` 為同源分支：修補任一邊的繞過手法時，
   須檢查另一邊是否需同步移植（詳見
-  [`integrated-harness/MAINTENANCE.md`](integrated-harness/MAINTENANCE.md)）。
+  [`integrated-harness/MAINTENANCE.md`](integrated-harness/MAINTENANCE.md)），
+  並把攻擊樣本加入 `tests/claude_hook_parity_test.sh` 的共同行為語料，
+  由該測試守護兩邊判定一致。
+- 回歸測試統一入口為 `tests/run_all.sh`，CI 與人工回歸皆應以它執行
+  全部測試；也可單獨執行個別 `tests/*_test.sh`。
 - `harness` 與 `integrated-harness` 的 `settings.json` 只掛載 `guard.py` 統一進入點，
   由它在單一直譯器行程內依序執行三道檢查；hook 檔案須整組複製，
   修改任一檢查腳本後應執行 `tests/claude_guard_test.sh` 回歸。
