@@ -93,6 +93,58 @@ chmod +x your-project/.claude/hooks/*.py
 
 詳細設定與核准流程請見各目錄的 `README.md`。
 
+## 移除 Plugin
+
+### Claude Code
+
+先移除選定的模式，再移除 marketplace 註冊（`.` 可換成目標專案路徑，
+`--scope` 需與安裝時一致）：
+
+```bash
+./scripts/select-claude-mode --remove --scope project .
+./scripts/verify-claude-mode --no-managed-mode .
+claude plugin marketplace remove ai-guardrail-kit
+```
+
+`select-claude-mode --remove` 會清除找到的所有 managed mode（跨 `project`／
+`local` 兩種 scope），移除後請開新的 Claude Code session 讓 hooks 確實卸載。
+完整行為見 [`docs/claude-marketplace.md`](docs/claude-marketplace.md)。
+
+### Codex
+
+若曾用 selector 啟用某一模式，先移除該模式再移除 marketplace：
+
+```bash
+codex plugin remove integrated-harness@ai-guardrail-kit
+codex plugin marketplace remove ai-guardrail-kit
+```
+
+若曾執行過全域預設安裝（`install-codex-global-integrated-harness`），
+需另外解除：
+
+```bash
+./scripts/install-codex-global-integrated-harness --remove
+./scripts/verify-codex-global-integrated-harness --no-installed
+```
+
+此指令只移除帶有 ai-guardrail-kit 標記的 hooks，不影響其他既有全域 hooks；
+既有個人政策檔 `~/.codex/guardrail/orchestration-policy.md` 不會被自動刪除，
+需自行決定是否保留或手動刪除。完整行為見
+[`docs/codex-marketplace.md`](docs/codex-marketplace.md)。
+
+### copy-in（複製即用）安裝
+
+若是以 `cp -r .../.claude your-project/` 方式複製安裝（未透過 marketplace），
+移除方式為手動刪除複製進去的檔案與合併過的 hooks 設定：
+
+```bash
+rm -rf your-project/.claude/hooks your-project/.claude/plan
+rm your-project/CLAUDE.md your-project/ORCHESTRATOR.md 2>/dev/null
+```
+
+若 `.claude/settings.json` 是與既有設定手動合併而非整份複製，請手動移除
+其中對應本 kit 的 hooks 區塊，不要整份刪除 `settings.json`。
+
 ## 三個目錄總覽
 
 | 目錄 | 一句話定位 | 拆解檢查 | 人類核准 | 安全 Hook | 完整編排層 |
