@@ -41,8 +41,13 @@ def main() -> None:
         print("guard: 無法解析 hook 輸入，保守攔截。", file=sys.stderr)
         sys.exit(2)
 
+    is_scheduled_task = os.environ.get("CLAUDE_SCHEDULED_TASK") == "1"
+
     try:
         for module in (block_dangerous_commands, block_secrets, plan_gate):
+            # 排程任務無人類在場核准，故僅豁免 plan_gate；紅線指令與憑證洩漏檢查仍需執行。
+            if is_scheduled_task and module is plan_gate:
+                continue
             reason = module.check(data)
             if reason is not None:
                 emit_deny(reason)

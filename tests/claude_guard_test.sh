@@ -39,9 +39,12 @@ def event(project, tool="Write", tool_input=None):
     }
 
 
-def run(hook, data, project, raw_input=None):
+def run(hook, data, project, raw_input=None, extra_env=None):
     env = os.environ.copy()
     env["CLAUDE_PROJECT_DIR"] = str(project)
+    env.pop("CLAUDE_SCHEDULED_TASK", None)
+    if extra_env:
+        env.update(extra_env)
     payload = raw_input if raw_input is not None else json.dumps(data)
     proc = subprocess.run(
         [sys.executable, str(hook)], input=payload, text=True,
@@ -100,6 +103,19 @@ with tempfile.TemporaryDirectory() as td:
         assert_denied_exit2(run(guard, event(project), project), "計畫閘門")
         # 危險指令：紅線攔截優先於計畫閘門
         assert_denied_exit2(run(guard, fixture("dangerous-command.json", project), project), "危險指令攔截")
+        # 排程任務：無核准旗標也放行一般寫入（僅豁免計畫閘門）
+        assert_allowed(run(guard, event(project), project, extra_env={"CLAUDE_SCHEDULED_TASK": "1"}))
+        # 排程任務：紅線指令與憑證攔截不因排程身分而豁免
+        assert_denied_exit2(run(
+            guard, fixture("dangerous-command.json", project), project,
+            extra_env={"CLAUDE_SCHEDULED_TASK": "1"},
+        ), "危險指令攔截")
+        result = run(
+            guard, fixture("secret-write.json", project), project,
+            extra_env={"CLAUDE_SCHEDULED_TASK": "1"},
+        )
+        assert_denied_exit2(result, "憑證攔截")
+        assert "AKIA1234567890ABCDEF" not in result[3] + result[4], result
         # 憑證寫入：即使已核准仍攔截，且憑證值不得外洩
         (project / ".claude/.plan_approved").touch()
         result = run(guard, fixture("secret-write.json", project), project)
@@ -144,6 +160,21 @@ with tempfile.TemporaryDirectory() as td:
         # 範圍外寫入：計畫閘門攔截
         assert_denied_json(run(guard, event(
             project, "Write", {"file_path": "other/app.py", "content": "x"}), project), "計畫閘門")
+        # 排程任務：範圍外寫入也放行（僅豁免計畫閘門）
+        assert_allowed(run(guard, event(
+            project, "Write", {"file_path": "other/app.py", "content": "x"}), project,
+            extra_env={"CLAUDE_SCHEDULED_TASK": "1"}))
+        # 排程任務：紅線指令與憑證攔截不因排程身分而豁免
+        assert_denied_json(run(
+            guard, fixture("dangerous-command.json", project), project,
+            extra_env={"CLAUDE_SCHEDULED_TASK": "1"},
+        ), "危險指令攔截")
+        result = run(
+            guard, fixture("secret-write.json", project), project,
+            extra_env={"CLAUDE_SCHEDULED_TASK": "1"},
+        )
+        assert_denied_json(result, "憑證攔截")
+        assert "AKIA1234567890ABCDEF" not in result[3] + result[4], result
         # 模型不得操作核准旗標
         assert_denied_json(run(guard, event(
             project, "Bash", {"command": "rm .claude/.plan_approved"}), project), "核准旗標")
