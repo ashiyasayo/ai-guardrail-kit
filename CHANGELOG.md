@@ -21,7 +21,7 @@ All notable changes to this project are documented in this file.
     屬精確率優先取捨，無法涵蓋無標籤裸資料。
   - `harness` plugin 版號由 0.4.0 升級為 0.5.0，`integrated-harness` 由 0.3.0
     升級為 0.4.0。
-  - 註：Codex 平台有各自獨立的 `shared/codex/pii_patterns.py`，本次尚未同步擴充。
+  - Codex 平台已於後續移植項目同步相同規則與驗證契約。
 
 ### Security
 
@@ -84,6 +84,9 @@ All notable changes to this project are documented in this file.
   `integrated-harness` 舊版號 `0.1.2`，每次版號升級都會過期失敗）。
 
 ### Added
+
+- Codex 個資防護同步 Claude 的四元組規則契約、Luhn 信用卡驗證，以及標籤錨定的
+  學號與護照號碼規則；`harness`／`integrated-harness` 版號皆升級至 0.5.0。
 
 - `integrated-harness` 新增個資保護兩層防線（僅 Claude Code 平台）：
   - `redact_sensitive_info.py`（PreToolUse，掛載於 `guard.py`）：偵測寫入內容中

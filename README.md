@@ -236,5 +236,7 @@ rm your-project/CLAUDE.md your-project/ORCHESTRATOR.md 2>/dev/null
 - Codex `harness` 與 `integrated-harness` 以 `security_guard.py` 在單一 Python
   程序內依序執行危險命令與秘密寫入檢查；計畫閘門與個資改寫因決策語意不同，
   仍維持獨立 hook。
+- Claude 與 Codex 的個資規則皆以 Luhn 驗證 13–19 碼信用卡候選值；學號與護照
+  號碼採標籤錨定，需鄰近 `學號`／`student id`／`護照`／`passport` 等文字才命中。
 - Regex hooks 是防線不是保證，無法涵蓋混淆、間接執行等所有變形；須搭配
   Claude Code 權限設定、SAST、Secret Manager 與人工審查。

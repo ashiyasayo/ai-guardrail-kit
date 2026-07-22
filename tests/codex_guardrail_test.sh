@@ -316,6 +316,23 @@ with tempfile.TemporaryDirectory() as td:
     assert redaction["permissionDecision"] == "allow"
     assert "test@example.com" not in redaction["updatedInput"]["patch"]
     assert "t***@example.com" in redaction["updatedInput"]["patch"]
+    pii_cases = event(project, tool_input={
+        "patch": "*** Begin Patch\n*** Add File: x\n+card=4111111111111111\n+學號：A12345678\n+護照號碼：123456789\n*** End Patch"
+    })
+    pii_output = run_raw(pii, pii_cases)["hookSpecificOutput"]
+    assert "信用卡卡號" in pii_output["permissionDecisionReason"]
+    assert "學號" in pii_output["permissionDecisionReason"]
+    assert "護照號碼" in pii_output["permissionDecisionReason"]
+    assert "4111111111111111" not in pii_output["updatedInput"]["patch"]
+    advanced_prompt = {"hook_event_name": "UserPromptSubmit", "prompt": "學號：A12345678"}
+    advanced_denial = run_raw(pii, advanced_prompt)
+    assert advanced_denial["continue"] is False
+    assert "學號" in advanced_denial["stopReason"]
+    assert "A12345678" not in json.dumps(advanced_denial, ensure_ascii=False)
+    invalid_card = event(project, tool_input={
+        "patch": "*** Begin Patch\n*** Add File: x\n+order=4111111111111112\n*** End Patch"
+    })
+    assert run_raw(pii, invalid_card) is None
 
     ip = install / "integrated-harness/hooks/plan_gate.py"
     session = run_raw(install / "integrated-harness/hooks/session_start.py", {})

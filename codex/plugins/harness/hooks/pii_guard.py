@@ -11,10 +11,14 @@ from pii_patterns import RULES
 
 def redact(text: str) -> Tuple[str, List[str]]:
     kinds: List[str] = []
-    for kind, pattern, mask in RULES:
-        if pattern.search(text):
-            kinds.append(kind)
-            text = pattern.sub(mask, text)
+    for kind, pattern, mask, validator in RULES:
+        def replace(match, _kind=kind, _mask=mask, _validator=validator):
+            if _validator is not None and not _validator(match):
+                return match.group(0)
+            if _kind not in kinds:
+                kinds.append(_kind)
+            return _mask(match)
+        text = pattern.sub(replace, text)
     return text, kinds
 
 
