@@ -23,6 +23,14 @@ fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 file_mode() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" 2>/dev/null; }
 assert_file() { [[ -f $1 ]] || fail "missing $1"; }
 assert_mode() { "$repo/scripts/verify-codex-mode" "$1" "$2" >/dev/null || fail "verify $1"; }
+wait_for_file() {
+  local path=$1
+  for _ in {1..200}; do
+    [[ -e $path ]] && return 0
+    sleep .01
+  done
+  return 1
+}
 new_project() { local p=$1; mkdir -p "$p/.codex"; : > "$AI_GUARDRAIL_TEST_STATE/installed"; rm -f "$AI_GUARDRAIL_TEST_STATE"/*.count "$AI_GUARDRAIL_TEST_STATE"/delay.*.ready; }
 assert_bad_json() { export FAKE_CODEX_LIST_JSON=$1; ! "$repo/scripts/verify-codex-mode" decomposition-gate "$project" >/dev/null 2>&1 || fail 'bad listing accepted'; unset FAKE_CODEX_LIST_JSON; }
 
@@ -314,7 +322,8 @@ for signal_case in TERM:143 HUP:129; do
 ' "$signal"; continue; }
   new_project "$tmp/signal-$signal"; printf 'harness@ai-guardrail-kit\n' > "$AI_GUARDRAIL_TEST_STATE/installed"; printf 'signal-original\n' > "$tmp/signal-$signal/.codex/config.toml"
   FAKE_CODEX_DELAY_OPERATION=remove "$repo/scripts/select-codex-mode" integrated-harness "$tmp/signal-$signal" >/dev/null 2>&1 & pid=$!
-  sleep 0.2; kill -"$signal" "$pid"; set +e; wait "$pid"; status=$?; set -e
+  wait_for_file "$AI_GUARDRAIL_TEST_STATE/delay.remove.1.ready" || fail "$signal signal synchronization timed out"
+  kill -"$signal" "$pid"; set +e; wait "$pid"; status=$?; set -e
   [[ $status -eq $expected ]] || fail "$signal status $status"
   grep -Fxq harness@ai-guardrail-kit "$AI_GUARDRAIL_TEST_STATE/installed" || fail "$signal plugin rollback failed"
   [[ $(cat "$tmp/signal-$signal/.codex/config.toml") == signal-original ]] || fail "$signal config rollback failed"
@@ -322,10 +331,19 @@ done
 
 if (( ! agk_windows )); then
   new_project "$tmp/signal-INT"; printf 'harness@ai-guardrail-kit\n' > "$AI_GUARDRAIL_TEST_STATE/installed"; printf 'signal-original\n' > "$tmp/signal-INT/.codex/config.toml"
-  FAKE_CODEX_DELAY_OPERATION=remove python3 - "$repo/scripts/select-codex-mode" "$tmp/signal-INT" <<'PY' || fail 'INT status or rollback failed'
-import os, signal, subprocess, sys, time
+  FAKE_CODEX_DELAY_OPERATION=remove python3 - "$repo/scripts/select-codex-mode" "$tmp/signal-INT" "$AI_GUARDRAIL_TEST_STATE/delay.remove.1.ready" <<'PY' || fail 'INT status or rollback failed'
+import os, pathlib, signal, subprocess, sys, time
 p = subprocess.Popen([sys.argv[1], "integrated-harness", sys.argv[2]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-time.sleep(.2); p.send_signal(signal.SIGINT)
+for _ in range(200):
+    if pathlib.Path(sys.argv[3]).exists():
+        break
+    if p.poll() is not None:
+        raise SystemExit(1)
+    time.sleep(.01)
+else:
+    p.kill()
+    raise SystemExit(1)
+p.send_signal(signal.SIGINT)
 raise SystemExit(0 if p.wait() == 130 else 1)
 PY
   grep -Fxq harness@ai-guardrail-kit "$AI_GUARDRAIL_TEST_STATE/installed" || fail 'INT plugin rollback failed'

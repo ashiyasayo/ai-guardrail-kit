@@ -45,6 +45,9 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- Codex 模式切換的訊號 rollback 回歸測試改為等待 fake CLI 的明確 ready marker，
+  取代固定 0.2 秒延遲，避免較慢環境在 trap 安裝前送出訊號造成偶發失敗。
+
 - Codex `harness`／`integrated-harness` 新增 `security_guard.py`，以單一 Python
   程序合併危險命令與秘密寫入兩道純阻擋檢查，減少 `exec_command` 的固定啟動成本；
   兩個 Codex plugin 版號皆升級至 0.4.0。
