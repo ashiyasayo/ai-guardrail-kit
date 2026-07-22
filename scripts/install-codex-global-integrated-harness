@@ -70,20 +70,33 @@ def interpreter_is_usable(name):
 interpreter = "python3" if interpreter_is_usable("python3") else "python"
 def is_managed(entry):
     return isinstance(entry, dict) and isinstance(entry.get("command"), str) and entry["command"].startswith(managed)
-old = hooks.get("PreToolUse", [])
-if not isinstance(old, list): raise SystemExit("hooks.PreToolUse must be an array")
-new = []
-for group in old:
-    if not isinstance(group, dict) or not isinstance(group.get("hooks"), list): raise SystemExit("invalid PreToolUse hook group")
-    remaining = [entry for entry in group["hooks"] if not is_managed(entry)]
-    if remaining:
-        copy = dict(group); copy["hooks"] = remaining; new.append(copy)
-if action == "remove" and new == old: raise SystemExit(0)
+changed = False
+def clean_event(event):
+    global changed
+    old = hooks.get(event, [])
+    if not isinstance(old, list): raise SystemExit(f"hooks.{event} must be an array")
+    new = []
+    for group in old:
+        if not isinstance(group, dict) or not isinstance(group.get("hooks"), list):
+            raise SystemExit(f"invalid {event} hook group")
+        remaining = [entry for entry in group["hooks"] if not is_managed(entry)]
+        if len(remaining) != len(group["hooks"]): changed = True
+        if remaining:
+            copy = dict(group); copy["hooks"] = remaining; new.append(copy)
+    hooks[event] = new
+    return new
+pre_tool = clean_event("PreToolUse")
+prompt_submit = clean_event("UserPromptSubmit")
+session_start = clean_event("SessionStart")
+if action == "remove" and not changed: raise SystemExit(0)
 if action == "install":
-    for matcher, filename in (("exec_command|apply_patch", "plan_gate.py"), ("exec_command", "block_dangerous_commands.py"), ("exec_command|apply_patch", "block_secrets.py")):
+    for matcher, filename in (("exec_command|apply_patch", "plan_gate.py"), ("exec_command", "block_dangerous_commands.py"), ("exec_command|apply_patch", "block_secrets.py"), ("apply_patch", "pii_guard.py")):
         command = managed + interpreter + " -- " + shlex.quote(str(pathlib.Path(root) / filename))
-        new.append({"matcher": matcher, "hooks": [{"type": "command", "command": command}]})
-hooks["PreToolUse"] = new
+        pre_tool.append({"matcher": matcher, "hooks": [{"type": "command", "command": command}]})
+    pii_command = managed + interpreter + " -- " + shlex.quote(str(pathlib.Path(root) / "pii_guard.py"))
+    prompt_submit.append({"hooks": [{"type": "command", "command": pii_command}]})
+    session_command = managed + interpreter + " -- " + shlex.quote(str(pathlib.Path(root) / "session_start.py"))
+    session_start.append({"matcher": "startup|resume|clear|compact", "hooks": [{"type": "command", "command": session_command}]})
 payload = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
 fd, temporary = tempfile.mkstemp(prefix=".hooks.ai-guardrail.", dir=path.parent)
 try:

@@ -78,6 +78,8 @@ on_signal() {
   cleanup
   exit "$status"
 }
+# 清除父程序可能遺留的忽略訊號設定，確保非互動式子程序也能執行回復。
+trap - INT TERM HUP
 trap cleanup EXIT
 trap 'on_signal INT 130' INT
 trap 'on_signal TERM 143' TERM

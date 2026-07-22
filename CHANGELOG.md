@@ -22,12 +22,28 @@ All notable changes to this project are documented in this file.
 
 ### Security
 
+- Codex 秘密檢查同步補上 Bash `${VAR:-fallback}` 與未加引號憑證指派判定，
+  可區分環境變數 fallback 與硬編碼秘密值。
+
+- Codex `integrated-harness` 的 `SessionStart` 提醒同步支援讀取 plugin 內的
+  `reasoning-protocol.md`；文件不存在、無法讀取或非 UTF-8 時安全回落基本提醒。
+
+- Codex `harness`／`integrated-harness` 危險命令檢查同步加入 shell token 化判定，
+  補強受保護分支 force-push、`curl|shell` 下載即執行、`find -exec` 間接寫入、
+  命令替換與多種旗標排列的攔截，並保留原有 regex fallback。
+
+- Codex `decomposition-gate` 同步加入 `.codex/guardrail/plan/.gate_disabled` 緊急逃生口；
+  只有人類可預先建立，Codex 工具與 `exec_command` 不得自建或修改，並新增對應回歸案例。
+
 - `decomposition-gate` 補上逃生口保護：`.claude/plan/.gate_disabled` 只能由人類在
   自己的終端機建立，模型透過寫入工具或 Bash 自建一律 deny（比照 `plan_gate.py`
   對 `.plan_approved` 的既有保護），避免模型自我停用拆解閘門。`decomposition-gate`
   plugin 版號由 0.1.2 升級為 0.2.0。
 
 ### Changed
+
+- Codex 模式切換在非互動式背景程序中重設繼承的 `SIGINT` 忽略狀態，確保中斷時能執行
+  rollback，並保留原始退出碼。
 
 - 文件釐清：`integrated-harness` README 明確說明 `light` 模式不解析也不強制
   `## 允許修改範圍`（等同放棄檔案範圍管制，只保留「有拆解才能動」）；個資防護

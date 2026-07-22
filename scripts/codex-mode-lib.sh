@@ -161,7 +161,15 @@ agk_render_block() {
       printf '[[hooks.PreToolUse]]\nmatcher = "exec_command"\n\n'
       printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/block_dangerous_commands.py")"
       printf '[[hooks.PreToolUse]]\nmatcher = "exec_command|apply_patch"\n\n'
-      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n' "$(agk_command_value "$root/block_secrets.py")"
+      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/block_secrets.py")"
+      printf '[[hooks.PreToolUse]]\nmatcher = "apply_patch"\n\n'
+      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/pii_guard.py")"
+      printf '[[hooks.UserPromptSubmit]]\n\n'
+      printf '[[hooks.UserPromptSubmit.hooks]]\ntype = "command"\ncommand = %s\n' "$(agk_command_value "$root/pii_guard.py")"
+      if [[ $mode == integrated-harness ]]; then
+        printf '\n[[hooks.SessionStart]]\nmatcher = "startup|resume|clear|compact"\n\n'
+        printf '[[hooks.SessionStart.hooks]]\ntype = "command"\ncommand = %s\n' "$(agk_command_value "$root/session_start.py")"
+      fi
       ;;
   esac
   printf '%s\n' "$AGK_END"

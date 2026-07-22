@@ -1,7 +1,7 @@
 {
   "name": "harness",
-  "version": "0.1.1",
-  "description": "以指令與機密檢查保護程式碼庫變更，受管寫入透過 Codex 原生 ask 交由人類核准。",
+  "version": "0.3.0",
+  "description": "以指令、機密與個資檢查保護程式碼庫變更，受管寫入透過 Codex 原生 ask 交由人類核准。",
   "author": {
     "name": "Local developer"
   },
@@ -9,7 +9,7 @@
   "interface": {
     "displayName": "Harness",
     "shortDescription": "人類核准與安全底線防護。",
-    "longDescription": "受管寫入先經確定性安全檢查（毀滅性指令與明文憑證一律攔截，核准不可豁免），再回傳 Codex 原生 ask 由人類回應核准；不使用核准檔或旗標。需 Python 3.9+；與其他兩種模式互斥，請以 scripts/select-codex-mode 選擇模式（勿直接 codex plugin add/remove），安裝或切換後須開啟新的 thread 才會生效。",
+    "longDescription": "受管寫入先經確定性安全檢查；毀滅性指令與明文憑證一律攔截，提示中的疑似個資會被阻擋，apply_patch 中的疑似個資會先去識別化，再由 Codex 原生 ask 交由人類核准。需 Python 3.9+；與其他兩種模式互斥。",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [],

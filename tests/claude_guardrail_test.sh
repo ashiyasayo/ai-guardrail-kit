@@ -170,7 +170,7 @@ with tempfile.TemporaryDirectory() as td:
         event(project), project,
     )
     assert_denied(stale)
-    policy.write_text(policy.read_text().replace("核准模式：strict", "核准模式：light", 1))
+    policy.write_text(policy.read_text().replace("- Approval Mode: strict", "- Approval Mode: light", 1))
     assert_allowed(assert_pair(
         integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py",
         event(project), project,
@@ -196,7 +196,7 @@ with tempfile.TemporaryDirectory() as td:
 
     # 僅個人層級政策檔（standard）：免核准放行範圍內寫入
     personal = home / ".claude/orchestration-policy.md"
-    personal.write_text(template.replace("核准模式：strict", "核准模式：standard", 1))
+    personal.write_text(template.replace("- Approval Mode: strict", "- Approval Mode: standard", 1))
     assert_allowed(assert_pair(*gates, event(project), project, home=home))
 
     # 模型修改個人政策檔：以政策檔保護理由攔截

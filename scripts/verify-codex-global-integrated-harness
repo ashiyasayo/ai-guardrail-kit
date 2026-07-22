@@ -18,10 +18,12 @@ if (( no_installed )); then
     python3 - "$hooks" <<'PY' || { agk_die 'managed global hooks remain'; exit 1; }
 import json, pathlib, sys
 hooks = json.loads(pathlib.Path(sys.argv[1]).read_text()).get("hooks", {})
-for group in hooks.get("PreToolUse", []):
-    for hook in group.get("hooks", []):
-        if isinstance(hook, dict) and str(hook.get("command", "")).startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 "):
-            raise SystemExit(1)
+for groups in hooks.values():
+    if not isinstance(groups, list): continue
+    for group in groups:
+        for hook in group.get("hooks", []):
+            if isinstance(hook, dict) and str(hook.get("command", "")).startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 "):
+                raise SystemExit(1)
 PY
   fi
   printf 'Verified no global Codex integrated-harness hooks.\n'; exit 0
@@ -43,19 +45,23 @@ data = json.loads(path.read_text())
 hooks = data.get("hooks")
 if not isinstance(hooks, dict): raise SystemExit(1)
 commands = []
-for group in hooks.get("PreToolUse", []):
-    if not isinstance(group, dict): raise SystemExit(1)
-    for hook in group.get("hooks", []):
-        if isinstance(hook, dict): commands.append((group.get("matcher"), hook.get("command")))
+for event in ("PreToolUse", "UserPromptSubmit", "SessionStart"):
+    for group in hooks.get(event, []):
+        if not isinstance(group, dict): raise SystemExit(1)
+        for hook in group.get("hooks", []):
+            if isinstance(hook, dict): commands.append((event, group.get("matcher"), hook.get("command")))
 expected = [
-    ("exec_command|apply_patch", root / "plan_gate.py"),
-    ("exec_command", root / "block_dangerous_commands.py"),
-    ("exec_command|apply_patch", root / "block_secrets.py"),
+    ("PreToolUse", "exec_command|apply_patch", root / "plan_gate.py"),
+    ("PreToolUse", "exec_command", root / "block_dangerous_commands.py"),
+    ("PreToolUse", "exec_command|apply_patch", root / "block_secrets.py"),
+    ("PreToolUse", "apply_patch", root / "pii_guard.py"),
+    ("UserPromptSubmit", None, root / "pii_guard.py"),
+    ("SessionStart", "startup|resume|clear|compact", root / "session_start.py"),
 ]
-for matcher, target in expected:
+for event, matcher, target in expected:
     wanted = "AI_GUARDRAIL_GLOBAL_DEFAULT=1 " + interpreter + " -- " + shlex.quote(str(target))
-    if commands.count((matcher, wanted)) != 1 or not target.is_file(): raise SystemExit(1)
-if sum(1 for _, command in commands if isinstance(command, str) and command.startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 ")) != 3:
+    if commands.count((event, matcher, wanted)) != 1 or not target.is_file(): raise SystemExit(1)
+if sum(1 for _, _, command in commands if isinstance(command, str) and command.startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 ")) != 6:
     raise SystemExit(1)
 PY
 command -v python3 >/dev/null || { agk_die 'python3 (or python) executable is unavailable'; exit 1; }

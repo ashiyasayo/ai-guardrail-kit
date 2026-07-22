@@ -1,7 +1,7 @@
 {
   "name": "integrated-harness",
-  "version": "0.1.3",
-  "description": "整合式護欄：任務分解、政策與範圍檢查、稽核脈絡，加上指令與機密資料防護。",
+  "version": "0.3.0",
+  "description": "整合式護欄：任務分解、政策與範圍檢查、協定提醒，加上指令、機密與個資防護。",
   "author": {
     "name": "Local developer"
   },
@@ -9,7 +9,7 @@
   "interface": {
     "displayName": "Integrated Harness",
     "shortDescription": "整合拆解、核准與安全底線的完整方案。",
-    "longDescription": "整合任務分解、政策、範圍與稽核脈絡：strict 模式在全部確定性檢查通過後回傳 Codex 原生 ask 由人類核准；light 模式可放行可證明範圍內的 apply_patch，但變更性 exec_command 仍會 ask。毀滅性指令與明文憑證一律攔截，核准不可豁免。需 Python 3.9+；與其他兩種模式互斥，請以 scripts/select-codex-mode 選擇模式（勿直接 codex plugin add/remove），安裝或切換後須開啟新的 thread 才會生效。",
+    "longDescription": "整合任務分解、政策、範圍與 thread 開場提醒；strict 模式在確定性檢查後使用 Codex 原生 ask，light 模式可放行範圍內的 apply_patch。危險指令與明文憑證一律攔截，提示中的疑似個資會被阻擋，apply_patch 中的疑似個資會先去識別化。需 Python 3.9+。",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [],

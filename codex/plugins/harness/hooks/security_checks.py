@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 from typing import Any, Dict, Optional
 
 
@@ -44,16 +45,110 @@ UNQUOTED_ASSIGNMENT_PATTERN = re.compile(
     r"(?i)(?:[A-Za-z0-9]+[_-])*(?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token"
     r"|auth[_-]?token|client[_-]?secret|token)\s*[:=]\s*([^\s'\"`;&|#]{8,})"
 )
+BASH_PARAMETER_FALLBACK_PATTERN = re.compile(
+    r"(?i)\b(password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|connection[_-]?string)\b"
+    r"\s*=\s*\"?\$\{[A-Za-z_][A-Za-z0-9_]*:[-=]([^}]*)}"
+)
+BASH_UNQUOTED_ASSIGNMENT_PATTERN = re.compile(
+    r"(?i)\b(password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|connection[_-]?string)\b"
+    r"\s*=\s*(?!['\"])([^\s;&|]{8,})"
+)
+SHELL_OPERATORS = {";", "&&", "||", "|", "&"}
+PROTECTED_BRANCHES = {"main", "master", "prod", "production", "trunk", "release"}
+COMMAND_SUBSTITUTION_PATTERN = re.compile(r"\$\(([^()]*)\)|`([^`]*)`")
 REFERENCE_VALUE_PREFIXES = (
     "os.environ", "process.env", "getenv", "system.getenv",
     "environment.", "config.", "env.", "settings.", "vault.",
 )
 
 
+def _command_name(token: str) -> str:
+    return token.rsplit("/", 1)[-1]
+
+
+def _tokenized_commands(command: str):
+    try:
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|")
+        lexer.whitespace_split = True
+        lexer.commenters = ""
+        tokens = list(lexer)
+    except ValueError:
+        return None
+    segments, operators, current = [], [], []
+    for token in tokens:
+        if token in SHELL_OPERATORS:
+            if current:
+                segments.append(current); current = []; operators.append(token)
+            continue
+        current.append(token)
+    if current:
+        segments.append(current)
+    return segments, operators[:max(0, len(segments) - 1)]
+
+
+def _rm_recursive_force(args) -> bool:
+    flags = "".join(token[1:] for token in args if token.startswith("-") and not token.startswith("--"))
+    long_flags = set(token for token in args if token.startswith("--"))
+    return ("r" in flags or "R" in flags or "--recursive" in long_flags) and ("f" in flags or "--force" in long_flags)
+
+
+def _protected_push(args) -> bool:
+    positional = [arg for arg in args if not arg.startswith("-")]
+    for refspec in positional[1:]:
+        destination = (refspec[1:] if refspec.startswith("+") else refspec).rsplit(":", 1)[-1]
+        if destination.removeprefix("refs/heads/") in PROTECTED_BRANCHES:
+            return True
+    return False
+
+
+def _token_dangerous(tokens) -> Optional[str]:
+    if not tokens:
+        return None
+    name, args = _command_name(tokens[0]), tokens[1:]
+    if name == "sudo" and len(tokens) > 1 and _command_name(tokens[1]) == "rm":
+        return "sudo 刪除"
+    if name == "rm" and _rm_recursive_force(args):
+        return "遞迴強制刪除"
+    if name == "git":
+        sub = next((arg for arg in args if not arg.startswith("-")), "")
+        if sub == "reset" and "--hard" in args: return "硬重置"
+        if sub == "filter-branch" or (sub == "push" and "--mirror" in args): return "清空 git 歷史"
+        if sub == "push" and any(arg in {"-f", "--force", "--force-with-lease"} for arg in args) and _protected_push(args):
+            return "強制推送主幹"
+    if name in {"shutdown", "reboot", "poweroff"} or (name == "init" and any(arg in {"0", "6"} for arg in args)): return "關機/重啟"
+    if name == "chmod" and "777" in args: return "全開權限"
+    if name.startswith("mkfs.") or (name == "dd" and any(arg.startswith("of=/dev/") for arg in args)): return "格式化/覆寫磁碟"
+    if name in {"iptables", "pfctl"} and any(arg in {"-F", "--flush"} for arg in args): return "清空防火牆規則"
+    if name == "nft" and args[:2] == ["flush", "ruleset"]: return "清空防火牆規則"
+    if name == "systemctl" and len(args) >= 2 and args[0] in {"stop", "disable"} and args[1].lower() in {"falcon-sensor", "crowdstrike", "auditd", "firewalld"}: return "停用安全服務"
+    if name in {"cat", "less", "more", "head", "tail"} and any(arg in {"/etc/shadow", "/etc/passwd"} for arg in args): return "讀取系統帳密檔"
+    if name == "find" and any(arg in {"-exec", "-execdir", "-delete", "-fprintf", "-fprint", "-fls"} for arg in args): return "find 間接寫入"
+    return None
+
+
 def dangerous_command(command: str) -> Optional[str]:
     """Return the first dangerous-command rule name, without command content."""
     if not isinstance(command, str):
         return None
+    for match in COMMAND_SUBSTITUTION_PATTERN.finditer(command):
+        nested = match.group(1) or match.group(2)
+        result = dangerous_command(nested)
+        if result:
+            return result
+    parsed = _tokenized_commands(command)
+    if parsed:
+        for segment in parsed[0]:
+            result = _token_dangerous(segment)
+            if result:
+                return result
+        for index, operator in enumerate(parsed[1]):
+            if operator != "|" or index + 1 >= len(parsed[0]):
+                continue
+            left, right = parsed[0][index], parsed[0][index + 1]
+            if left and right and _command_name(left[0]) in {"curl", "wget"}:
+                right_name = _command_name(right[1] if _command_name(right[0]) == "sudo" and len(right) > 1 else right[0])
+                if right_name in {"bash", "sh", "python", "python3"}:
+                    return "下載即執行"
     for rule_name, pattern in DANGEROUS_PATTERNS:
         if pattern.search(command):
             return rule_name
@@ -92,6 +187,11 @@ def secret_kind(content: str) -> Optional[str]:
     if not isinstance(content, str):
         return None
     for line in content.splitlines():
+        safe_fallback_spans = []
+        for fallback in BASH_PARAMETER_FALLBACK_PATTERN.finditer(line):
+            if _looks_like_secret_literal(fallback.group(2)):
+                return "一般憑證指派"
+            safe_fallback_spans.append(fallback.span())
         for rule_name, pattern in SECRET_PATTERNS:
             hit = pattern.search(line)
             if hit and not PLACEHOLDER_PATTERN.search(hit.group(0)):
@@ -99,4 +199,9 @@ def secret_kind(content: str) -> Optional[str]:
         for hit in UNQUOTED_ASSIGNMENT_PATTERN.finditer(line):
             if _looks_like_secret_literal(hit.group(1)):
                 return "未加引號的憑證指派"
+        for hit in BASH_UNQUOTED_ASSIGNMENT_PATTERN.finditer(line):
+            if any(hit.start() >= start and hit.end() <= end for start, end in safe_fallback_spans):
+                continue
+            if _looks_like_secret_literal(hit.group(2)):
+                return "一般憑證指派"
     return None

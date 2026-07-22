@@ -1,6 +1,6 @@
 {
   "name": "decomposition-gate",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "變更程式碼庫前，強制要求先在專案 .codex/guardrail/plan/decomposition.md 提出任務分解計畫。",
   "author": {
     "name": "Local developer"
@@ -9,7 +9,7 @@
   "interface": {
     "displayName": "Decomposition Gate",
     "shortDescription": "任務分解閘門：先想清楚、再動手。",
-    "longDescription": "以 hook 封鎖寫入類操作，直到專案存在 .codex/guardrail/plan/decomposition.md 拆解文件。屬流程紀律而非人工授權或沙箱。需 Python 3.9+；與 harness、integrated-harness 互斥，請以 scripts/select-codex-mode 選擇模式（勿直接 codex plugin add/remove），安裝或切換後須開啟新的 thread 才會生效。",
+    "longDescription": "以 hook 封鎖寫入類操作，直到專案存在 .codex/guardrail/plan/decomposition.md 拆解文件；支援由人類建立 .gate_disabled 緊急逃生口，模型不得自建或修改。屬流程紀律而非人工授權或沙箱。需 Python 3.9+；與 harness、integrated-harness 互斥，請以 scripts/select-codex-mode 選擇模式（勿直接 codex plugin add/remove），安裝或切換後須開啟新的 thread 才會生效。",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [],

@@ -52,10 +52,14 @@ data = json.loads(pathlib.Path(sys.argv[1]).read_text())
 groups = data["hooks"]["PreToolUse"]
 commands = [hook["command"] for group in groups for hook in group["hooks"]]
 assert "python3 -- /opt/unrelated.py" in commands
-for name in ("plan_gate.py", "block_dangerous_commands.py", "block_secrets.py"):
+for name in ("plan_gate.py", "block_dangerous_commands.py", "block_secrets.py", "pii_guard.py"):
     matches = [command for command in commands if name in command]
     assert len(matches) == 1, (name, matches)
     assert matches[0].startswith(("AI_GUARDRAIL_GLOBAL_DEFAULT=1 python3 -- ", "AI_GUARDRAIL_GLOBAL_DEFAULT=1 python -- ")), matches[0]
+prompt = data["hooks"]["UserPromptSubmit"][0]["hooks"][0]["command"]
+session = data["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+assert "pii_guard.py" in prompt and prompt.startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 ")
+assert "session_start.py" in session and session.startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 ")
 assert data["hooks"]["PermissionRequest"][0]["hooks"][0]["command"] == "python3 -- /opt/approval.py"
 PY
 }
