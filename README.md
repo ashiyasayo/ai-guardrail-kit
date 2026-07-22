@@ -230,5 +230,8 @@ rm your-project/CLAUDE.md your-project/ORCHESTRATOR.md 2>/dev/null
 - `harness` 與 `integrated-harness` 的 `settings.json` 只掛載 `guard.py` 統一進入點，
   由它在單一直譯器行程內依序執行三道檢查；hook 檔案須整組複製，
   修改任一檢查腳本後應執行 `tests/claude_guard_test.sh` 回歸。
+- Codex plugin 的共用 hook 以 `shared/codex/` 為唯一審核來源；修改該目錄後執行
+  `scripts/sync-codex-hook-copies` 更新可攜式 plugin 副本，再以
+  `scripts/sync-codex-hook-copies --check` 與完整回歸測試確認沒有漂移。
 - Regex hooks 是防線不是保證，無法涵蓋混淆、間接執行等所有變形；須搭配
   Claude Code 權限設定、SAST、Secret Manager 與人工審查。

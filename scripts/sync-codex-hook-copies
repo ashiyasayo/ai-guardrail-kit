@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 將可攜式 plugin 內必須隨附的 hook 副本，從唯一審核來源 shared/codex 同步。
+# plugin 不能在執行期依賴儲存庫根目錄，故保留發佈副本，但不再以手動複製維護。
+script_dir=$(cd "$(dirname "$0")" && pwd -P)
+repo=${AI_GUARDRAIL_ROOT:-$(cd "$script_dir/.." && pwd -P)}
+mode=write
+
+case ${1:-} in
+  '') ;;
+  --check) mode=check ;;
+  --help|-h)
+    printf 'usage: sync-codex-hook-copies [--check]\n'
+    exit 0
+    ;;
+  *)
+    printf 'sync-codex-hook-copies: unknown option: %s\n' "$1" >&2
+    exit 2
+    ;;
+esac
+
+[[ -d $repo/shared/codex && -d $repo/codex/plugins ]] || {
+  printf 'sync-codex-hook-copies: invalid repository root: %s\n' "$repo" >&2
+  exit 1
+}
+
+sync_file() {
+  local source=$1 target=$2
+  [[ -f $source && ! -L $source ]] || {
+    printf 'sync-codex-hook-copies: invalid source: %s\n' "$source" >&2
+    return 1
+  }
+  [[ ! -e $target || ! -L $target ]] || {
+    printf 'sync-codex-hook-copies: refusing symlink target: %s\n' "$target" >&2
+    return 1
+  }
+  if cmp -s "$source" "$target"; then
+    return 0
+  fi
+  if [[ $mode == check ]]; then
+    printf 'Codex hook copy is out of sync: %s\n' "${target#"$repo/"}" >&2
+    return 1
+  fi
+  cp -p "$source" "$target"
+  printf 'Synced %s\n' "${target#"$repo/"}"
+}
+
+for plugin in decomposition-gate harness integrated-harness; do
+  sync_file "$repo/shared/codex/hook_protocol.py" "$repo/codex/plugins/$plugin/hooks/hook_protocol.py"
+done
+for plugin in harness integrated-harness; do
+  for filename in security_checks.py pii_guard.py pii_patterns.py; do
+    sync_file "$repo/shared/codex/$filename" "$repo/codex/plugins/$plugin/hooks/$filename"
+  done
+done
+

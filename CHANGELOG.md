@@ -6,6 +6,9 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- 新增 `scripts/sync-codex-hook-copies` 與對應回歸測試；`shared/codex/` 成為
+  Codex 共用 hook 的唯一審核來源，工具可同步或檢查可攜式 plugin 副本的漂移。
+
 - `pii_patterns.py`（`harness`／`integrated-harness` 共用）將 `RULES` 契約由三元組
   升級為四元組（名稱、regex、遮罩函式、**驗證函式**）；命中判定改為「regex 命中
   且驗證函式為 `None` 或回傳 `True`」，讓需要額外邏輯的規則也能納入而不放寬 regex。
