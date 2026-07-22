@@ -17,7 +17,7 @@ APPROVAL_TTL_SECONDS = 3600
 # 缺檔、讀取失敗或無法辨識時一律視為 strict（保守預設）。
 APPROVAL_MODES = {"strict", "standard", "light"}
 APPROVAL_MODE_PATTERN = re.compile(
-    r"(?m)^[ \t]*-[ \t]+核准模式[：:][ \t]*(strict|standard|light)[ \t]*$"
+    r"(?m)^[ \t]*-[ \t]+Approval Mode[：:][ \t]*(strict|standard|light)[ \t]*$"
 )
 STRICT_BASH_ALLOWLIST_HEADER = "## Strict Bash 測試與建置 Allowlist"
 POLICY_LIST_ITEM_PATTERN = re.compile(r"^[ \t]*-[ \t]+`([^`]+)`[ \t]*$")

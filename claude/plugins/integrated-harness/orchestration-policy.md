@@ -12,7 +12,7 @@ permissions 與 hook 支援，不會自動受到同等保護。
 
 ## 核准模式
 
-- 核准模式：strict
+- Approval Mode: strict
 
 `strict`：拆解、允許修改範圍與 SHA-256 人工核准。
 `standard`：拆解與允許修改範圍，免人工核准。

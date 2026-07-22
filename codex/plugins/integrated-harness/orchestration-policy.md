@@ -4,7 +4,7 @@
 
 ## 核准模式
 
-- 核准模式：strict
+- Approval Mode: strict
 
 支援 `strict`、`standard`、`light`。缺少或無效設定一律採用 strict。
 

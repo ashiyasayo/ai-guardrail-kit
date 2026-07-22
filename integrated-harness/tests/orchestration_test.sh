@@ -137,5 +137,33 @@ for mode in strict standard light; do
 done
 require "$ROOT/README.md" 'Python 3\.9+' 'README 說明 Python 3.9+ 需求'
 
+if PYTHONDONTWRITEBYTECODE=1 python3 - "$ROOT" <<'PY'
+import importlib.util
+import pathlib
+import sys
+import tempfile
+
+root = pathlib.Path(sys.argv[1])
+path = root / ".claude/hooks/plan_gate.py"
+spec = importlib.util.spec_from_file_location("plan_gate", path)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+with tempfile.TemporaryDirectory() as tmp:
+    fake_root = pathlib.Path(tmp)
+    policy_dir = fake_root / ".claude"
+    policy_dir.mkdir(parents=True)
+    (policy_dir / "orchestration-policy.md").write_text(
+        "## Approval Mode\n\n- Approval Mode: standard\n", encoding="utf-8"
+    )
+    assert module.approval_mode(str(fake_root)) == "standard"
+PY
+then
+  printf 'PASS: Approval Mode 英文標籤解析\n'
+else
+  printf 'FAIL: Approval Mode 英文標籤解析\n'
+  fail=$((fail + 1))
+fi
+
 printf '結果：%d 失敗\n' "$fail"
 test "$fail" -eq 0

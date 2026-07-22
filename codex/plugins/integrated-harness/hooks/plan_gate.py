@@ -10,7 +10,7 @@ from hook_protocol import ask, deny, load_event, project_root
 PLAN = ".codex/guardrail/plan/decomposition.md"
 POLICY = ".codex/guardrail/orchestration-policy.md"
 MARKERS = ("## 已知資訊", "## 缺少的資訊", "【假設】")
-MODE = re.compile(r"^\s*-\s+核准模式[：:]\s*(strict|standard|light)\s*$", re.MULTILINE)
+MODE = re.compile(r"^\s*-\s+Approval Mode[：:]\s*(strict|standard|light)\s*$", re.MULTILINE)
 PATCH_PATH = re.compile(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", re.MULTILINE)
 UNSAFE = re.compile(r"[;&|><`\n\r*?\[\]]|\$\(")
 

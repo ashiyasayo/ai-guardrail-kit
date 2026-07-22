@@ -3,7 +3,11 @@
 import hashlib
 import json
 import os
+import sys
 import time
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
 PLAN = os.path.join(ROOT, ".claude", "plan", "decomposition.md")
