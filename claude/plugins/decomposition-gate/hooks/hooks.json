@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "for interpreter in python3 python py; do \"$interpreter\" -V >/dev/null 2>&1 && exec env PYTHONUTF8=1 \"$interpreter\" \"${CLAUDE_PLUGIN_ROOT}/hooks/decomposition_gate.py\"; done; exit 127",
+            "command": "for interpreter in python3 python py; do \"$interpreter\" -V >/dev/null 2>&1 && exec env PYTHONUTF8=1 \"$interpreter\" \"${CLAUDE_PLUGIN_ROOT}/hooks/decomposition_gate.py\"; done; echo 'ai-guardrail-kit: 找不到可用的 python3/python/py 直譯器，請安裝 Python 3.9+ 並確認已加入 PATH，安裝完成後開新的終端機／session 再試一次。' >&2; exit 127",
             "timeout": 10
           }
         ]

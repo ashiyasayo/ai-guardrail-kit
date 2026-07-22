@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- 六份 `settings.json`／`hooks.json`（`decomposition-gate`、`harness`、
+  `integrated-harness` 各自的 copy-in 與 marketplace 版）的直譯器探測指令：
+  `python3`／`python`／`py` 皆不可用時，改為先在 stderr 印出清楚訊息（提示
+  安裝 Python 3.9+ 並加入 PATH）再 `exit 127`，取代原本完全無訊息的失敗；
+  exit code 語意未變。根目錄 `README.md`「需求環境」段落同步說明 Python
+  是唯一執行期依賴、無任何 `pip` 套件需求。
+- `tests/codex_marketplace_test.sh` 的版號比對比照 `claude_marketplace_test.sh`
+  的既有修法，改為驗證 semver 格式而非寫死特定版號（原本仍卡在
+  `integrated-harness` 舊版號 `0.1.2`，每次版號升級都會過期失敗）。
+
 ### Added
 
 - `integrated-harness` 新增個資保護兩層防線（僅 Claude Code 平台）：

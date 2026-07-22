@@ -58,10 +58,18 @@ for mode in modes:
         'for interpreter in python3 python py; do "$interpreter" -V >/dev/null 2>&1 '
         '&& exec env PYTHONUTF8=1 "$interpreter" "${CLAUDE_PLUGIN_ROOT}/hooks/'
     )
+    # 找不到任一直譯器時的清楚錯誤訊息（純附加、不影響 exit code 語意）
+    suffix = (
+        "\"; done; echo 'ai-guardrail-kit: 找不到可用的 "
+        "python3/python/py 直譯器，請安裝 Python 3.9+ "
+        "並確認已加入 PATH，安裝完成後"
+        "開新的終端機／session 再試一次。"
+        "' >&2; exit 127"
+    )
     for command in commands:
         assert command.startswith(prefix), f"non-plugin-root command: {command}"
         match = re.fullmatch(
-            re.escape(prefix) + r'([^"/]+\.py)"; done; exit 127', command
+            re.escape(prefix) + r'([^"/]+\.py)' + re.escape(suffix), command
         )
         assert match, f"unexpected hook command: {command}"
         executable = plugin_root / "hooks" / match.group(1)

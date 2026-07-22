@@ -8,7 +8,9 @@ fi
 export PYTHONUTF8=${PYTHONUTF8:-1}
 cd "$(dirname "$0")/.."
 python3 - <<'PY'
-import json, pathlib, sys
+import json, pathlib, re, sys
+
+SEMVER_PATTERN = re.compile(r'^\d+\.\d+\.\d+$')
 
 def check(condition, message):
  if not condition:
@@ -27,8 +29,9 @@ for p,name in zip(data['plugins'],names):
  base=root/p['source']['path'].removeprefix('./')
  manifest=json.loads((base/'.codex-plugin/plugin.json').read_text())
  check(base.name==manifest.get('name')==name, f'{name}: directory and manifest names must match')
- expected_versions={'decomposition-gate':'0.1.1','harness':'0.1.1','integrated-harness':'0.1.2'}
- check(manifest.get('version')==expected_versions[name], f'{name}: version must be {expected_versions[name]}')
+ # 版號本身由各 plugin.json 維護、隨每次功能變更調整；此測試只驗證格式，
+ # 不寫死特定版號，避免每次版號升級都要同步改測試。
+ check(SEMVER_PATTERN.match(manifest.get('version', '')), f"{name}: version must be semver, got {manifest.get('version')!r}")
  skills=list(base.glob('skills/*/SKILL.md'))
  check(len(skills)==1, f'{name}: expected exactly one skill, found {len(skills)}')
  text=skills[0].read_text()
