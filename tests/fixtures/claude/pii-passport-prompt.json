@@ -1,0 +1,4 @@
+{
+  "hook_event_name": "UserPromptSubmit",
+  "prompt": "這位老師的護照號碼 310123456 幫我登記到出國名冊"
+}

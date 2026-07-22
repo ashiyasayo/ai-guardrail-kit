@@ -115,6 +115,21 @@ EOF
 out=$(echo '{"tool_name":"Bash","tool_input":{"command":"echo x > config.txt"},"cwd":"'"$WORKDIR"'"}' | python3 "$HOOK")
 check "關卡通過後 Bash 寫入放行（無輸出）" "^$" "${out:-$'\n'}"
 
+# --- 逃生口保護：即使拆解檔已完整，模型仍不得自建 .gate_disabled 停用關卡 ---
+# （拆解檔此時為完整狀態，若無保護，Bash 版會被 plan 目錄白名單放行，正是漏洞）
+
+echo "情境 13：寫入工具建立 .gate_disabled 應被 deny"
+out=$(echo '{"tool_name":"Write","tool_input":{"file_path":".claude/plan/.gate_disabled"},"cwd":"'"$WORKDIR"'"}' | python3 "$HOOK")
+check "Write 建立逃生口被封鎖" '"permissionDecision": "deny"' "$out"
+
+echo "情境 14：Bash touch 建立 .gate_disabled 應被 deny（不因 plan 目錄白名單而放行）"
+out=$(echo '{"tool_name":"Bash","tool_input":{"command":"touch .claude/plan/.gate_disabled"},"cwd":"'"$WORKDIR"'"}' | python3 "$HOOK")
+check "Bash touch 逃生口被封鎖" '"permissionDecision": "deny"' "$out"
+
+echo "情境 15：Bash 重導向建立 .gate_disabled 應被 deny"
+out=$(echo '{"tool_name":"Bash","tool_input":{"command":"echo x > .claude/plan/.gate_disabled"},"cwd":"'"$WORKDIR"'"}' | python3 "$HOOK")
+check "Bash 重導向逃生口被封鎖" '"permissionDecision": "deny"' "$out"
+
 echo
 echo "結果：$pass 通過，$fail 失敗"
 [ "$fail" -eq 0 ]

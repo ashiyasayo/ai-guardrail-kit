@@ -77,11 +77,15 @@ Edit／MultiEdit／NotebookEdit）觸發個資規則時，會比照 integrated-h
 - 核准旗標為時間窗（非綁定單一計畫）：60 分鐘內的所有寫入都在核准範圍內。
   需要逐計畫核准時，請縮短 `APPROVAL_TTL_SECONDS` 或改用 `integrated-harness` 的
   SHA-256 綁定核准。
-- 個資偵測規則涵蓋台灣身分證字號、手機號碼、Email、地址、信用卡卡號（限
-  4-4-4-4 分隔格式）；不含學號、護照號碼——學號格式與身分證字號高度重疊
-  （如 `R10921001`），護照號碼為純數字缺乏可辨識結構，兩者納入規則會造成
-  大量誤判，故刻意排除。擴充規則於 `pii_patterns.py` 的 `RULES` 新增即可，
-  但新規則須是「regex 命中即視為個資」的簡單型態——`RULES` 與呼叫端
-  （`redact_sensitive_info.py`、`block_pii_prompt.py`）的契約不支援需要額外
-  驗證邏輯（如信用卡 Luhn checksum）的規則類型。
+- 個資偵測規則涵蓋台灣身分證字號、手機號碼、Email、地址、信用卡卡號、學號、
+  護照號碼。`RULES` 契約為四元組（名稱、regex、遮罩函式、驗證函式），命中判定
+  為「regex 命中且驗證函式為 `None` 或回傳 `True`」，支援需要額外邏輯的規則：
+  - 信用卡卡號：放寬為 13–19 碼（含連續無分隔），以 Luhn checksum 驗證過濾誤判。
+  - 學號、護照號碼：採「標籤錨定」——需鄰近出現標籤關鍵字（`學號`／`護照`／
+    `student id`／`passport` 等）才觸發。台灣學號無全國統一格式且與身分證字號、
+    任意編號高度重疊；ROC 護照為純數字且無公開檢查碼。裸偵測會造成大量誤判，
+    故要求標籤，屬精確率優先的取捨，**無法涵蓋無標籤的裸資料**。
+  擴充規則於 `pii_patterns.py` 的 `RULES` 新增即可（需二次驗證時附上驗證函式），
+  兩支 hook（`redact_sensitive_info.py`、`block_pii_prompt.py`）與 integrated-harness
+  會同步取得新規則。
 - 其餘操作性限制與白名單擴充方式見 `README.md` 的「已知限制」與「維護」段落。

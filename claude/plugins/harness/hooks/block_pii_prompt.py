@@ -5,7 +5,8 @@ block_pii_prompt.py — 使用者提交提示前的個資阻擋 hook。
 事件：UserPromptSubmit
 
 行為：
-- 偵測即將送進模型的使用者輸入是否含疑似個資（台灣身分證字號、手機號碼、Email）
+- 偵測即將送進模型的使用者輸入是否含疑似個資（身分證字號、手機、Email、地址、
+  信用卡卡號、學號、護照號碼；規則集中於 pii_patterns.py）
 - 命中即整段阻擋（decision="block"），提示使用者自行遮蔽或改用去識別化資料後重新送出
 - Claude Code 的 UserPromptSubmit 不支援改寫提示內容（僅 PreToolUse 的
   updatedInput 支援改寫），故本 hook 只能整段阻擋，無法比照
@@ -30,9 +31,14 @@ from pii_patterns import RULES
 
 def find_pii_kinds(prompt: str) -> list[str]:
     kinds: list[str] = []
-    for kind, pattern, _mask in RULES:
-        if pattern.search(prompt) and kind not in kinds:
-            kinds.append(kind)
+    for kind, pattern, _mask, validator in RULES:
+        if kind in kinds:
+            continue
+        # 逐一比對，任一 match 通過驗證函式即算命中（驗證函式為 None 代表命中即算）
+        for match in pattern.finditer(prompt):
+            if validator is None or validator(match):
+                kinds.append(kind)
+                break
     return kinds
 
 

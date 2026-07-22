@@ -171,6 +171,9 @@ rm your-project/CLAUDE.md your-project/ORCHESTRATOR.md 2>/dev/null
 
 - 屬「流程紀律」而非「授權控制」：拆解文件可由模型自行完成，不能視為
   人工審批或安全沙箱。
+- 逃生口 `.claude/plan/.gate_disabled` 存在時停用關卡（緊急修復用）；此檔
+  **只能由人類在自己的終端機建立**，模型透過寫入工具或 Bash 自建一律被 deny，
+  避免模型自我停用關卡。
 - 適用：個人開發、教學、PoC，或只想強制留下任務拆解的專案。
 
 ### harness — 人類核准與安全底線
@@ -178,7 +181,7 @@ rm your-project/CLAUDE.md your-project/ORCHESTRATOR.md 2>/dev/null
 一組可獨立複製到專案的 hooks：未取得人類核准（`touch .claude/.plan_approved`，
 60 分鐘有效）時攔截一切寫入；另有兩道獨立防線——攔截疑似硬寫的憑證，以及
 永久攔截毀滅性 Bash 指令（不因核准而豁免）。使用者提交提示時另偵測疑似個資
-（身分證字號、手機、Email、地址、信用卡卡號）即整段阻擋；寫入類工具偵測到疑似個資時則自動
+（身分證字號、手機、Email、地址、信用卡卡號、學號、護照號碼）即整段阻擋；寫入類工具偵測到疑似個資時則自動
 去識別化改寫後放行（`guard.py` 以 `hookSpecificOutput` JSON 傳遞 deny／allow
 決策）。附一份用於產生 `ORCHESTRATOR.md` 的提示稿，但本目錄不含完整編排層。
 

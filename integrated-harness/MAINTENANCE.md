@@ -42,13 +42,14 @@
   `redact_sensitive_info.py`（PreToolUse）才支援「去識別化後放行」，因
   PreToolUse 有 `updatedInput` 可改寫 `tool_input`。使用者若在 prompt 階段被擋下，
   仍需自行遮蔽後重送，非本工具自動處理。
-- 個資偵測規則涵蓋台灣身分證字號、手機號碼、Email、地址、信用卡卡號（限
-  4-4-4-4 分隔格式）；不含學號、護照號碼——學號格式與身分證字號高度重疊
-  （如 `R10921001`），護照號碼為純數字缺乏可辨識結構，兩者納入規則會造成
-  大量誤判，故刻意排除。如需擴充，於 `pii_patterns.py` 的 `RULES` 新增規則
-  即可（`redact_sensitive_info.py`／`block_pii_prompt.py` 皆直接複用同一份
-  定義，不需重複維護），但新規則須是「regex 命中即視為個資」的簡單型態，
-  不支援需要額外驗證邏輯（如信用卡 Luhn checksum）的規則類型。
+- 個資偵測規則涵蓋台灣身分證字號、手機號碼、Email、地址、信用卡卡號、學號、
+  護照號碼。`RULES` 契約為四元組（名稱、regex、遮罩函式、驗證函式），命中判定為
+  「regex 命中且驗證函式為 `None` 或回傳 `True`」，支援需要額外邏輯的規則：信用卡
+  放寬為 13–19 碼並以 Luhn checksum 驗證；學號、護照號碼採「標籤錨定」（需鄰近出現
+  標籤關鍵字才觸發，屬精確率優先取捨，**無法涵蓋無標籤裸資料**）。如需擴充，於
+  `pii_patterns.py` 的 `RULES` 新增規則即可（`redact_sensitive_info.py`／
+  `block_pii_prompt.py` 皆直接複用同一份定義，需二次驗證時附上驗證函式）。
+  註：Codex 平台有各自獨立的 `shared/codex/pii_patterns.py`，尚未同步此次擴充。
 - 尚未實作攔截已知正式環境主機或部署命令的 hook；環境命名不一致可能誤攔。
 - 尚未實作計畫關卡前攔截非 Bash／檔案工具外部副作用的 hook；matcher 依新增工具決定，
   且可能攔截唯讀 API。

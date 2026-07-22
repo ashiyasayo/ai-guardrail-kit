@@ -21,6 +21,10 @@ GATE_FILE_RELATIVE_PATH = ".claude/plan/decomposition.md"
 # 逃生口：此檔案存在時停用關卡（緊急修復用）
 GATE_BYPASS_RELATIVE_PATH = ".claude/plan/.gate_disabled"
 
+# 逃生口檔名（供保護檢查用）：只能由人類在自己的終端機建立，
+# 模型不得透過寫入工具或 Bash 自建以自我停用關卡。
+GATE_BYPASS_BASENAME = ".gate_disabled"
+
 # 拆解檔案所在目錄（寫入此目錄的操作一律放行，避免雞生蛋問題）
 PLAN_DIR_RELATIVE_PATH = ".claude/plan/"
 
@@ -62,6 +66,21 @@ def emit_decision(decision: str, reason: str) -> None:
         }
     }, ensure_ascii=False))
     sys.exit(0)
+
+
+def targets_bypass_file(tool_name: str, tool_input: dict) -> bool:
+    """偵測工具是否試圖建立或寫入逃生口檔案 .gate_disabled。
+
+    比照 harness／integrated-harness 的 plan_gate.py 對 .plan_approved 的保護：
+    只要寫入工具目標路徑或 Bash 指令字串涉及該檔名，一律視為試圖自建逃生口。
+    """
+    if tool_name in GATED_TOOLS:
+        path = tool_input.get("file_path", "")
+        return isinstance(path, str) and GATE_BYPASS_BASENAME in path.replace("\\", "/")
+    if tool_name == "Bash":
+        command = tool_input.get("command", "")
+        return isinstance(command, str) and GATE_BYPASS_BASENAME in command
+    return False
 
 
 def resolve_project_dir(hook_input: dict) -> str:
@@ -131,6 +150,15 @@ def main() -> None:
 
     tool_name = hook_input.get("tool_name", "")
     tool_input = hook_input.get("tool_input", {})
+
+    # 逃生口保護：優先於一切關卡判斷。.gate_disabled 只能由人類在終端機建立，
+    # 模型不得透過寫入工具或 Bash 自建以停用關卡（否則等同關卡形同虛設）。
+    if targets_bypass_file(tool_name, tool_input):
+        emit_decision(
+            "deny",
+            "逃生口 .claude/plan/.gate_disabled 只能由人類在自己的終端機建立；"
+            "模型不得透過寫入工具或 Bash 自建以停用拆解閘門。",
+        )
 
     if tool_name in GATED_TOOLS:
         # 檔案編輯工具：允許撰寫拆解檔本身，避免雞生蛋問題

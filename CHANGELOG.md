@@ -4,6 +4,35 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `pii_patterns.py`（`harness`／`integrated-harness` 共用）將 `RULES` 契約由三元組
+  升級為四元組（名稱、regex、遮罩函式、**驗證函式**）；命中判定改為「regex 命中
+  且驗證函式為 `None` 或回傳 `True`」，讓需要額外邏輯的規則也能納入而不放寬 regex。
+  兩個 consumer（`redact_sensitive_info.py`、`block_pii_prompt.py`）同步調整驗證邏輯，
+  四個位置維持逐字元相同。
+  - 信用卡卡號：放寬為 13–19 碼（含連續無分隔），改以 **Luhn checksum** 驗證過濾
+    一般長數字（如訂單編號）誤判，取代原本僅限 4-4-4-4 分隔格式的做法。
+  - 新增「學號」「護照號碼」規則，採「標籤錨定」（需鄰近出現 `學號`／`護照`／
+    `student id`／`passport` 等標籤才觸發），降低與身分證字號、任意編號的誤判；
+    屬精確率優先取捨，無法涵蓋無標籤裸資料。
+  - `harness` plugin 版號由 0.4.0 升級為 0.5.0，`integrated-harness` 由 0.3.0
+    升級為 0.4.0。
+  - 註：Codex 平台有各自獨立的 `shared/codex/pii_patterns.py`，本次尚未同步擴充。
+
+### Security
+
+- `decomposition-gate` 補上逃生口保護：`.claude/plan/.gate_disabled` 只能由人類在
+  自己的終端機建立，模型透過寫入工具或 Bash 自建一律 deny（比照 `plan_gate.py`
+  對 `.plan_approved` 的既有保護），避免模型自我停用拆解閘門。`decomposition-gate`
+  plugin 版號由 0.1.2 升級為 0.2.0。
+
+### Changed
+
+- 文件釐清：`integrated-harness` README 明確說明 `light` 模式不解析也不強制
+  `## 允許修改範圍`（等同放棄檔案範圍管制，只保留「有拆解才能動」）；個資防護
+  機制文件同步更新規則種類、Luhn 與標籤錨定的判斷方式與已知限制。
+
 ### Changed
 
 - 六份 `settings.json`／`hooks.json`（`decomposition-gate`、`harness`、

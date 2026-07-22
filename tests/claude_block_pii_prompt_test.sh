@@ -55,6 +55,20 @@ for base in (
     assert output["decision"] == "block", output
     assert "地址" in output.get("reason", ""), output
 
+    student = fixture("pii-student-prompt.json")
+    proc, output = run(hook, student)
+    assert proc.returncode == 0, (hook, proc.stdout, proc.stderr)
+    assert output is not None, (hook, proc.stdout)
+    assert output["decision"] == "block", output
+    assert "學號" in output.get("reason", ""), output
+
+    passport = fixture("pii-passport-prompt.json")
+    proc, output = run(hook, passport)
+    assert proc.returncode == 0, (hook, proc.stdout, proc.stderr)
+    assert output is not None, (hook, proc.stdout)
+    assert output["decision"] == "block", output
+    assert "護照號碼" in output.get("reason", ""), output
+
     clean = fixture("clean-prompt.json")
     proc, output = run(hook, clean)
     assert proc.returncode == 0, (hook, proc.stdout, proc.stderr)
