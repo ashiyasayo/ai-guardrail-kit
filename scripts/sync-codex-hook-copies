@@ -54,4 +54,3 @@ for plugin in harness integrated-harness; do
     sync_file "$repo/shared/codex/$filename" "$repo/codex/plugins/$plugin/hooks/$filename"
   done
 done
-
