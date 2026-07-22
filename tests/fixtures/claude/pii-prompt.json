@@ -1,0 +1,4 @@
+{
+  "hook_event_name": "UserPromptSubmit",
+  "prompt": "幫我看一下這位同學的身分證字號 A123456789 對不對"
+}

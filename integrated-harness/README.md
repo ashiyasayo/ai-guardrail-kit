@@ -16,6 +16,7 @@
 | 思考層 | orchestrator 與 subagent 在行動前應如何分析及自我審查 | `reasoning-protocol*.md` |
 | 流程層 | 是否已建立最低合格的拆解文件，是否取得有效人工核准 | `plan_gate.py` |
 | 安全層 | 是否疑似寫入憑證，或執行不可交給模型的紅線命令 | `block_secrets.py`、`block_dangerous_commands.py` |
+| 個資層 | 使用者提交是否疑似含個資（阻擋）、寫入內容是否疑似含個資（去識別化後放行） | `block_pii_prompt.py`（UserPromptSubmit）、`redact_sensitive_info.py`（PreToolUse） |
 | 維護層 | 為何採用各項規則、何時可修改、目前有哪些限制 | `MAINTENANCE.md`、tests |
 
 主要用途是把 AI 開發工作從單純的 prompt 約定，提升為「軟性決策規則＋硬性工具
@@ -39,7 +40,11 @@
 - `.claude/orchestration-policy.md`：由人類設定成本門檻與環境授權。
 - `.claude/hooks/`：計畫、人類核准、憑證及危險命令硬性關卡。`settings.json` 只掛載
   `guard.py` 統一進入點，於單一直譯器行程內依序執行三道檢查（危險指令 → 憑證 →
-  計畫閘門），降低每次工具呼叫的啟動開銷；各檢查腳本仍可獨立執行驗證。
+  計畫閘門）加上第四道去識別化改寫（`redact_sensitive_info.py`），降低每次工具
+  呼叫的啟動開銷；各檢查腳本仍可獨立執行驗證。另掛載 `block_pii_prompt.py` 於
+  `UserPromptSubmit`，在使用者提交當下（送進模型前）先行阻擋疑似個資——因
+  Claude Code 的 UserPromptSubmit 不支援改寫提示內容，只能整段阻擋並提示使用者
+  自行遮蔽後重送，與 PreToolUse 的去識別化形成兩層縱深防禦。
 - `CLAUDE.md`：載入上述規則的專案入口。
 
 ## 關卡順序

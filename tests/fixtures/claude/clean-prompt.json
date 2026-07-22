@@ -1,0 +1,4 @@
+{
+  "hook_event_name": "UserPromptSubmit",
+  "prompt": "幫我重構這支 Python 腳本，改善可讀性"
+}

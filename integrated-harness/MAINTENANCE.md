@@ -37,6 +37,14 @@
 
 ## 已知限制
 
+- 個資防線分兩層、能力不對稱：`block_pii_prompt.py`（UserPromptSubmit）只能整段
+  阻擋，因 Claude Code 的 UserPromptSubmit 不支援改寫提示內容；
+  `redact_sensitive_info.py`（PreToolUse）才支援「去識別化後放行」，因
+  PreToolUse 有 `updatedInput` 可改寫 `tool_input`。使用者若在 prompt 階段被擋下，
+  仍需自行遮蔽後重送，非本工具自動處理。
+- 個資偵測規則（台灣身分證字號、手機號碼、Email）為初版樣式，不含學號、地址、
+  護照號碼等其他個資類型；如需擴充，於 `redact_sensitive_info.py` 的 `RULES`
+  新增規則即可（`block_pii_prompt.py` 直接複用同一份定義，不需重複維護）。
 - 尚未實作攔截已知正式環境主機或部署命令的 hook；環境命名不一致可能誤攔。
 - 尚未實作計畫關卡前攔截非 Bash／檔案工具外部副作用的 hook；matcher 依新增工具決定，
   且可能攔截唯讀 API。

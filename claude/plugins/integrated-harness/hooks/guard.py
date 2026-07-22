@@ -9,9 +9,12 @@ matcher：*
 1. block_dangerous_commands — 紅線指令，不因核准而豁免
 2. block_secrets — 疑似硬寫憑證
 3. plan_gate — 拆解文件 + 人類限時核准
+4. redact_sensitive_info — 疑似個資，不阻擋，改寫後放行（見下方 redact 分支）
 
 deny 語意：stdout 輸出 permissionDecision JSON（exit 0）；
 輸入異常或已知工具 schema 不符時 stderr + exit 2（fail closed）。
+redact 語意：前三道檢查皆放行後才執行；命中時 stdout 輸出
+permissionDecision="allow" + updatedInput（exit 0），不計入 deny 判斷。
 """
 import json
 import os
@@ -23,6 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import block_dangerous_commands
 import block_secrets
 import plan_gate
+import redact_sensitive_info
 
 
 def emit_deny(reason: str) -> None:
@@ -54,6 +58,10 @@ def main() -> None:
     except block_secrets.HookInputError as exc:
         print(f"guard: 已知工具 schema 不符：{exc}。", file=sys.stderr)
         sys.exit(2)
+
+    redact_output = redact_sensitive_info.check(data)
+    if redact_output is not None:
+        print(json.dumps({"hookSpecificOutput": redact_output}, ensure_ascii=False))
 
 
 if __name__ == "__main__":
