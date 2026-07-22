@@ -185,7 +185,8 @@ agk_command_value() {
 import json, shlex, sys
 # Windows 上 stdout 預設會將換行翻譯為 CRLF，重設為 LF 供 bash 讀取
 sys.stdout.reconfigure(newline=chr(10))
-print(json.dumps(sys.argv[0] + " -- " + shlex.quote(sys.argv[1])))
+# sys.argv[0] 是 stdin 指令碼標記「-」；實際的直譯器與 hook 路徑從位置參數取得。
+print(json.dumps(sys.argv[1] + " -- " + shlex.quote(sys.argv[2])))
 PY
 }
 

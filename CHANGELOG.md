@@ -42,6 +42,9 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- 修正 Codex 模式切換快取 Python 直譯器時的命令列參數對應，確保產生的 hook
+  指令仍保留實際直譯器與 hook 檔案路徑。
+
 - Codex 驗證腳本沿用共用的 Python 直譯器回退結果，不再在 Windows 只有 `python`
   時錯誤要求 `python3`。
 
