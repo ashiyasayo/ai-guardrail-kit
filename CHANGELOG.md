@@ -42,6 +42,9 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- Codex 驗證腳本沿用共用的 Python 直譯器回退結果，不再在 Windows 只有 `python`
+  時錯誤要求 `python3`。
+
 - Codex 模式切換流程只在啟動時探測一次可用的 Python 直譯器，避免每個 hook
   命令產生時重複啟動子程序進行版本探測。
 

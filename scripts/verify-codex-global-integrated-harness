@@ -64,5 +64,4 @@ for event, matcher, target in expected:
 if sum(1 for _, _, command in commands if isinstance(command, str) and command.startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 ")) != 6:
     raise SystemExit(1)
 PY
-command -v python3 >/dev/null || { agk_die 'python3 (or python) executable is unavailable'; exit 1; }
 printf 'Verified global Codex integrated-harness hooks.\n'
