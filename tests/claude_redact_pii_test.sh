@@ -55,8 +55,11 @@ for base in (
     assert "A123456789" not in content, content
     assert "0912345678" not in content, content
     assert "test.user@example.com" not in content, content
+    assert "台北市大安區羅斯福路四段1號" not in content, content
+    assert "4111-1111-1111-1111" not in content, content
     assert "A123456789" not in proc.stdout, proc.stdout
     assert "0912345678" not in proc.stdout, proc.stdout
+    assert "4111-1111-1111-1111" not in proc.stdout, proc.stdout
 
     # 未命中個資：不輸出任何 hookSpecificOutput（放行、不改寫）
     clean = fixture("allow.json")

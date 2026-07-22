@@ -24,11 +24,7 @@ marketplace = json.loads(marketplace_path.read_text())
 assert marketplace["name"] == "ai-guardrail-kit"
 
 modes = ("decomposition-gate", "harness", "integrated-harness")
-expected_versions = {
-    "decomposition-gate": "0.1.1",
-    "harness": "0.1.1",
-    "integrated-harness": "0.1.3",
-}
+SEMVER_PATTERN = re.compile(r"^\d+\.\d+\.\d+$")
 plugins = marketplace["plugins"]
 assert len(plugins) == len(modes)
 assert {entry["name"] for entry in plugins} == set(modes)
@@ -45,7 +41,9 @@ for mode in modes:
 
     manifest = json.loads(manifest_path.read_text())
     assert manifest["name"] == mode
-    assert manifest["version"] == expected_versions[mode]
+    # 版號本身由各 plugin.json 維護、隨每次功能變更調整；此測試只驗證格式與註冊
+    # 契約，不寫死特定版號，避免每次版號升級都要同步改測試。
+    assert SEMVER_PATTERN.match(manifest["version"]), (mode, manifest["version"])
 
     registration = json.loads(hooks_path.read_text())
     commands = [

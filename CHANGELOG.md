@@ -22,6 +22,12 @@ All notable changes to this project are documented in this file.
   與 `integrated-harness` 逐字元相同），寫入類工具偵測到疑似個資時自動
   去識別化改寫後放行，補齊 `harness/MAINTENANCE.md` 原先記錄的能力落差。
   plugin 版號由 0.2.0 升級為 0.3.0。
+- `pii_patterns.py`（`harness`／`integrated-harness` 共用單一事實來源）擴充個資
+  規則種類，新增「地址」（台灣縣市＋路街＋門牌格式）與「信用卡卡號」（限
+  4-4-4-4 分隔格式，降低誤判）；學號、護照號碼因與既有規則格式高度重疊或
+  缺乏可辨識結構、易誤判，刻意不納入，詳見兩個目錄 `MAINTENANCE.md` 的說明。
+  `harness` plugin 版號由 0.3.0 升級為 0.4.0，`integrated-harness` 由 0.2.0
+  升級為 0.3.0。
 
 ### Changed
 

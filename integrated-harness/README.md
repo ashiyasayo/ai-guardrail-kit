@@ -44,7 +44,9 @@
   呼叫的啟動開銷；各檢查腳本仍可獨立執行驗證。另掛載 `block_pii_prompt.py` 於
   `UserPromptSubmit`，在使用者提交當下（送進模型前）先行阻擋疑似個資——因
   Claude Code 的 UserPromptSubmit 不支援改寫提示內容，只能整段阻擋並提示使用者
-  自行遮蔽後重送，與 PreToolUse 的去識別化形成兩層縱深防禦。
+  自行遮蔽後重送，與 PreToolUse 的去識別化形成兩層縱深防禦。兩支 hook 共用
+  `pii_patterns.py` 的規則與遮罩邏輯（與 `harness` 逐字元相同），偵測種類、
+  判斷方式與遮罩範例見 [`harness/README.md`「個資防護機制」](../harness/README.md#個資防護機制如何攔截如何去識別化)。
 - `CLAUDE.md`：載入上述規則的專案入口。
 
 ## 關卡順序

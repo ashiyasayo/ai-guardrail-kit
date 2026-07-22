@@ -42,9 +42,13 @@
   `redact_sensitive_info.py`（PreToolUse）才支援「去識別化後放行」，因
   PreToolUse 有 `updatedInput` 可改寫 `tool_input`。使用者若在 prompt 階段被擋下，
   仍需自行遮蔽後重送，非本工具自動處理。
-- 個資偵測規則（台灣身分證字號、手機號碼、Email）為初版樣式，不含學號、地址、
-  護照號碼等其他個資類型；如需擴充，於 `redact_sensitive_info.py` 的 `RULES`
-  新增規則即可（`block_pii_prompt.py` 直接複用同一份定義，不需重複維護）。
+- 個資偵測規則涵蓋台灣身分證字號、手機號碼、Email、地址、信用卡卡號（限
+  4-4-4-4 分隔格式）；不含學號、護照號碼——學號格式與身分證字號高度重疊
+  （如 `R10921001`），護照號碼為純數字缺乏可辨識結構，兩者納入規則會造成
+  大量誤判，故刻意排除。如需擴充，於 `pii_patterns.py` 的 `RULES` 新增規則
+  即可（`redact_sensitive_info.py`／`block_pii_prompt.py` 皆直接複用同一份
+  定義，不需重複維護），但新規則須是「regex 命中即視為個資」的簡單型態，
+  不支援需要額外驗證邏輯（如信用卡 Luhn checksum）的規則類型。
 - 尚未實作攔截已知正式環境主機或部署命令的 hook；環境命名不一致可能誤攔。
 - 尚未實作計畫關卡前攔截非 Bash／檔案工具外部副作用的 hook；matcher 依新增工具決定，
   且可能攔截唯讀 API。

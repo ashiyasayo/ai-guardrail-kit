@@ -77,6 +77,11 @@ Edit／MultiEdit／NotebookEdit）觸發個資規則時，會比照 integrated-h
 - 核准旗標為時間窗（非綁定單一計畫）：60 分鐘內的所有寫入都在核准範圍內。
   需要逐計畫核准時，請縮短 `APPROVAL_TTL_SECONDS` 或改用 `integrated-harness` 的
   SHA-256 綁定核准。
-- 個資偵測規則（台灣身分證字號、手機號碼、Email）為初版樣式，不含學號、地址、
-  護照號碼等其他個資類型；擴充規則於 `pii_patterns.py` 的 `RULES` 新增即可。
+- 個資偵測規則涵蓋台灣身分證字號、手機號碼、Email、地址、信用卡卡號（限
+  4-4-4-4 分隔格式）；不含學號、護照號碼——學號格式與身分證字號高度重疊
+  （如 `R10921001`），護照號碼為純數字缺乏可辨識結構，兩者納入規則會造成
+  大量誤判，故刻意排除。擴充規則於 `pii_patterns.py` 的 `RULES` 新增即可，
+  但新規則須是「regex 命中即視為個資」的簡單型態——`RULES` 與呼叫端
+  （`redact_sensitive_info.py`、`block_pii_prompt.py`）的契約不支援需要額外
+  驗證邏輯（如信用卡 Luhn checksum）的規則類型。
 - 其餘操作性限制與白名單擴充方式見 `README.md` 的「已知限制」與「維護」段落。

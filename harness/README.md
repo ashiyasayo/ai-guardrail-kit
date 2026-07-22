@@ -11,7 +11,7 @@
 | 核心功能 | 未取得人類核准時，只允許保守白名單中的唯讀 Bash；一般寫入與其他 Bash 均攔截 |
 | 人類控制 | 人類以 `.claude/.plan_approved` 表示核准，旗標預設有效 60 分鐘 |
 | 安全防線 | 掃描即將寫入的憑證樣式，並永久攔截毀滅性或高風險 Bash 指令 |
-| 個資防線 | 使用者提交提示時偵測疑似個資（身分證字號、手機、Email），整段阻擋並提示改以去識別化內容重送；寫入類工具偵測到疑似個資時則自動去識別化改寫後放行 |
+| 個資防線 | 使用者提交提示時偵測疑似個資（身分證字號、手機、Email、地址、信用卡卡號），整段阻擋並提示改以去識別化內容重送；寫入類工具偵測到疑似個資時則自動去識別化改寫後放行 |
 | 主要用途 | 為已有計畫／編排規範的專案補上確定性的施作授權與安全底線 |
 | 適用情境 | 需要人工先核准再修改，或要為 orchestrator 與 subagent 套用共同 hook 的團隊專案 |
 | 不提供 | 不驗證拆解文件內容、不把核准綁定特定計畫、沒有可直接載入的完整 `ORCHESTRATOR.md` |
@@ -29,7 +29,7 @@
 | `block_secrets.py` | 檢查模組（亦可獨立執行） | 攔截疑似 API Key、Token、密碼、私鑰與含密碼的連線字串 |
 | `block_dangerous_commands.py` | 檢查模組（亦可獨立執行） | 攔截刪除、毀損資料庫、破壞 Git 歷史、停用安全服務等紅線操作 |
 | `redact_sensitive_info.py` | 檢查模組（亦可獨立執行，供 `guard.py` 匯入） | 寫入類工具（Write/Edit/MultiEdit/NotebookEdit）內容偵測到疑似個資時不阻擋，改寫為遮罩後內容並放行，與 `integrated-harness` 逐字元相同 |
-| `block_pii_prompt.py` | UserPromptSubmit | 使用者提交提示當下偵測疑似個資（身分證字號、手機、Email），整段阻擋並提示改以去識別化內容重送；本 hook 只能阻擋，改寫放行由 `redact_sensitive_info.py` 負責 |
+| `block_pii_prompt.py` | UserPromptSubmit | 使用者提交提示當下偵測疑似個資（身分證字號、手機、Email、地址、信用卡卡號），整段阻擋並提示改以去識別化內容重送；本 hook 只能阻擋，改寫放行由 `redact_sensitive_info.py` 負責 |
 | `pii_patterns.py` | 規則模組（供 `block_pii_prompt.py` 與 `redact_sensitive_info.py` 匯入） | 個資偵測規則單一事實來源，與 `integrated-harness` 逐字元相同，改規則只需改這一份 |
 | `settings.json` | Claude Code 設定 | 將 `guard.py` 掛載到 PreToolUse（五個檔案須一起複製，`guard.py` 匯入其餘四支）；另將 `block_pii_prompt.py` 掛載到 UserPromptSubmit |
 | `fable-orchestrator-prompt.md` | 編排規格提示稿 | 引導高階模型產生 A–I 章的 `ORCHESTRATOR.md`；它是生成素材，不是執行時規則 |
@@ -39,6 +39,46 @@
 分工原則：`plan_gate` 管「未核准的一般寫入」；
 `block_dangerous_commands` 管「永遠不准模型執行」的紅線。
 兩者獨立，互不依賴。
+
+## 個資防護機制：如何攔截、如何去識別化
+
+兩支個資 hook 共用同一份規則來源 `pii_patterns.py`（`RULES`：規則名稱、
+正規表示式、遮罩函式三元組），偵測邏輯統一為「regex 命中即視為疑似個資」，
+兩層防線只是「命中後怎麼處理」不同：
+
+| 目前規則 | 判斷方式（`pii_patterns.py`） |
+| --- | --- |
+| 台灣身分證字號 | 開頭大寫字母 + `1`或`2` + 8 碼數字（如 `A123456789`） |
+| 手機號碼 | `09` 開頭 10 碼數字，容許 `-` 或空白分隔 |
+| Email | 標準 `local@domain` 格式 |
+| 地址 | 縣市＋（區／鄉／鎮／市，可省略）＋路／街／大道（可含段）＋門牌號 |
+| 信用卡卡號 | 限定 `4-4-4-4` 分隔格式（含空白或連字號），未分隔的純數字不比對 |
+
+**攔截（`block_pii_prompt.py`，UserPromptSubmit）**：使用者送出提示的當下，
+對整段 `prompt` 文字逐一比對 `RULES` 中的每個 regex；只要有任一規則命中，
+就回傳 `decision: "block"`，整段提示不會送進模型，回饋訊息只列出命中的
+規則名稱（如「身分證字號、地址」），**不會把疑似個資的原文回顯**在攔截
+訊息裡。因為 Claude Code 的 `UserPromptSubmit` 事件不支援改寫提示內容，
+這一層只能整段擋下、無法自動改寫，需使用者自行遮蔽後重新送出。
+
+**去識別化（`redact_sensitive_info.py`，PreToolUse，掛載於 `guard.py`）**：
+寫入類工具（`Write`／`Edit`／`MultiEdit`／`NotebookEdit`）即將寫入的內容，
+同樣以 `RULES` 逐一比對；命中時**不阻擋**，改用對應的遮罩函式改寫該段文字
+後，以 `permissionDecision: "allow"` + `updatedInput` 回傳給 Claude Code，
+讓工具改用遮罩後的內容繼續執行原本的寫入。各規則的遮罩方式（保留可辨識
+片段、其餘以 `*`／`＊` 取代）：
+
+- 身分證字號：保留首尾字元，中間遮罩，如 `A*******9`
+- 手機號碼：保留前 4 碼與後 3 碼，如 `0912***678`
+- Email：保留網域與帳號首字元，如 `t***@example.com`
+- 地址：保留縣市（與行政區，若有），門牌與路名細節遮罩
+- 信用卡卡號：保留前後 4 碼，中間以 `****` 取代，如 `4111 **** **** 1111`
+
+這套規則刻意只做「regex 命中即視為個資」的簡單判斷，不含需要額外驗證邏輯
+（如信用卡 Luhn checksum）的規則類型；也不含學號、護照號碼——前者格式與
+身分證字號高度重疊、後者純數字缺乏可辨識結構，納入規則會造成大量誤判。
+擴充或調整規則一律改 `pii_patterns.py` 的 `RULES`，兩支 hook 與
+`integrated-harness` 會同步取得新規則，不需分別修改。
 
 ## 安裝
 
