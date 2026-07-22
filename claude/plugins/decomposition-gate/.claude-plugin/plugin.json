@@ -1,8 +1,8 @@
 {
   "name": "decomposition-gate",
-  "description": "變更程式碼庫前，強制要求先在專案 .claude/plan/decomposition.md 提出任務分解計畫。需 Python 3.8+；與 harness、integrated-harness 互斥，安裝或切換後須重新啟動 Claude Code session 才會生效。",
+  "description": "變更程式碼庫前，強制要求先在專案 .claude/plan/decomposition.md 提出任務分解計畫。需 Python 3.9+；與 harness、integrated-harness 互斥，安裝或切換後須重新啟動 Claude Code session 才會生效。",
   "author": {
     "name": "ai-guardrail-kit"
   },
-  "version": "0.1.1"
+  "version": "0.1.2"
 }
