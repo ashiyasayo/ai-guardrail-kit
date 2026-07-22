@@ -1,6 +1,6 @@
 {
   "name": "harness",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "以指令、機密與個資檢查保護程式碼庫變更，受管寫入透過 Codex 原生 ask 交由人類核准。",
   "author": {
     "name": "Local developer"

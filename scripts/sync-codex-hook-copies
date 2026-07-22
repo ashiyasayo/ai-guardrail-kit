@@ -50,7 +50,7 @@ for plugin in decomposition-gate harness integrated-harness; do
   sync_file "$repo/shared/codex/hook_protocol.py" "$repo/codex/plugins/$plugin/hooks/hook_protocol.py"
 done
 for plugin in harness integrated-harness; do
-  for filename in security_checks.py pii_guard.py pii_patterns.py; do
+  for filename in security_checks.py security_guard.py pii_guard.py pii_patterns.py; do
     sync_file "$repo/shared/codex/$filename" "$repo/codex/plugins/$plugin/hooks/$filename"
   done
 done

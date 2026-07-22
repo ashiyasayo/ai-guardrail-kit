@@ -90,7 +90,7 @@ prompt_submit = clean_event("UserPromptSubmit")
 session_start = clean_event("SessionStart")
 if action == "remove" and not changed: raise SystemExit(0)
 if action == "install":
-    for matcher, filename in (("exec_command|apply_patch", "plan_gate.py"), ("exec_command", "block_dangerous_commands.py"), ("exec_command|apply_patch", "block_secrets.py"), ("apply_patch", "pii_guard.py")):
+    for matcher, filename in (("exec_command|apply_patch", "plan_gate.py"), ("exec_command|apply_patch", "security_guard.py"), ("apply_patch", "pii_guard.py")):
         command = managed + interpreter + " -- " + shlex.quote(str(pathlib.Path(root) / filename))
         pre_tool.append({"matcher": matcher, "hooks": [{"type": "command", "command": command}]})
     pii_command = managed + interpreter + " -- " + shlex.quote(str(pathlib.Path(root) / "pii_guard.py"))

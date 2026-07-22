@@ -45,6 +45,10 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- Codex `harness`／`integrated-harness` 新增 `security_guard.py`，以單一 Python
+  程序合併危險命令與秘密寫入兩道純阻擋檢查，減少 `exec_command` 的固定啟動成本；
+  兩個 Codex plugin 版號皆升級至 0.4.0。
+
 - 修正 Codex 模式切換快取 Python 直譯器時的命令列參數對應，確保產生的 hook
   指令仍保留實際直譯器與 hook 檔案路徑。
 

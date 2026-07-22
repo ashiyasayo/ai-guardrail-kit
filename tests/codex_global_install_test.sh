@@ -52,7 +52,7 @@ data = json.loads(pathlib.Path(sys.argv[1]).read_text())
 groups = data["hooks"]["PreToolUse"]
 commands = [hook["command"] for group in groups for hook in group["hooks"]]
 assert "python3 -- /opt/unrelated.py" in commands
-for name in ("plan_gate.py", "block_dangerous_commands.py", "block_secrets.py", "pii_guard.py"):
+for name in ("plan_gate.py", "security_guard.py", "pii_guard.py"):
     matches = [command for command in commands if name in command]
     assert len(matches) == 1, (name, matches)
     assert matches[0].startswith(("AI_GUARDRAIL_GLOBAL_DEFAULT=1 python3 -- ", "AI_GUARDRAIL_GLOBAL_DEFAULT=1 python -- ")), matches[0]

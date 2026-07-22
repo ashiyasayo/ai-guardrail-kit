@@ -233,5 +233,8 @@ rm your-project/CLAUDE.md your-project/ORCHESTRATOR.md 2>/dev/null
 - Codex plugin 的共用 hook 以 `shared/codex/` 為唯一審核來源；修改該目錄後執行
   `scripts/sync-codex-hook-copies` 更新可攜式 plugin 副本，再以
   `scripts/sync-codex-hook-copies --check` 與完整回歸測試確認沒有漂移。
+- Codex `harness` 與 `integrated-harness` 以 `security_guard.py` 在單一 Python
+  程序內依序執行危險命令與秘密寫入檢查；計畫閘門與個資改寫因決策語意不同，
+  仍維持獨立 hook。
 - Regex hooks 是防線不是保證，無法涵蓋混淆、間接執行等所有變形；須搭配
   Claude Code 權限設定、SAST、Secret Manager 與人工審查。

@@ -291,6 +291,10 @@ with tempfile.TemporaryDirectory() as td:
         denied(dangerous, event(project, "exec_command", {"cmd": command}))
     secrets = install / "harness/hooks/block_secrets.py"
     denied(secrets, event(project, tool_input={"patch": "*** Begin Patch\n*** Add File: x\n+AWS=AKIA1234567890ABCDEF\n*** End Patch"}))
+    security_guard = install / "harness/hooks/security_guard.py"
+    denied(security_guard, event(project, "exec_command", {"cmd": "git reset --hard"}))
+    denied(security_guard, event(project, tool_input={"patch": "*** Begin Patch\n*** Add File: x\n+AWS=AKIA1234567890ABCDEF\n*** End Patch"}))
+    assert run(security_guard, event(project, "exec_command", {"cmd": "git status"})) is None
 
     pii = install / "harness/hooks/pii_guard.py"
     prompt_event = {
@@ -370,6 +374,7 @@ with tempfile.TemporaryDirectory() as td:
         assert (install / plugin / "hooks/hook_protocol.py").read_bytes() == (root / "shared/codex/hook_protocol.py").read_bytes()
     for plugin in ("harness", "integrated-harness"):
         assert (install / plugin / "hooks/security_checks.py").read_bytes() == (root / "shared/codex/security_checks.py").read_bytes()
+        assert (install / plugin / "hooks/security_guard.py").read_bytes() == (root / "shared/codex/security_guard.py").read_bytes()
         assert (install / plugin / "hooks/pii_guard.py").read_bytes() == (root / "shared/codex/pii_guard.py").read_bytes()
         assert (install / plugin / "hooks/pii_patterns.py").read_bytes() == (root / "shared/codex/pii_patterns.py").read_bytes()
     assert (install / "harness/hooks/pii_guard.py").read_bytes() == (install / "integrated-harness/hooks/pii_guard.py").read_bytes()

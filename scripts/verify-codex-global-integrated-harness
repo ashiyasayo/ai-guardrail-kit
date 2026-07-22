@@ -52,8 +52,7 @@ for event in ("PreToolUse", "UserPromptSubmit", "SessionStart"):
             if isinstance(hook, dict): commands.append((event, group.get("matcher"), hook.get("command")))
 expected = [
     ("PreToolUse", "exec_command|apply_patch", root / "plan_gate.py"),
-    ("PreToolUse", "exec_command", root / "block_dangerous_commands.py"),
-    ("PreToolUse", "exec_command|apply_patch", root / "block_secrets.py"),
+    ("PreToolUse", "exec_command|apply_patch", root / "security_guard.py"),
     ("PreToolUse", "apply_patch", root / "pii_guard.py"),
     ("UserPromptSubmit", None, root / "pii_guard.py"),
     ("SessionStart", "startup|resume|clear|compact", root / "session_start.py"),
@@ -61,7 +60,7 @@ expected = [
 for event, matcher, target in expected:
     wanted = "AI_GUARDRAIL_GLOBAL_DEFAULT=1 " + interpreter + " -- " + shlex.quote(str(target))
     if commands.count((event, matcher, wanted)) != 1 or not target.is_file(): raise SystemExit(1)
-if sum(1 for _, _, command in commands if isinstance(command, str) and command.startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 ")) != 6:
+if sum(1 for _, _, command in commands if isinstance(command, str) and command.startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 ")) != 5:
     raise SystemExit(1)
 PY
 printf 'Verified global Codex integrated-harness hooks.\n'

@@ -163,10 +163,8 @@ agk_render_block() {
     harness|integrated-harness)
       printf '[[hooks.PreToolUse]]\nmatcher = "exec_command|apply_patch"\n\n'
       printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/plan_gate.py")"
-      printf '[[hooks.PreToolUse]]\nmatcher = "exec_command"\n\n'
-      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/block_dangerous_commands.py")"
       printf '[[hooks.PreToolUse]]\nmatcher = "exec_command|apply_patch"\n\n'
-      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/block_secrets.py")"
+      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/security_guard.py")"
       printf '[[hooks.PreToolUse]]\nmatcher = "apply_patch"\n\n'
       printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/pii_guard.py")"
       printf '[[hooks.UserPromptSubmit]]\n\n'
