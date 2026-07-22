@@ -1,8 +1,8 @@
 {
   "name": "harness",
-  "description": "以計畫、指令與機密檢查保護程式碼庫變更。寫入前須由人類在終端機手動核准：touch .claude/.plan_approved（60 分鐘有效）。需 Python 3.9+；與其他兩種模式互斥，安裝或切換後須重新啟動 Claude Code session。",
+  "description": "以計畫、指令、機密及個資檢查保護程式碼庫變更。寫入前須由人類在終端機手動核准：touch .claude/.plan_approved（60 分鐘有效）。使用者提交提示時偵測疑似個資即整段阻擋。需 Python 3.9+；與其他兩種模式互斥，安裝或切換後須重新啟動 Claude Code session。",
   "author": {
     "name": "ai-guardrail-kit"
   },
-  "version": "0.1.3"
+  "version": "0.2.0"
 }

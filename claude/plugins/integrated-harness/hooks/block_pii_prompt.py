@@ -25,7 +25,7 @@ sys.dont_write_bytecode = True
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from redact_sensitive_info import RULES
+from pii_patterns import RULES
 
 
 def find_pii_kinds(prompt: str) -> list[str]:

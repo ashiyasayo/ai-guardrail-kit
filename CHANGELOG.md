@@ -13,6 +13,11 @@ All notable changes to this project are documented in this file.
     整段阻擋並提示改以去識別化內容重新送出；因 Claude Code 的 UserPromptSubmit
     不支援改寫提示內容，僅能阻擋，與 PreToolUse 的去識別化互補為縱深防禦。
   - `integrated-harness` plugin 版號隨此變更由 0.1.5 升級為 0.2.0。
+- `harness` 補上 `block_pii_prompt.py`（UserPromptSubmit）阻擋型個資防線；
+  規則抽成共用的 `pii_patterns.py`，與 `integrated-harness` 逐字元同步，
+  避免兩份規則各自維護漂移。`harness` 因 `guard.py` 尚未升級為 JSON 協定，
+  不具備 `redact_sensitive_info.py` 的去識別化改寫能力，僅能整段阻擋，
+  詳見 `harness/MAINTENANCE.md`。plugin 版號由 0.1.3 升級為 0.2.0。
 
 ### Changed
 

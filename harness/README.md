@@ -11,9 +11,10 @@
 | 核心功能 | 未取得人類核准時，只允許保守白名單中的唯讀 Bash；一般寫入與其他 Bash 均攔截 |
 | 人類控制 | 人類以 `.claude/.plan_approved` 表示核准，旗標預設有效 60 分鐘 |
 | 安全防線 | 掃描即將寫入的憑證樣式，並永久攔截毀滅性或高風險 Bash 指令 |
+| 個資防線 | 使用者提交提示時偵測疑似個資（身分證字號、手機、Email），整段阻擋並提示改以去識別化內容重送 |
 | 主要用途 | 為已有計畫／編排規範的專案補上確定性的施作授權與安全底線 |
 | 適用情境 | 需要人工先核准再修改，或要為 orchestrator 與 subagent 套用共同 hook 的團隊專案 |
-| 不提供 | 不驗證拆解文件內容、不把核准綁定特定計畫，也沒有可直接載入的完整 `ORCHESTRATOR.md` |
+| 不提供 | 不驗證拆解文件內容、不把核准綁定特定計畫、沒有可直接載入的完整 `ORCHESTRATOR.md`，也不支援把個資去識別化後仍放行寫入（僅 `integrated-harness` 有此能力） |
 
 與 `decomposition-gate` 最大差異是：它的 `decomposition_gate.py` 檢查
 「拆解是否完成」，本目錄的 `plan_gate.py` 檢查「人類是否核准」。
@@ -27,7 +28,9 @@
 | `plan_gate.py` | 檢查模組（亦可獨立執行） | 未經核准攔截寫入性操作；唯讀白名單放行；禁止模型操作核准旗標 |
 | `block_secrets.py` | 檢查模組（亦可獨立執行） | 攔截疑似 API Key、Token、密碼、私鑰與含密碼的連線字串 |
 | `block_dangerous_commands.py` | 檢查模組（亦可獨立執行） | 攔截刪除、毀損資料庫、破壞 Git 歷史、停用安全服務等紅線操作 |
-| `settings.json` | Claude Code 設定 | 將 `guard.py` 掛載到 PreToolUse（四個檔案須一起複製，`guard.py` 匯入其餘三支） |
+| `block_pii_prompt.py` | UserPromptSubmit | 使用者提交提示當下偵測疑似個資（身分證字號、手機、Email），整段阻擋並提示改以去識別化內容重送；本目錄無 `updatedInput` 改寫能力，只能阻擋 |
+| `pii_patterns.py` | 規則模組（供 `block_pii_prompt.py` 匯入） | 個資偵測規則單一事實來源，與 `integrated-harness` 逐字元相同，改規則只需改這一份 |
+| `settings.json` | Claude Code 設定 | 將 `guard.py` 掛載到 PreToolUse（四個檔案須一起複製，`guard.py` 匯入其餘三支）；另將 `block_pii_prompt.py` 掛載到 UserPromptSubmit |
 | `fable-orchestrator-prompt.md` | 編排規格提示稿 | 引導高階模型產生 A–I 章的 `ORCHESTRATOR.md`；它是生成素材，不是執行時規則 |
 | `MAINTENANCE.md` | 維護說明 | 設計理由、與 `integrated-harness` 的差異與跨產品同步原則（維護者閱讀，不需複製到專案） |
 | `CLAUDE.md` | 專案指引範本 | 命名規範（識別字英文、註解與回覆用台灣繁體中文）、架構原則（Clean Architecture／SOLID／TDD-BDD、既有系統最小變動）與 Spec by Example（需求以具體範例表達並可轉為可執行測試） |

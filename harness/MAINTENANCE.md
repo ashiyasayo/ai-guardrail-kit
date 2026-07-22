@@ -38,6 +38,22 @@
 會使兩個產品的防護強度悄悄分歧（此類漏洞確實發生過）。移植後把攻擊樣本加入根層
 `tests/claude_hook_parity_test.sh` 的共同行為語料，由該測試守護兩邊判定一致。
 
+## 個資防線與 integrated-harness 的差異
+
+`block_pii_prompt.py`（UserPromptSubmit，整段阻擋）在兩個產品皆可用，且是**逐字元
+相同**的檔案（連同其匯入的 `pii_patterns.py`），非刻意分歧的同源分支，修改個資
+規則時只需改 `pii_patterns.py` 一份、複製到兩個目錄即可，不適用上方「刻意分歧、
+不逐行同步」的原則。
+
+`integrated-harness` 另有 `redact_sensitive_info.py`（PreToolUse，去識別化後
+放行，需要 `updatedInput` 改寫機制），本目錄**沒有**這一層。原因：本目錄的
+`guard.py` 仍是舊版純 stderr／exit code 協定，未輸出 `hookSpecificOutput` 結構化
+JSON，無法承載 `updatedInput`；要補上這層需先把 `plan_gate.py`／
+`block_secrets.py`／`block_dangerous_commands.py` 三支既有 hook 一併升級到 JSON
+協定（deny 行為不變，只換傳遞機制），屬於比新增單一功能更大範圍的變更，尚未執行。
+本目錄使用者若在 prompt 階段被 `block_pii_prompt.py` 擋下，僅能自行遮蔽後重送，
+無法比照 integrated-harness 自動去識別化後繼續寫入。
+
 ## 已知限制
 
 - 安全 hook 是縱深防禦，非保證：regex 無法窮舉所有危險變形或編碼後的憑證，
@@ -45,4 +61,6 @@
 - 核准旗標為時間窗（非綁定單一計畫）：60 分鐘內的所有寫入都在核准範圍內。
   需要逐計畫核准時，請縮短 `APPROVAL_TTL_SECONDS` 或改用 `integrated-harness` 的
   SHA-256 綁定核准。
+- 個資偵測規則（台灣身分證字號、手機號碼、Email）為初版樣式，不含學號、地址、
+  護照號碼等其他個資類型；擴充規則於 `pii_patterns.py` 的 `RULES` 新增即可。
 - 其餘操作性限制與白名單擴充方式見 `README.md` 的「已知限制」與「維護」段落。

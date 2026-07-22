@@ -18,43 +18,19 @@ exit code 語意：0 = 一律放行（阻擋型判斷不在本 hook 職責）；
 輸入異常時 stderr + exit 2（fail closed，交由 guard.py 的既有慣例處理）。
 """
 import json
+import os
 import re
 import sys
 from typing import Optional
 
-# （規則名稱, 正規表示式, 遮罩函式）
-TAIWAN_ID_PATTERN = re.compile(r"\b[A-Z][12]\d{8}\b")
-MOBILE_PATTERN = re.compile(r"\b09\d{2}[- ]?\d{3}[- ]?\d{3}\b")
-EMAIL_PATTERN = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pii_patterns import RULES
 
 SINGLE_TEXT_FIELDS = {
     "Write": "content",
     "Edit": "new_string",
     "NotebookEdit": "new_source",
 }
-
-
-def _mask_id(match: re.Match) -> str:
-    value = match.group(0)
-    return value[:2] + "*" * (len(value) - 3) + value[-1]
-
-
-def _mask_mobile(match: re.Match) -> str:
-    digits = re.sub(r"[^0-9]", "", match.group(0))
-    return digits[:4] + "*" * 3 + digits[-3:]
-
-
-def _mask_email(match: re.Match) -> str:
-    local, _, domain = match.group(0).partition("@")
-    masked_local = local[0] + "*" * max(len(local) - 1, 1)
-    return f"{masked_local}@{domain}"
-
-
-RULES = (
-    ("台灣身分證字號", TAIWAN_ID_PATTERN, _mask_id),
-    ("手機號碼", MOBILE_PATTERN, _mask_mobile),
-    ("Email", EMAIL_PATTERN, _mask_email),
-)
 
 
 def redact(content: str) -> tuple[str, list[str]]:

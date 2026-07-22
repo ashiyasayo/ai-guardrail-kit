@@ -35,6 +35,8 @@ def run(hook, data):
 for base in (
     root / "integrated-harness/.claude/hooks",
     root / "claude/plugins/integrated-harness/hooks",
+    root / "harness/.claude/hooks",
+    root / "claude/plugins/harness/hooks",
 ):
     hook = base / "block_pii_prompt.py"
 
