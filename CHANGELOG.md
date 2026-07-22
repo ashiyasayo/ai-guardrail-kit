@@ -42,6 +42,9 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- Codex 模式切換流程只在啟動時探測一次可用的 Python 直譯器，避免每個 hook
+  命令產生時重複啟動子程序進行版本探測。
+
 - Codex 模式切換在非互動式背景程序中重設繼承的 `SIGINT` 忽略狀態，確保中斷時能執行
   rollback，並保留原始退出碼。
 

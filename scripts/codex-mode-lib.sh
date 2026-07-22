@@ -3,8 +3,13 @@
 
 # Windows（Git Bash）環境通常只有 python 而沒有可用的 python3
 #（WindowsApps 的 python3 別名 stub 找得到卻不能執行），故以實際執行 -V 探測後回退
-if ! python3 -V >/dev/null 2>&1 && python -V >/dev/null 2>&1; then
+if python3 -V >/dev/null 2>&1; then
+  AGK_PYTHON_BIN=python3
+elif python -V >/dev/null 2>&1; then
+  AGK_PYTHON_BIN=python
   python3() { python "$@"; }
+else
+  AGK_PYTHON_BIN=python3
 fi
 # Windows 預設編碼為 cp950，強制 Python 使用 UTF-8 避免中文讀寫失敗
 export PYTHONUTF8=${PYTHONUTF8:-1}
@@ -176,19 +181,11 @@ agk_render_block() {
 }
 
 agk_command_value() {
-  python3 - "$1" <<'PY'
-import json, shlex, subprocess, sys
+  "$AGK_PYTHON_BIN" - "$AGK_PYTHON_BIN" "$1" <<'PY'
+import json, shlex, sys
 # Windows 上 stdout 預設會將換行翻譯為 CRLF，重設為 LF 供 bash 讀取
 sys.stdout.reconfigure(newline=chr(10))
-# 安裝當下解析可用的直譯器名稱，讓產生的 config 在 WSL 與 Windows 都能執行；
-# 以實際執行 -V 探測，避免選到 Windows 上不能執行的 python3 別名 stub
-def interpreter_is_usable(name):
-    try:
-        return subprocess.run([name, "-V"], capture_output=True).returncode == 0
-    except OSError:
-        return False
-interpreter = "python3" if interpreter_is_usable("python3") else "python"
-print(json.dumps(interpreter + " -- " + shlex.quote(sys.argv[1])))
+print(json.dumps(sys.argv[0] + " -- " + shlex.quote(sys.argv[1])))
 PY
 }
 
