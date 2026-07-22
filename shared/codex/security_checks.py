@@ -126,33 +126,54 @@ def _token_dangerous(tokens) -> Optional[str]:
     return None
 
 
-def dangerous_command(command: str) -> Optional[str]:
-    """Return the first dangerous-command rule name, without command content."""
-    if not isinstance(command, str):
-        return None
+def _nested_danger(command: str) -> Optional[str]:
+    """檢查命令替換中的巢狀命令。"""
     for match in COMMAND_SUBSTITUTION_PATTERN.finditer(command):
-        nested = match.group(1) or match.group(2)
-        result = dangerous_command(nested)
+        result = dangerous_command(match.group(1) or match.group(2))
         if result:
             return result
+    return None
+
+
+def _pipeline_danger(segments, operators) -> Optional[str]:
+    """檢查下載器直接管線到直譯器的組合。"""
+    for index, operator in enumerate(operators):
+        if operator != "|" or index + 1 >= len(segments):
+            continue
+        left, right = segments[index], segments[index + 1]
+        if not left or not right or _command_name(left[0]) not in {"curl", "wget"}:
+            continue
+        right_index = 1 if _command_name(right[0]) == "sudo" and len(right) > 1 else 0
+        if _command_name(right[right_index]) in {"bash", "sh", "python", "python3"}:
+            return "下載即執行"
+    return None
+
+
+def _parsed_danger(command: str) -> Optional[str]:
     parsed = _tokenized_commands(command)
-    if parsed:
-        for segment in parsed[0]:
-            result = _token_dangerous(segment)
-            if result:
-                return result
-        for index, operator in enumerate(parsed[1]):
-            if operator != "|" or index + 1 >= len(parsed[0]):
-                continue
-            left, right = parsed[0][index], parsed[0][index + 1]
-            if left and right and _command_name(left[0]) in {"curl", "wget"}:
-                right_name = _command_name(right[1] if _command_name(right[0]) == "sudo" and len(right) > 1 else right[0])
-                if right_name in {"bash", "sh", "python", "python3"}:
-                    return "下載即執行"
+    if not parsed:
+        return None
+    segments, operators = parsed
+    for segment in segments:
+        result = _token_dangerous(segment)
+        if result:
+            return result
+    return _pipeline_danger(segments, operators)
+
+
+def _regex_danger(command: str) -> Optional[str]:
+    """保留 regex fallback，涵蓋無法安全 token 化的既有輸入。"""
     for rule_name, pattern in DANGEROUS_PATTERNS:
         if pattern.search(command):
             return rule_name
     return None
+
+
+def dangerous_command(command: str) -> Optional[str]:
+    """Return the first dangerous-command rule name, without command content."""
+    if not isinstance(command, str):
+        return None
+    return _nested_danger(command) or _parsed_danger(command) or _regex_danger(command)
 
 
 def pending_content(tool_input: Dict[str, Any]) -> str:
@@ -182,26 +203,29 @@ def _looks_like_secret_literal(value: str) -> bool:
     return any(c.isdigit() for c in value) and any(c.isalpha() for c in value)
 
 
+def _secret_in_line(line: str) -> Optional[str]:
+    safe_fallback_spans = []
+    for fallback in BASH_PARAMETER_FALLBACK_PATTERN.finditer(line):
+        if _looks_like_secret_literal(fallback.group(2)):
+            return "一般憑證指派"
+        safe_fallback_spans.append(fallback.span())
+    for rule_name, pattern in SECRET_PATTERNS:
+        hit = pattern.search(line)
+        if hit and not PLACEHOLDER_PATTERN.search(hit.group(0)):
+            return rule_name
+    for hit in UNQUOTED_ASSIGNMENT_PATTERN.finditer(line):
+        if _looks_like_secret_literal(hit.group(1)):
+            return "未加引號的憑證指派"
+    for hit in BASH_UNQUOTED_ASSIGNMENT_PATTERN.finditer(line):
+        if any(hit.start() >= start and hit.end() <= end for start, end in safe_fallback_spans):
+            continue
+        if _looks_like_secret_literal(hit.group(2)):
+            return "一般憑證指派"
+    return None
+
+
 def secret_kind(content: str) -> Optional[str]:
     """Return only the first secret rule name, never the matched value."""
     if not isinstance(content, str):
         return None
-    for line in content.splitlines():
-        safe_fallback_spans = []
-        for fallback in BASH_PARAMETER_FALLBACK_PATTERN.finditer(line):
-            if _looks_like_secret_literal(fallback.group(2)):
-                return "一般憑證指派"
-            safe_fallback_spans.append(fallback.span())
-        for rule_name, pattern in SECRET_PATTERNS:
-            hit = pattern.search(line)
-            if hit and not PLACEHOLDER_PATTERN.search(hit.group(0)):
-                return rule_name
-        for hit in UNQUOTED_ASSIGNMENT_PATTERN.finditer(line):
-            if _looks_like_secret_literal(hit.group(1)):
-                return "未加引號的憑證指派"
-        for hit in BASH_UNQUOTED_ASSIGNMENT_PATTERN.finditer(line):
-            if any(hit.start() >= start and hit.end() <= end for start, end in safe_fallback_spans):
-                continue
-            if _looks_like_secret_literal(hit.group(2)):
-                return "一般憑證指派"
-    return None
+    return next((kind for line in content.splitlines() if (kind := _secret_in_line(line))), None)

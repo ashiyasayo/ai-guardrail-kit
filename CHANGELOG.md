@@ -45,6 +45,9 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- Codex 安全判定將巢狀命令、token 化命令、下載管線、regex fallback 與逐行秘密
+  判定拆成獨立內部函式；規則優先順序與對外輸出維持不變，降低單一函式複雜度。
+
 - Codex 模式切換的訊號 rollback 回歸測試改為等待 fake CLI 的明確 ready marker，
   取代固定 0.2 秒延遲，避免較慢環境在 trap 安裝前送出訊號造成偶發失敗。
 
