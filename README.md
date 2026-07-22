@@ -171,8 +171,9 @@ rm your-project/CLAUDE.md your-project/ORCHESTRATOR.md 2>/dev/null
 一組可獨立複製到專案的 hooks：未取得人類核准（`touch .claude/.plan_approved`，
 60 分鐘有效）時攔截一切寫入；另有兩道獨立防線——攔截疑似硬寫的憑證，以及
 永久攔截毀滅性 Bash 指令（不因核准而豁免）。使用者提交提示時另偵測疑似個資
-（身分證字號、手機、Email）即整段阻擋（僅阻擋，無去識別化改寫能力）。附一份
-用於產生 `ORCHESTRATOR.md` 的提示稿，但本目錄不含完整編排層。
+（身分證字號、手機、Email）即整段阻擋；寫入類工具偵測到疑似個資時則自動
+去識別化改寫後放行（`guard.py` 以 `hookSpecificOutput` JSON 傳遞 deny／allow
+決策）。附一份用於產生 `ORCHESTRATOR.md` 的提示稿，但本目錄不含完整編排層。
 
 - 屬「授權控制」：核准旗標只能由人類在自己的終端機操作，模型無法自我核准。
 - 適用：已有計畫／編排規範、需要補上確定性施作授權與安全底線的專案。

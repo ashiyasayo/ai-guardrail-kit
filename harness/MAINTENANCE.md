@@ -45,14 +45,30 @@
 規則時只需改 `pii_patterns.py` 一份、複製到兩個目錄即可，不適用上方「刻意分歧、
 不逐行同步」的原則。
 
-`integrated-harness` 另有 `redact_sensitive_info.py`（PreToolUse，去識別化後
-放行，需要 `updatedInput` 改寫機制），本目錄**沒有**這一層。原因：本目錄的
-`guard.py` 仍是舊版純 stderr／exit code 協定，未輸出 `hookSpecificOutput` 結構化
-JSON，無法承載 `updatedInput`；要補上這層需先把 `plan_gate.py`／
-`block_secrets.py`／`block_dangerous_commands.py` 三支既有 hook 一併升級到 JSON
-協定（deny 行為不變，只換傳遞機制），屬於比新增單一功能更大範圍的變更，尚未執行。
-本目錄使用者若在 prompt 階段被 `block_pii_prompt.py` 擋下，僅能自行遮蔽後重送，
-無法比照 integrated-harness 自動去識別化後繼續寫入。
+`redact_sensitive_info.py`（PreToolUse，去識別化後放行，需要 `updatedInput`
+改寫機制）與 `integrated-harness` 逐字元相同，本目錄現已一併掛載。原因：
+`guard.py` 的 deny 分支已改輸出 `hookSpecificOutput` 結構化 JSON（見下方
+「guard.py 傳遞協定」），足以承載 `updatedInput`；`plan_gate.py`／
+`block_secrets.py`／`block_dangerous_commands.py` 三支既有 hook 的 `check()`
+回傳值本身未變，只有 `guard.py` 的 emit 邏輯升級。
+本目錄使用者若在 prompt 階段被 `block_pii_prompt.py` 擋下，仍只能自行遮蔽後
+重送（`block_pii_prompt.py` 無 `updatedInput` 改寫能力）；但寫入類工具（Write／
+Edit／MultiEdit／NotebookEdit）觸發個資規則時，會比照 integrated-harness
+自動去識別化後繼續寫入。
+
+## guard.py 傳遞協定
+
+`guard.py` 的三道攔截型檢查（`block_dangerous_commands`／`block_secrets`／
+`plan_gate`）與 `redact_sensitive_info` 的 `check()` 函式簽章及回傳語意皆未變；
+唯一變更是 `guard.py` 本身如何把結果傳給 Claude Code：
+
+- deny：改為 stdout 輸出 `{"hookSpecificOutput": {"permissionDecision": "deny", ...}}`
+  並 `exit 0`（原本是 stderr 文字 + `exit 2`）
+- redact：沿用既有作法，stdout 輸出 `permissionDecision: "allow"` + `updatedInput`
+- 輸入無法解析為 JSON：仍是 stderr + `exit 2`（fail closed，未變）
+
+三支既有檢查腳本各自的 `main()`（獨立執行時）**不受影響**，仍是 stderr／exit code
+協定；只有透過 `guard.py` 統一進入點呼叫時才是 JSON 協定。
 
 ## 已知限制
 

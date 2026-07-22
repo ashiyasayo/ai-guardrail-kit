@@ -15,9 +15,13 @@ All notable changes to this project are documented in this file.
   - `integrated-harness` plugin 版號隨此變更由 0.1.5 升級為 0.2.0。
 - `harness` 補上 `block_pii_prompt.py`（UserPromptSubmit）阻擋型個資防線；
   規則抽成共用的 `pii_patterns.py`，與 `integrated-harness` 逐字元同步，
-  避免兩份規則各自維護漂移。`harness` 因 `guard.py` 尚未升級為 JSON 協定，
-  不具備 `redact_sensitive_info.py` 的去識別化改寫能力，僅能整段阻擋，
-  詳見 `harness/MAINTENANCE.md`。plugin 版號由 0.1.3 升級為 0.2.0。
+  避免兩份規則各自維護漂移。plugin 版號由 0.1.3 升級為 0.2.0。
+- `harness` 的 `guard.py` 升級為 `hookSpecificOutput` JSON 傳遞協定（deny 語意
+  不變，只換傳遞機制，比照 `integrated-harness`；三支既有檢查 hook 的
+  `check()` 回傳值未變）；並補上 `redact_sensitive_info.py`（PreToolUse，
+  與 `integrated-harness` 逐字元相同），寫入類工具偵測到疑似個資時自動
+  去識別化改寫後放行，補齊 `harness/MAINTENANCE.md` 原先記錄的能力落差。
+  plugin 版號由 0.2.0 升級為 0.3.0。
 
 ### Changed
 

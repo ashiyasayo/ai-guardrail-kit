@@ -67,11 +67,6 @@ def assert_denied_json(result, keyword):
     assert status == 0 and decision == "deny" and keyword in reason, result
 
 
-def assert_denied_exit2(result, keyword):
-    status, decision, _, _, stderr = result
-    assert status == 2 and decision is None and keyword in stderr, result
-
-
 # --- 註冊契約：四個設定檔都只註冊 guard.py 一條 PreToolUse 規則 ---
 REGISTRATIONS = (
     ("harness/.claude/settings.json", "Write|Edit|MultiEdit|NotebookEdit|Bash"),
@@ -93,20 +88,20 @@ for mode in ("harness", "integrated-harness"):
     packaged = (root / "claude/plugins" / mode / "hooks/guard.py").read_text()
     assert legacy == packaged, mode
 
-# --- harness 模式：stderr + exit 2 語意 ---
+# --- harness 模式：JSON deny 語意（guard.py 已升級為 hookSpecificOutput 協定） ---
 with tempfile.TemporaryDirectory() as td:
     project = Path(td) / "project"
     (project / ".claude").mkdir(parents=True)
     for guard in (root / "harness/.claude/hooks/guard.py",
                   root / "claude/plugins/harness/hooks/guard.py"):
         # 尚未核准：一般寫入被計畫閘門攔截
-        assert_denied_exit2(run(guard, event(project), project), "計畫閘門")
+        assert_denied_json(run(guard, event(project), project), "計畫閘門")
         # 危險指令：紅線攔截優先於計畫閘門
-        assert_denied_exit2(run(guard, fixture("dangerous-command.json", project), project), "危險指令攔截")
+        assert_denied_json(run(guard, fixture("dangerous-command.json", project), project), "危險指令攔截")
         # 排程任務：無核准旗標也放行一般寫入（僅豁免計畫閘門）
         assert_allowed(run(guard, event(project), project, extra_env={"CLAUDE_SCHEDULED_TASK": "1"}))
         # 排程任務：紅線指令與憑證攔截不因排程身分而豁免
-        assert_denied_exit2(run(
+        assert_denied_json(run(
             guard, fixture("dangerous-command.json", project), project,
             extra_env={"CLAUDE_SCHEDULED_TASK": "1"},
         ), "危險指令攔截")
@@ -114,20 +109,20 @@ with tempfile.TemporaryDirectory() as td:
             guard, fixture("secret-write.json", project), project,
             extra_env={"CLAUDE_SCHEDULED_TASK": "1"},
         )
-        assert_denied_exit2(result, "憑證攔截")
+        assert_denied_json(result, "憑證攔截")
         assert "AKIA1234567890ABCDEF" not in result[3] + result[4], result
         # 憑證寫入：即使已核准仍攔截，且憑證值不得外洩
         (project / ".claude/.plan_approved").touch()
         result = run(guard, fixture("secret-write.json", project), project)
-        assert_denied_exit2(result, "憑證攔截")
+        assert_denied_json(result, "憑證攔截")
         assert "AKIA1234567890ABCDEF" not in result[3] + result[4], result
         # 已核准：唯讀指令與一般寫入放行
         assert_allowed(run(guard, fixture("allow.json", project), project))
         assert_allowed(run(guard, event(project), project))
         # 模型不得操作核准旗標
-        assert_denied_exit2(run(guard, event(
+        assert_denied_json(run(guard, event(
             project, "Bash", {"command": "touch .claude/.plan_approved"}), project), "計畫閘門")
-        # 輸入非 JSON：fail closed
+        # 輸入非 JSON：fail closed（仍是 stderr + exit 2，未變）
         status, _, _, _, stderr = run(guard, None, project, raw_input="{bad")
         assert status == 2 and stderr, (status, stderr)
         (project / ".claude/.plan_approved").unlink()

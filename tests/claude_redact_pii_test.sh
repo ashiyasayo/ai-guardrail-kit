@@ -36,6 +36,8 @@ def run(hook, data, env=None):
 
 
 for base in (
+    root / "harness/.claude/hooks",
+    root / "claude/plugins/harness/hooks",
     root / "integrated-harness/.claude/hooks",
     root / "claude/plugins/integrated-harness/hooks",
 ):

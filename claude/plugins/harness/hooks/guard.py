@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-guard.py — PreToolUse 統一進入點：一次啟動直譯器，依序執行三道檢查。
+guard.py — PreToolUse 統一進入點：一次啟動直譯器，依序執行下列檢查。
 
 事件：PreToolUse
 matcher：Write|Edit|MultiEdit|NotebookEdit|Bash
@@ -9,8 +9,12 @@ matcher：Write|Edit|MultiEdit|NotebookEdit|Bash
 1. block_dangerous_commands — 紅線指令，不因核准而豁免
 2. block_secrets — 疑似硬寫憑證
 3. plan_gate — 人類核准旗標
+4. redact_sensitive_info — 疑似個資，不阻擋，改寫後放行（見下方 redact 分支）
 
-exit code 語意：0 = 放行；2 = 攔截（stderr 回饋給模型）
+deny 語意：stdout 輸出 permissionDecision JSON（exit 0）；
+輸入異常時 stderr + exit 2（fail closed）。
+redact 語意：前三道檢查皆放行後才執行；命中時 stdout 輸出
+permissionDecision="allow" + updatedInput（exit 0），不計入 deny 判斷。
 """
 import json
 import os
@@ -22,6 +26,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import block_dangerous_commands
 import block_secrets
 import plan_gate
+import redact_sensitive_info
+
+
+def emit_deny(reason: str) -> None:
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": reason,
+    }}, ensure_ascii=False))
+    sys.exit(0)
 
 
 def main() -> None:
@@ -39,8 +53,11 @@ def main() -> None:
             continue
         reason = module.check(hook_input)
         if reason is not None:
-            print(reason, file=sys.stderr)
-            sys.exit(2)
+            emit_deny(reason)
+
+    redact_output = redact_sensitive_info.check(hook_input)
+    if redact_output is not None:
+        print(json.dumps({"hookSpecificOutput": redact_output}, ensure_ascii=False))
 
 
 if __name__ == "__main__":
