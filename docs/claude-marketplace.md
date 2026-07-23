@@ -1,9 +1,20 @@
 # Claude guardrail marketplace
 
 The Claude marketplace manifest is at `.claude-plugin/marketplace.json`, with
-three complete plugins under `claude/plugins/` named `decomposition-gate`,
-`harness`, and `integrated-harness`. Use the repository selector to keep
+four complete plugins under `claude/plugins/` named `decomposition-gate`,
+`sensitive-data-guard`, `harness`, and `integrated-harness`. Use the repository selector to keep
 exactly one managed mode effective across project and local scope.
+
+`sensitive-data-guard` is the standalone data-protection option. It blocks
+plaintext secrets and prompt PII, and redacts supported PII from write content.
+It does not add decomposition, dangerous-command checks, human approval, or
+orchestration.
+
+`harness` no longer promotes generation of an orchestration prompt; its legacy
+prompt remains deprecated for compatibility. `integrated-harness` uses a slim
+governance policy for authorization, side effects, validation, cost, and failure
+disclosure. Claude decides ordinary decomposition, model selection, and agent
+delegation through its native capabilities.
 
 ## Register and select
 

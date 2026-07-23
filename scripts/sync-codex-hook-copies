@@ -46,11 +46,15 @@ sync_file() {
   printf 'Synced %s\n' "${target#"$repo/"}"
 }
 
-for plugin in decomposition-gate harness integrated-harness; do
+for plugin in decomposition-gate sensitive-data-guard harness integrated-harness; do
   sync_file "$repo/shared/codex/hook_protocol.py" "$repo/codex/plugins/$plugin/hooks/hook_protocol.py"
 done
-for plugin in harness integrated-harness; do
-  for filename in security_checks.py security_guard.py pii_guard.py pii_patterns.py; do
+for plugin in sensitive-data-guard harness integrated-harness; do
+  filenames=(security_checks.py pii_guard.py pii_patterns.py)
+  if [[ $plugin != sensitive-data-guard ]]; then
+    filenames+=(security_guard.py)
+  fi
+  for filename in "${filenames[@]}"; do
     sync_file "$repo/shared/codex/$filename" "$repo/codex/plugins/$plugin/hooks/$filename"
   done
 done

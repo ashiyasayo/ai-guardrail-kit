@@ -387,13 +387,14 @@ with tempfile.TemporaryDirectory() as td:
     asked(ip, event(project), home=home)
 
     # Packaged runtime is the exact audited shared runtime.
-    for plugin in ("decomposition-gate", "harness", "integrated-harness"):
+    for plugin in ("decomposition-gate", "sensitive-data-guard", "harness", "integrated-harness"):
         assert (install / plugin / "hooks/hook_protocol.py").read_bytes() == (root / "shared/codex/hook_protocol.py").read_bytes()
-    for plugin in ("harness", "integrated-harness"):
+    for plugin in ("sensitive-data-guard", "harness", "integrated-harness"):
         assert (install / plugin / "hooks/security_checks.py").read_bytes() == (root / "shared/codex/security_checks.py").read_bytes()
-        assert (install / plugin / "hooks/security_guard.py").read_bytes() == (root / "shared/codex/security_guard.py").read_bytes()
         assert (install / plugin / "hooks/pii_guard.py").read_bytes() == (root / "shared/codex/pii_guard.py").read_bytes()
         assert (install / plugin / "hooks/pii_patterns.py").read_bytes() == (root / "shared/codex/pii_patterns.py").read_bytes()
+    for plugin in ("harness", "integrated-harness"):
+        assert (install / plugin / "hooks/security_guard.py").read_bytes() == (root / "shared/codex/security_guard.py").read_bytes()
     assert (install / "harness/hooks/pii_guard.py").read_bytes() == (install / "integrated-harness/hooks/pii_guard.py").read_bytes()
     assert (install / "harness/hooks/pii_patterns.py").read_bytes() == (install / "integrated-harness/hooks/pii_patterns.py").read_bytes()
 

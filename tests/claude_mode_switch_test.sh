@@ -38,7 +38,7 @@ root=pathlib.Path(sys.argv[1]); rows=[]
 for scope in ('project','local'):
  p=root/f'{scope}.json'
  for x in json.loads(p.read_text()) if p.exists() else []:
-  if x['id'].endswith('@ai-guardrail-kit') and x['id'].split('@')[0] in ('decomposition-gate','harness','integrated-harness'):
+  if x['id'].endswith('@ai-guardrail-kit') and x['id'].split('@')[0] in ('decomposition-gate','sensitive-data-guard','harness','integrated-harness'):
    rows.append((x['id'],scope,x['enabled']))
 print(rows)
 PY
@@ -57,8 +57,8 @@ PY
   [[ $before == "$(state_digest)" ]] || fail 'verifier mutated plugin state'
   output=$(select_mode decomposition-gate); grep -Fq 'start a new Claude Code session' <<<"$output" || fail 'update omitted session restart'
   assert_effective decomposition-gate
-  for from in decomposition-gate harness integrated-harness; do
-    for to in decomposition-gate harness integrated-harness; do
+  for from in decomposition-gate sensitive-data-guard harness integrated-harness; do
+    for to in decomposition-gate sensitive-data-guard harness integrated-harness; do
       [[ $from == "$to" ]] && continue
       reset_state; select_mode "$from" >/dev/null; select_mode "$to" >/dev/null; assert_effective "$to"
     done
@@ -253,7 +253,7 @@ PY
   printf 'PASS: transactional Claude mode switching\n'; exit 0
 fi
 
-assert_output $'decomposition-gate\nharness\nintegrated-harness' agk_claude_modes
+assert_output $'decomposition-gate\nsensitive-data-guard\nharness\nintegrated-harness' agk_claude_modes
 agk_claude_validate_scope project || fail 'project scope rejected'
 agk_claude_validate_scope local || fail 'local scope rejected'
 ! agk_claude_validate_scope user >/dev/null 2>&1 || fail 'user scope accepted'

@@ -20,9 +20,10 @@ require() {
   fi
 }
 
-for section in A B C D E F G H I; do
-  require "$ROOT/ORCHESTRATOR.md" "## $section\." "ORCHESTRATOR 包含 $section 章"
+for section in 1 2 3 4 5 6 7; do
+  require "$ROOT/ORCHESTRATOR.md" "## $section\." "治理政策包含第 $section 節"
 done
+require "$ROOT/ORCHESTRATOR.md" '不教導模型如何思考' '治理政策不承擔模型調度教學'
 if python3 - "$ROOT" <<'PY'
 import json
 import pathlib

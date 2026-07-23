@@ -10,7 +10,7 @@ fi
 export PYTHONUTF8=${PYTHONUTF8:-1}
 
 AGK_CLAUDE_MARKETPLACE=ai-guardrail-kit
-AGK_CLAUDE_MODES=(decomposition-gate harness integrated-harness)
+AGK_CLAUDE_MODES=(decomposition-gate sensitive-data-guard harness integrated-harness)
 
 agk_claude_modes() { printf '%s\n' "${AGK_CLAUDE_MODES[@]}"; }
 
@@ -109,7 +109,7 @@ try:
 except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError):
     raise SystemExit(1)
 if market.get("name") != identity or not isinstance(entries, list): raise SystemExit(1)
-wanted = [target] if target else ["decomposition-gate", "harness", "integrated-harness"]
+wanted = [target] if target else ["decomposition-gate", "sensitive-data-guard", "harness", "integrated-harness"]
 for mode in wanted:
     matches=[x for x in entries if isinstance(x,dict) and x.get("name")==mode]
     if len(matches)!=1 or matches[0].get("source")!=f"./claude/plugins/{mode}": raise SystemExit(1)

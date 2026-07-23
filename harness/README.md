@@ -1,8 +1,8 @@
 # Harness — 人類核准與安全 Hook 防線
 
 本目錄是一組可獨立複製到 Claude Code 專案的 PreToolUse hooks。它以人工核准旗標
-控制寫入，並另行攔截疑似憑證與高危險 Bash 指令。它也包含一份用來產生
-`ORCHESTRATOR.md` 的提示稿，但本目錄本身不是完整的編排層實作。
+控制寫入，並另行攔截疑似憑證與高危險 Bash 指令。本目錄不負責產生或強制代理
+編排；歷史提示稿只為相容既有使用者保留，已標示 deprecated。
 
 ## 功能與用途分析
 
@@ -14,7 +14,7 @@
 | 個資防線 | 使用者提交提示時偵測疑似個資（身分證字號、手機、Email、地址、信用卡卡號、學號、護照號碼），整段阻擋並提示改以去識別化內容重送；寫入類工具偵測到疑似個資時則自動去識別化改寫後放行 |
 | 主要用途 | 為已有計畫／編排規範的專案補上確定性的施作授權與安全底線 |
 | 適用情境 | 需要人工先核准再修改，或要為 orchestrator 與 subagent 套用共同 hook 的團隊專案 |
-| 不提供 | 不驗證拆解文件內容、不把核准綁定特定計畫、沒有可直接載入的完整 `ORCHESTRATOR.md` |
+| 不提供 | 不驗證拆解文件內容、不把核准綁定特定計畫、不產生或強制代理編排 |
 
 與 `decomposition-gate` 最大差異是：它的 `decomposition_gate.py` 檢查
 「拆解是否完成」，本目錄的 `plan_gate.py` 檢查「人類是否核准」。
@@ -32,7 +32,7 @@
 | `block_pii_prompt.py` | UserPromptSubmit | 使用者提交提示當下偵測疑似個資（身分證字號、手機、Email、地址、信用卡卡號、學號、護照號碼），整段阻擋並提示改以去識別化內容重送；本 hook 只能阻擋，改寫放行由 `redact_sensitive_info.py` 負責 |
 | `pii_patterns.py` | 規則模組（供 `block_pii_prompt.py` 與 `redact_sensitive_info.py` 匯入） | 個資偵測規則單一事實來源，與 `integrated-harness` 逐字元相同，改規則只需改這一份 |
 | `settings.json` | Claude Code 設定 | 將 `guard.py` 掛載到 PreToolUse（五個檔案須一起複製，`guard.py` 匯入其餘四支）；另將 `block_pii_prompt.py` 掛載到 UserPromptSubmit |
-| `fable-orchestrator-prompt.md` | 編排規格提示稿 | 引導高階模型產生 A–I 章的 `ORCHESTRATOR.md`；它是生成素材，不是執行時規則 |
+| `fable-orchestrator-prompt.md` | 已淘汰的相容資產 | 歷史編排提示稿；新專案不應使用，未來主要版本可移除 |
 | `MAINTENANCE.md` | 維護說明 | 設計理由、與 `integrated-harness` 的差異與跨產品同步原則（維護者閱讀，不需複製到專案） |
 | `CLAUDE.md` | 專案指引範本 | 命名規範（識別字英文、註解與回覆用台灣繁體中文）、架構原則（Clean Architecture／SOLID／TDD-BDD、既有系統最小變動）與 Spec by Example（需求以具體範例表達並可轉為可執行測試） |
 
@@ -183,19 +183,8 @@ echo '{"tool_name":"Write","tool_input":{"file_path":"note.md","content":"身分
 - 設計理由、與 `integrated-harness` 同名 hook 的差異，以及修補共用規則時的
   跨產品同步原則，見 [`MAINTENANCE.md`](MAINTENANCE.md)
 
-## 需要你補充的設定
+## 已淘汰的編排提示稿
 
-`fable-orchestrator-prompt.md` 的「團隊環境脈絡」段落內標示
-`[在此貼上：...]` 的項目必須由人類填寫，才能請高階模型產生貼合團隊實況的
-`ORCHESTRATOR.md`：
-
-- 單位／團隊性質
-- 開發技術堆疊（語言、框架、遺留系統與其變動原則、資料庫）
-- 基礎設施與維運工具（僅供模型判斷風險等級與派工邊界，
-  不建議寫出具體廠商或產品名稱）
-- 程式碼與協作規範（架構原則、測試要求、命名慣例、語言慣例等）
-- 現有 CLAUDE.md、術語對照表、團隊規範全文
-- 過去 AI 協作的失敗案例與踩坑紀錄
-
-留空會讓產出的 `ORCHESTRATOR.md` 過於通用，無法反映團隊實際的風險邊界與
-派工判斷準則。
+`fable-orchestrator-prompt.md` 已不再是 Harness 的功能賣點。它僅保留相容性，避免
+既有連結突然失效；新專案應直接維護簡短、可稽核的治理政策，內容聚焦於人類授權、
+外部副作用、驗收底線與成本門檻，不需教模型如何拆解或路由工作。

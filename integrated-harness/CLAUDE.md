@@ -1,7 +1,8 @@
 # Claude 專案規則
 
-1. 擔任 orchestrator 的模型必須載入並遵循 `ORCHESTRATOR.md`；subagent 另遵循
-   任務委派與 `.claude/reasoning-protocol-subagent.md`。
+1. 主要模型必須載入並遵循 `ORCHESTRATOR.md` 的治理邊界；一般任務分解、模型選擇
+   與代理調度交由平台自行決定，subagent 另遵循任務委派與
+   `.claude/reasoning-protocol-subagent.md`。
 2. 任何修改前，先依 `.claude/orchestration-policy.md` 的 `strict`、`standard` 或
    `light` 建立符合模式的 `.claude/plan/decomposition.md`。一般修改只要求拆解、
    方案與驗證。任務風險決定思考深度；核准模式只決定授權關卡，兩者互不取代。

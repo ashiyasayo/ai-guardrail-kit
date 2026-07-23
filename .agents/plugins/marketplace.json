@@ -17,6 +17,12 @@
       "category": "Security"
     },
     {
+      "name": "sensitive-data-guard",
+      "source": {"source": "local", "path": "./codex/plugins/sensitive-data-guard"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Security"
+    },
+    {
       "name": "harness",
       "source": {
         "source": "local",

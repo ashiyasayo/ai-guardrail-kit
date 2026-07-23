@@ -19,7 +19,7 @@ def check(condition, message):
 
 root=pathlib.Path('.')
 data=json.loads((root/'.agents/plugins/marketplace.json').read_text())
-names=['decomposition-gate','harness','integrated-harness']
+names=['decomposition-gate','sensitive-data-guard','harness','integrated-harness']
 check(data.get('name')=='ai-guardrail-kit', 'marketplace name must be ai-guardrail-kit')
 check([p.get('name') for p in data.get('plugins', [])]==names, f'plugin order must be {names}')
 for p,name in zip(data['plugins'],names):

@@ -154,8 +154,8 @@ unset FAKE_CODEX_FAIL_OPERATION
 grep -Fq 'rollback succeeded' <<<"$output" || fail 'uninstall final verification rollback missing'
 [[ $remove_before == "$(shasum -a 256 "$tmp/remove-fail/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'uninstall final verification changed state'
 
-for from in decomposition-gate harness integrated-harness; do
-  for to in decomposition-gate harness integrated-harness; do
+for from in decomposition-gate sensitive-data-guard harness integrated-harness; do
+  for to in decomposition-gate sensitive-data-guard harness integrated-harness; do
     if [[ $from == "$to" ]]; then continue; fi
     new_project "$tmp/trans-$from-$to"
     "$repo/scripts/select-codex-mode" "$from" "$tmp/trans-$from-$to" >/dev/null

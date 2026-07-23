@@ -1,8 +1,9 @@
 # Codex guardrail marketplace
 
 The Codex marketplace manifest is at `.agents/plugins/marketplace.json`, with
-three complete plugins under `codex/plugins/` named `decomposition-gate`, `harness`, and
-`integrated-harness`. Select exactly one. These plugins implement the same product
+four complete plugins under `codex/plugins/` named `decomposition-gate`,
+`sensitive-data-guard`, `harness`, and `integrated-harness`. Select exactly one.
+These plugins implement the same product
 intent as the top-level Claude packages, but Codex hook, approval, installation,
 and policy semantics are platform-specific and are not claimed to be identical.
 
@@ -74,11 +75,15 @@ selection remains strict and still requires the plan file from the start.
 
 - `decomposition-gate` requires `.codex/guardrail/plan/decomposition.md` before
   writes. It is workflow discipline, not human authorization or a sandbox.
+- `sensitive-data-guard` blocks plaintext secrets and prompt PII, and redacts
+  supported PII from patch content. It does not add decomposition,
+  dangerous-command checks, human approval, or orchestration.
 - `harness` returns native Codex `ask` for guarded writes after deterministic
-  safety checks.
-- `integrated-harness` adds decomposition, policy, scope, and audit context. Strict
+  safety checks. It does not generate or enforce agent orchestration.
+- `integrated-harness` adds decomposition, a slim governance policy, scope, and audit context. Strict
   mode asks after all deterministic checks pass. Light mode may allow a provably
-  scoped `apply_patch`, but mutating `exec_command` still asks.
+  scoped `apply_patch`, but mutating `exec_command` still asks. Ordinary model
+  routing and agent delegation remain platform-native.
 
 For `integrated-harness`, the project policy at
 `.codex/guardrail/orchestration-policy.md` always wins. Only when it is absent

@@ -23,7 +23,7 @@ assert marketplace_path.is_file(), f"missing {marketplace_path.relative_to(root)
 marketplace = json.loads(marketplace_path.read_text())
 assert marketplace["name"] == "ai-guardrail-kit"
 
-modes = ("decomposition-gate", "harness", "integrated-harness")
+modes = ("decomposition-gate", "sensitive-data-guard", "harness", "integrated-harness")
 SEMVER_PATTERN = re.compile(r"^\d+\.\d+\.\d+$")
 plugins = marketplace["plugins"]
 assert len(plugins) == len(modes)

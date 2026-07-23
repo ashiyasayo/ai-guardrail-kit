@@ -6,6 +6,11 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- 新增 Claude Code 與 Codex 的第四種互斥模式 `sensitive-data-guard`（初始版號
+  `0.1.0`）：可獨立安裝明文秘密／憑證阻擋、提示個資阻擋及寫入個資去識別化，
+  不包含危險命令、拆解、人工核准或編排；marketplace、selector、verifier 與 Codex
+  共用 hook 同步清單一併納入新模式。
+
 - 新增 `scripts/sync-codex-hook-copies` 與對應回歸測試；`shared/codex/` 成為
   Codex 共用 hook 的唯一審核來源，工具可同步或檢查可攜式 plugin 副本的漂移。
 
@@ -44,6 +49,21 @@ All notable changes to this project are documented in this file.
   plugin 版號由 0.1.2 升級為 0.2.0。
 
 ### Changed
+
+- 將 `integrated-harness/ORCHESTRATOR.md` 從完整調度教學精簡為治理政策，只保留
+  人類授權、外部副作用、修改範圍、驗收證據、成本與失敗揭露；一般任務分解、
+  模型選擇及代理調度改由 Claude／Codex 平台自行決定。Claude 的政策範本同步移除
+  固定 Opus／Sonnet／Haiku 路由，改為選填禁止模型／供應商與資料區域限制。
+- 淘汰 `harness` 產生編排提示稿的主要賣點；`fable-orchestrator-prompt.md` 僅作為
+  deprecated 相容資產保留，新專案不再建議使用。Claude／Codex 的 `harness` 版號
+  升為 `0.6.0`；Claude `integrated-harness` 升為 `0.5.0`，Codex 升為 `0.6.0`。
+
+- 根目錄 `README.md` 新增 Claude Code／Codex 六種平台模式的完整功能矩陣，涵蓋
+  拆解、核准、政策模式、範圍、危險命令、秘密、個資、SessionStart、安裝生命週期、
+  維護方式與共同限制；並釐清兩平台核准語意、`light` 範圍行為、附件掃描缺口及
+  copy-in 僅適用 Claude。另新增三種模式各自的優點、代價、適用條件、保留必要性，
+  以及維持三個 plugin 與合併成單一可設定 plugin 的取捨。同步修正 Claude
+  `integrated-harness` 實際支援 `strict`／`standard`／`light` 三種模式的根文件描述。
 
 - Codex 安全判定將巢狀命令、token 化命令、下載管線、regex fallback 與逐行秘密
   判定拆成獨立內部函式；規則優先順序與對外輸出維持不變，降低單一函式複雜度。

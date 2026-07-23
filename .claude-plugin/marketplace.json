@@ -1,6 +1,6 @@
 {
   "name": "ai-guardrail-kit",
-  "description": "提供計畫強制執行、機密保護與安全指令執行的護欄 plugin 集合。三種模式互斥、擇一啟用：請以 scripts/select-claude-mode 選擇模式（勿直接 install/enable），安裝或切換後須重新啟動 Claude Code session。",
+  "description": "提供計畫強制執行、敏感資料保護與安全指令執行的護欄 plugin 集合。四種模式互斥、擇一啟用。",
   "owner": {
     "name": "ai-guardrail-kit"
   },
@@ -8,6 +8,10 @@
     {
       "name": "decomposition-gate",
       "source": "./claude/plugins/decomposition-gate"
+    },
+    {
+      "name": "sensitive-data-guard",
+      "source": "./claude/plugins/sensitive-data-guard"
     },
     {
       "name": "harness",

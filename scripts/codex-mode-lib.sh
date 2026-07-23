@@ -14,7 +14,7 @@ fi
 # Windows 預設編碼為 cp950，強制 Python 使用 UTF-8 避免中文讀寫失敗
 export PYTHONUTF8=${PYTHONUTF8:-1}
 
-AGK_MODES=(decomposition-gate harness integrated-harness)
+AGK_MODES=(decomposition-gate sensitive-data-guard harness integrated-harness)
 AGK_MARKETPLACE=ai-guardrail-kit
 AGK_BEGIN='# ai-guardrail-kit:begin'
 AGK_END='# ai-guardrail-kit:end'
@@ -23,7 +23,7 @@ AGK_PERSONAL_POLICY_CREATED=0
 agk_die() { printf 'codex mode: %s\n' "$*" >&2; return 1; }
 
 agk_valid_mode() {
-  case $1 in decomposition-gate|harness|integrated-harness) return 0;; *) return 1;; esac
+  case $1 in decomposition-gate|sensitive-data-guard|harness|integrated-harness) return 0;; *) return 1;; esac
 }
 
 agk_resolve_project() {
@@ -117,7 +117,7 @@ import json, pathlib, sys
 # Windows 上 stdout 預設會將換行翻譯為 CRLF，重設為 LF 供 bash 讀取
 sys.stdout.reconfigure(newline=chr(10))
 market = sys.argv[1]
-managed = {"decomposition-gate", "harness", "integrated-harness"}
+managed = {"decomposition-gate", "sensitive-data-guard", "harness", "integrated-harness"}
 data = json.loads(pathlib.Path(sys.argv[2]).read_text())
 if not isinstance(data, dict) or not isinstance(data.get("installed"), list): raise SystemExit(1)
 seen = set()
@@ -159,6 +159,14 @@ agk_render_block() {
     decomposition-gate)
       printf '[[hooks.PreToolUse]]\nmatcher = "exec_command|apply_patch"\n\n'
       printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n' "$(agk_command_value "$root/decomposition_gate.py")"
+      ;;
+    sensitive-data-guard)
+      printf '[[hooks.PreToolUse]]\nmatcher = "exec_command|apply_patch"\n\n'
+      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/block_secrets.py")"
+      printf '[[hooks.PreToolUse]]\nmatcher = "apply_patch"\n\n'
+      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/pii_guard.py")"
+      printf '[[hooks.UserPromptSubmit]]\n\n'
+      printf '[[hooks.UserPromptSubmit.hooks]]\ntype = "command"\ncommand = %s\n' "$(agk_command_value "$root/pii_guard.py")"
       ;;
     harness|integrated-harness)
       printf '[[hooks.PreToolUse]]\nmatcher = "exec_command|apply_patch"\n\n'

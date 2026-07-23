@@ -28,6 +28,7 @@ def load(alias: str, path: pathlib.Path):
 
 harness_secrets = load("h_secrets", root / "harness/.claude/hooks/block_secrets.py")
 integrated_secrets = load("i_secrets", root / "integrated-harness/.claude/hooks/block_secrets.py")
+sensitive_secrets = load("s_secrets", root / "claude/plugins/sensitive-data-guard/hooks/block_secrets.py")
 harness_danger = load("h_danger", root / "harness/.claude/hooks/block_dangerous_commands.py")
 integrated_danger = load("i_danger", root / "integrated-harness/.claude/hooks/block_dangerous_commands.py")
 
@@ -86,7 +87,7 @@ failures = []
 
 for label, tool, tool_input, expect_deny in SECRET_CASES:
     event = {"tool_name": tool, "tool_input": tool_input}
-    for name, module in (("harness", harness_secrets), ("integrated", integrated_secrets)):
+    for name, module in (("sensitive", sensitive_secrets), ("harness", harness_secrets), ("integrated", integrated_secrets)):
         got = verdict(module, event)
         if got != expect_deny:
             failures.append(f"secrets/{name}: {label} 預期 {'攔截' if expect_deny else '放行'}，實際相反")
@@ -101,5 +102,10 @@ for label, command, expect_deny in DANGER_CASES:
 if failures:
     print("\n".join(failures), file=sys.stderr)
     raise SystemExit(1)
+for filename in ("redact_sensitive_info.py", "block_pii_prompt.py", "pii_patterns.py"):
+    sensitive = root / "claude/plugins/sensitive-data-guard/hooks" / filename
+    harness = root / "harness/.claude/hooks" / filename
+    if sensitive.read_text() != harness.read_text():
+        raise SystemExit(f"sensitive-data-guard/{filename} 與共用資料規則不同步")
 print("PASS: harness 與 integrated-harness 同源 hooks 行為對齊")
 PY

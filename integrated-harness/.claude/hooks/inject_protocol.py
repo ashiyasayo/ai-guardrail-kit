@@ -40,6 +40,8 @@ def build_reminder():
         "2. strict 模式下，由人類執行 approve_plan.py 核准（綁 SHA-256，60 分鐘有效）；\n"
         "   standard／light 模式免人工核准，但拆解仍為必要。\n"
         "3. 核准後才能寫入允許範圍內的檔案\n"
+        "4. 平台可自行決定任務分解、模型選擇與代理調度，但不得繞過人類授權、\n"
+        "   外部副作用、敏感資料、成本、驗收與失敗揭露邊界。\n"
     )
     protocol_path = find_reasoning_protocol()
     if protocol_path:

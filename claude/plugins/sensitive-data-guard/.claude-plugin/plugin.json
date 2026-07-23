@@ -1,0 +1,1 @@
+{"name":"sensitive-data-guard","description":"獨立敏感資料防線：阻擋明文秘密與提示個資，並將寫入內容中的個資去識別化；不包含拆解、核准、危險命令或編排。","author":{"name":"ai-guardrail-kit"},"version":"0.1.0"}
