@@ -88,7 +88,8 @@ All notable changes to this project are documented in this file.
 - Codex 個資防護同步 Claude 的四元組規則契約、Luhn 信用卡驗證，以及標籤錨定的
   學號與護照號碼規則；`harness`／`integrated-harness` 版號皆升級至 0.5.0。
 
-- `integrated-harness` 新增個資保護兩層防線（僅 Claude Code 平台）：
+- `integrated-harness` 最初於 Claude Code 平台新增個資保護兩層防線；Codex 對應
+  實作已於本版後續移植項目補齊：
   - `redact_sensitive_info.py`（PreToolUse，掛載於 `guard.py`）：偵測寫入內容中
     疑似台灣身分證字號、手機號碼、Email，去識別化改寫後放行（非阻擋）。
   - `block_pii_prompt.py`（UserPromptSubmit）：使用者提交提示當下偵測疑似個資，
@@ -106,8 +107,8 @@ All notable changes to this project are documented in this file.
   plugin 版號由 0.2.0 升級為 0.3.0。
 - `pii_patterns.py`（`harness`／`integrated-harness` 共用單一事實來源）擴充個資
   規則種類，新增「地址」（台灣縣市＋路街＋門牌格式）與「信用卡卡號」（限
-  4-4-4-4 分隔格式，降低誤判）；學號、護照號碼因與既有規則格式高度重疊或
-  缺乏可辨識結構、易誤判，刻意不納入，詳見兩個目錄 `MAINTENANCE.md` 的說明。
+  4-4-4-4 分隔格式，降低誤判）；當時學號、護照號碼因與既有規則格式高度重疊或
+  缺乏可辨識結構、易誤判而未納入，後續已改採標籤錨定方式補上。
   `harness` plugin 版號由 0.3.0 升級為 0.4.0，`integrated-harness` 由 0.2.0
   升級為 0.3.0。
 

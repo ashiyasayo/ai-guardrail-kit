@@ -54,6 +54,12 @@ policy only when absent, and adds three tagged `PreToolUse` commands to
 keeps a private pre-install backup so `--remove` can restore the original hooks
 file byte-for-byte:
 
+The three `PreToolUse` commands keep distinct decision semantics: the plan gate
+requests native approval, `security_guard.py` runs dangerous-command and secret
+checks in one Python process, and the PII hook can return a redacted
+`updatedInput`. Prompt PII blocking and the session reminder remain separate
+event hooks.
+
 ```bash
 ./scripts/install-codex-global-integrated-harness --remove
 ./scripts/verify-codex-global-integrated-harness --no-installed
