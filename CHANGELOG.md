@@ -37,6 +37,14 @@ All notable changes to this project are documented in this file.
     升級為 0.4.0。
   - Codex 平台已於後續移植項目同步相同規則與驗證契約。
 
+- 新增 `tests/claude_copyin_parity_test.sh`：守護 copy-in（`harness/.claude/hooks`、
+  `integrated-harness/.claude/hooks`）與 marketplace plugin 的**非 PII** hook
+  （`guard.py`／`plan_gate.py`／`block_secrets.py`／`block_dangerous_commands.py`／
+  `approve_plan.py`／`inject_protocol.py`）逐字節一致，補上 Layer 1 只覆蓋 PII 三件組
+  之外的 copy-in↔plugin 漂移守護缺口。唯一放行 `integrated-harness/plan_gate.py` 的核准
+  路徑差異（copy-in 用 `.claude/hooks/`、plugin 用 `${CLAUDE_PLUGIN_ROOT}`），且限定為
+  單一連續差異區塊、須涉及 `approve_plan.py`，其餘任何位置差異均判為漂移而失敗。
+
 ### Fixed
 
 - 修正 `sensitive-data-guard` plugin 的 PII 三件組各多一個結尾空行、與其餘 4 個位置
@@ -50,6 +58,10 @@ All notable changes to this project are documented in this file.
   `scripts/select-codex-mode sensitive-data-guard` selector 指令與新 thread 提示
   （`tests/codex_marketplace_test.sh`）。屬設定一致性修正，hook 攔截行為不變。
   `sensitive-data-guard` plugin 版號再升級：Claude 0.1.1 → 0.1.2、Codex 0.1.0 → 0.1.1。
+
+- 補齊 Codex `decomposition-gate` 遺漏的版號升級：其 `.codex/guardrail/plan/.gate_disabled`
+  逃生口功能已具備（manifest 描述亦已載明），但 `.codex-plugin/plugin.json` 版號仍停在
+  0.1.2，而 Claude 對應早已為 0.2.0；對齊升級為 0.2.0。
 
 ### Security
 

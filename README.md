@@ -374,6 +374,12 @@ Codex 請使用 marketplace plugin 與 selector，不可沿用 copy-in 步驟。
   `scripts/sync-claude-hook-copies --check`（即 `tests/claude_shared_sync_test.sh`）確認
   沒有漂移。`block_secrets.py`／`block_dangerous_commands.py` 為刻意分歧分支，不在同步
   範圍，改由 `tests/claude_hook_parity_test.sh` 行為守護。
+- copy-in（`harness/.claude/hooks`、`integrated-harness/.claude/hooks`）與 marketplace
+  plugin 的**非 PII** hook（`guard.py`／`plan_gate.py`／`block_secrets.py`／
+  `block_dangerous_commands.py`／`approve_plan.py`／`inject_protocol.py`）為兩份平行副本，
+  由 `tests/claude_copyin_parity_test.sh` 守護逐字節一致；`integrated-harness/plan_gate.py`
+  的核准命令路徑差異（copy-in 用 `.claude/hooks/`、plugin 用 `${CLAUDE_PLUGIN_ROOT}`）為
+  已知刻意例外。修改上述任一份後，兩份都要一起改。
 - Codex plugin 的共用 hook 以 `shared/codex/` 為唯一審核來源；修改該目錄後執行
   `scripts/sync-codex-hook-copies` 更新可攜式 plugin 副本，再以
   `scripts/sync-codex-hook-copies --check` 與完整回歸測試確認沒有漂移。
