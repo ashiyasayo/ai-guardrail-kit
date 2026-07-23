@@ -236,7 +236,7 @@ rm your-project/CLAUDE.md your-project/ORCHESTRATOR.md 2>/dev/null
 | 生效時機 | 選擇、更新或移除後開新 Claude Code session | 選擇、更新或移除後開新 Codex thread |
 | Python | 3.9+；依序探測 `python3`／`python`／`py` | 3.9+；selector 探測並寫入 hook 命令 |
 | 額外 Python 套件 | 無，現有 hooks 僅用標準函式庫 | 無，現有 hooks 僅用標準函式庫 |
-| 共用程式來源 | Claude copy-in／plugin 副本由 parity 測試守護 | `shared/codex/` 為唯一審核來源，透過同步腳本產生 plugin 副本 |
+| 共用程式來源 | PII 三件組以 `shared/claude/` 為唯一審核來源，同步腳本產生 plugin 與 copy-in 副本；`block_secrets`／`block_dangerous` 為分歧分支，由 parity 行為測試守護 | `shared/codex/` 為唯一審核來源，透過同步腳本產生 plugin 副本 |
 | 統一回歸入口 | `tests/run_all.sh` | `tests/run_all.sh` |
 
 ### 已知共同限制
@@ -368,6 +368,12 @@ Codex 請使用 marketplace plugin 與 selector，不可沿用 copy-in 步驟。
 - `harness` 與 `integrated-harness` 的 `settings.json` 只掛載 `guard.py` 統一進入點，
   由它在單一直譯器行程內依序執行三道檢查；hook 檔案須整組複製，
   修改任一檢查腳本後應執行 `tests/claude_guard_test.sh` 回歸。
+- Claude plugin 與 copy-in 的 PII 三件組（`pii_patterns.py`／`block_pii_prompt.py`／
+  `redact_sensitive_info.py`）以 `shared/claude/` 為唯一審核來源；修改該目錄後執行
+  `scripts/sync-claude-hook-copies` 更新 5 份發佈副本（3 plugin＋2 copy-in），再以
+  `scripts/sync-claude-hook-copies --check`（即 `tests/claude_shared_sync_test.sh`）確認
+  沒有漂移。`block_secrets.py`／`block_dangerous_commands.py` 為刻意分歧分支，不在同步
+  範圍，改由 `tests/claude_hook_parity_test.sh` 行為守護。
 - Codex plugin 的共用 hook 以 `shared/codex/` 為唯一審核來源；修改該目錄後執行
   `scripts/sync-codex-hook-copies` 更新可攜式 plugin 副本，再以
   `scripts/sync-codex-hook-copies --check` 與完整回歸測試確認沒有漂移。

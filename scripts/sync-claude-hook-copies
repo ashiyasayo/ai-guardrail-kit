@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 將 Claude plugin 與 copy-in 內必須隨附的 PII 規則 hook 副本，從唯一審核來源
+# shared/claude 同步。marketplace sparse checkout 與 copy-in 都讀取儲存庫內的
+# 實體檔，故保留發佈副本，但不再以手動複製維護（手動複製曾導致 SDG plugin
+# 結尾空行漂移）。block_secrets.py／block_dangerous_commands.py 為刻意分歧的
+# 同源分支，不在本腳本範圍，改由 tests/claude_hook_parity_test.sh 行為守護。
+script_dir=$(cd "$(dirname "$0")" && pwd -P)
+repo=${AI_GUARDRAIL_ROOT:-$(cd "$script_dir/.." && pwd -P)}
+mode=write
+
+case ${1:-} in
+  '') ;;
+  --check) mode=check ;;
+  --help|-h)
+    printf 'usage: sync-claude-hook-copies [--check]\n'
+    exit 0
+    ;;
+  *)
+    printf 'sync-claude-hook-copies: unknown option: %s\n' "$1" >&2
+    exit 2
+    ;;
+esac
+
+[[ -d $repo/shared/claude && -d $repo/claude/plugins ]] || {
+  printf 'sync-claude-hook-copies: invalid repository root: %s\n' "$repo" >&2
+  exit 1
+}
+
+sync_file() {
+  local source=$1 target=$2
+  [[ -f $source && ! -L $source ]] || {
+    printf 'sync-claude-hook-copies: invalid source: %s\n' "$source" >&2
+    return 1
+  }
+  [[ ! -e $target || ! -L $target ]] || {
+    printf 'sync-claude-hook-copies: refusing symlink target: %s\n' "$target" >&2
+    return 1
+  }
+  if cmp -s "$source" "$target"; then
+    return 0
+  fi
+  if [[ $mode == check ]]; then
+    printf 'Claude hook copy is out of sync: %s\n' "${target#"$repo/"}" >&2
+    return 1
+  fi
+  cp -p "$source" "$target"
+  printf 'Synced %s\n' "${target#"$repo/"}"
+}
+
+# 唯一審核來源：shared/claude；目標為 3 個 plugin hooks 目錄與 2 個 copy-in
+# .claude/hooks 目錄，共 5 個位置。
+target_dirs=(
+  "claude/plugins/sensitive-data-guard/hooks"
+  "claude/plugins/harness/hooks"
+  "claude/plugins/integrated-harness/hooks"
+  "harness/.claude/hooks"
+  "integrated-harness/.claude/hooks"
+)
+filenames=(pii_patterns.py block_pii_prompt.py redact_sensitive_info.py)
+
+for target_dir in "${target_dirs[@]}"; do
+  for filename in "${filenames[@]}"; do
+    sync_file "$repo/shared/claude/$filename" "$repo/$target_dir/$filename"
+  done
+done

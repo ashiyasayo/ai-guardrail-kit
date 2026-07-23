@@ -40,10 +40,13 @@
 
 ## 個資防線與 integrated-harness 的差異
 
-`block_pii_prompt.py`（UserPromptSubmit，整段阻擋）在兩個產品皆可用，且是**逐字元
-相同**的檔案（連同其匯入的 `pii_patterns.py`），非刻意分歧的同源分支，修改個資
-規則時只需改 `pii_patterns.py` 一份、複製到兩個目錄即可，不適用上方「刻意分歧、
-不逐行同步」的原則。
+`block_pii_prompt.py`（UserPromptSubmit，整段阻擋）在兩個產品皆可用，且與其匯入的
+`pii_patterns.py`、`redact_sensitive_info.py` 同為**逐字元相同**的檔案，非刻意分歧的
+同源分支，不適用上方「刻意分歧、不逐行同步」的原則。這三個檔案（PII 三件組）以
+`shared/claude/` 為唯一審核來源：修改規則時只改 `shared/claude/` 一份，再執行
+`scripts/sync-claude-hook-copies` 同步到 3 個 plugin 與 2 個 copy-in 共 5 份副本，
+並以 `scripts/sync-claude-hook-copies --check`（即 `tests/claude_shared_sync_test.sh`）
+確認沒有漂移，不再手動複製。
 
 `redact_sensitive_info.py`（PreToolUse，去識別化後放行，需要 `updatedInput`
 改寫機制）與 `integrated-harness` 逐字元相同，本目錄現已一併掛載。原因：

@@ -14,6 +14,15 @@ All notable changes to this project are documented in this file.
 - 新增 `scripts/sync-codex-hook-copies` 與對應回歸測試；`shared/codex/` 成為
   Codex 共用 hook 的唯一審核來源，工具可同步或檢查可攜式 plugin 副本的漂移。
 
+- 新增 `shared/claude/` 作為 Claude 側 PII 三件組（`pii_patterns.py`／
+  `block_pii_prompt.py`／`redact_sensitive_info.py`）的唯一審核來源，並新增
+  `scripts/sync-claude-hook-copies` 與回歸測試 `tests/claude_shared_sync_test.sh`：
+  同步腳本以 `cp -p` 產生、以 `cmp -s`（`--check`）守護 5 份發佈副本（3 plugin ＋
+  2 copy-in）逐字節一致；Claude 側自此比照 Codex 由單一來源結構性防止漂移，不再
+  手動複製。`block_secrets.py`／`block_dangerous_commands.py` 為刻意分歧分支不納入，
+  仍由 `tests/claude_hook_parity_test.sh` 行為守護；後者同步移除已被 `--check` 取代的
+  逐字節斷言，避免雙軌。
+
 - `pii_patterns.py`（`harness`／`integrated-harness` 共用）將 `RULES` 契約由三元組
   升級為四元組（名稱、regex、遮罩函式、**驗證函式**）；命中判定改為「regex 命中
   且驗證函式為 `None` 或回傳 `True`」，讓需要額外邏輯的規則也能納入而不放寬 regex。
@@ -27,6 +36,13 @@ All notable changes to this project are documented in this file.
   - `harness` plugin 版號由 0.4.0 升級為 0.5.0，`integrated-harness` 由 0.3.0
     升級為 0.4.0。
   - Codex 平台已於後續移植項目同步相同規則與驗證契約。
+
+### Fixed
+
+- 修正 `sensitive-data-guard` plugin 的 PII 三件組各多一個結尾空行、與其餘 4 個位置
+  逐字節不一致的漂移（此漂移使 `tests/claude_hook_parity_test.sh` 原為紅燈）；統一對齊
+  canonical（106／79／120 行）內容，屬惰性空白差異，偵測與遮罩行為不變。
+  `sensitive-data-guard` plugin 版號由 0.1.0 升級為 0.1.1。
 
 ### Security
 

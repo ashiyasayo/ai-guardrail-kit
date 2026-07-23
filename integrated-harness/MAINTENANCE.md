@@ -44,9 +44,10 @@
   「regex 命中且驗證函式為 `None` 或回傳 `True`」，支援需要額外邏輯的規則：信用卡
   放寬為 13–19 碼並以 Luhn checksum 驗證；學號、護照號碼採「標籤錨定」（需鄰近出現
   標籤關鍵字才觸發，屬精確率優先取捨，**無法涵蓋無標籤裸資料**）。如需擴充，於
-  `pii_patterns.py` 的 `RULES` 新增規則即可（`redact_sensitive_info.py`／
+  唯一審核來源 `shared/claude/pii_patterns.py` 的 `RULES` 新增規則，再執行
+  `scripts/sync-claude-hook-copies` 同步到各 plugin 與 copy-in 副本（`redact_sensitive_info.py`／
   `block_pii_prompt.py` 皆直接複用同一份定義，需二次驗證時附上驗證函式）。
-  註：Codex 平台有各自獨立的 `shared/codex/pii_patterns.py`，尚未同步此次擴充。
+  註：Codex 平台以各自獨立的 `shared/codex/pii_patterns.py` 維護對等規則。
 - 尚未實作攔截已知正式環境主機或部署命令的 hook；環境命名不一致可能誤攔。
 - 尚未實作計畫關卡前攔截非 Bash／檔案工具外部副作用的 hook；matcher 依新增工具決定，
   且可能攔截唯讀 API。

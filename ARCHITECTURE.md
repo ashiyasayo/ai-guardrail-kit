@@ -24,8 +24,9 @@ Claude 的 `PreToolUse` dispatcher 先執行秘密檢查，再執行個資遮罩
 註冊為 hooks：`exec_command`／`apply_patch` 先做秘密檢查，`apply_patch`
 另做個資遮罩，`UserPromptSubmit` 則攔截提示詞個資。
 
-規則引擎只使用 Python 標準函式庫。Codex 的共用可稽核來源位於
-`shared/codex/`，發佈 plugin 保留可攜副本，並由
+規則引擎只使用 Python 標準函式庫。兩平台的 PII 規則各有唯一審核來源：Claude
+位於 `shared/claude/`（PII 三件組），Codex 位於 `shared/codex/`；發佈的 plugin
+與 copy-in 保留可攜副本，分別由 `scripts/sync-claude-hook-copies` 與
 `scripts/sync-codex-hook-copies` 檢查同步。平台 hook 協定不同，但敏感資料
 規則與產品邊界保持對等。
 

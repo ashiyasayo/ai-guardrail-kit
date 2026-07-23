@@ -102,10 +102,9 @@ for label, command, expect_deny in DANGER_CASES:
 if failures:
     print("\n".join(failures), file=sys.stderr)
     raise SystemExit(1)
-for filename in ("redact_sensitive_info.py", "block_pii_prompt.py", "pii_patterns.py"):
-    sensitive = root / "claude/plugins/sensitive-data-guard/hooks" / filename
-    harness = root / "harness/.claude/hooks" / filename
-    if sensitive.read_text() != harness.read_text():
-        raise SystemExit(f"sensitive-data-guard/{filename} 與共用資料規則不同步")
+# PII 三件組（pii_patterns.py／block_pii_prompt.py／redact_sensitive_info.py）的
+# 逐字節一致性，已改由 tests/claude_shared_sync_test.sh 對唯一來源 shared/claude
+# 全面守護（涵蓋 3 個 plugin 與 2 個 copy-in 共 5 個位置），不再於此重複斷言，
+# 避免與 sync --check 形成雙軌、修一邊漏另一邊。
 print("PASS: harness 與 integrated-harness 同源 hooks 行為對齊")
 PY
