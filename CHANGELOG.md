@@ -44,6 +44,13 @@ All notable changes to this project are documented in this file.
   canonical（106／79／120 行）內容，屬惰性空白差異，偵測與遮罩行為不變。
   `sensitive-data-guard` plugin 版號由 0.1.0 升級為 0.1.1。
 
+- 修正 `sensitive-data-guard`（第四模式）與其他三模式不一致導致的 marketplace 測試紅燈：
+  Claude `hooks.json` 兩條命令的 Python 缺失錯誤訊息對齊標準長訊息
+  （`tests/claude_marketplace_test.sh`）；Codex `SKILL.md` 補上啟用說明，含
+  `scripts/select-codex-mode sensitive-data-guard` selector 指令與新 thread 提示
+  （`tests/codex_marketplace_test.sh`）。屬設定一致性修正，hook 攔截行為不變。
+  `sensitive-data-guard` plugin 版號再升級：Claude 0.1.1 → 0.1.2、Codex 0.1.0 → 0.1.1。
+
 ### Security
 
 - Codex 秘密檢查同步補上 Bash `${VAR:-fallback}` 與未加引號憑證指派判定，
