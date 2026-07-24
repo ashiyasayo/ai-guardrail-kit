@@ -6,6 +6,21 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- 新增 **GitHub Copilot (VS Code)** 平台的第一個護欄模式 `decomposition-gate`
+  （初始版號 `0.1.0`），發行樹 `copilot/plugins/decomposition-gate/`：以 VS Code
+  Agent hooks（Preview）的 `PreToolUse` 封鎖寫入向量 `create_file`、
+  `multi_replace_string_in_file`、`run_in_terminal`（後者採 Codex 式「拆解前整體
+  gate」，因實機 spike 證明對抗性 agent 會用終端機繞過寫入意圖正則），拆解檔
+  `.github/guardrail/plan/decomposition.md` 完成前一律 deny；唯讀與未知工具放行。
+  單一 Python 邏輯（`decomposition_gate.py` + `hook_protocol.py`）+ 各平台薄啟動器
+  （`launch.ps1` Windows 已實機驗證、`launch.sh` POSIX/Mac 附帶標未驗）；設定用扁平
+  格式 + 分平台鍵 + **工作區相對路徑**。關鍵約束（皆有 Phase 0 spike 實證）：入站讀
+  原始位元組解 UTF-8、出站 ASCII-safe JSON、啟動器對任何錯誤自印 deny（VS Code 對
+  hook 錯誤/非 JSON 輸出預設 fail-open）。`tests/smoke_test.sh` 16 情境全通過。
+  屬 Preview、僅 Copilot Agent mode 生效；決策與踩坑記於
+  `.docs/vault/decisions/2026-07-23-copilot-vscode-support-plan.md` 與
+  `.docs/vault/gotchas/2026-07-23-vscode-copilot-hook-wiring.md`。
+
 - 新增 Claude Code 與 Codex 的第四種互斥模式 `sensitive-data-guard`（初始版號
   `0.1.0`）：可獨立安裝明文秘密／憑證阻擋、提示個資阻擋及寫入個資去識別化，
   不包含危險命令、拆解、人工核准或編排；marketplace、selector、verifier 與 Codex

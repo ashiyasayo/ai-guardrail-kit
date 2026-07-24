@@ -7,6 +7,11 @@ Claude Code 方案把 AI 協作開發從
 hooks）」。三個目錄**功能與用途各自獨立、不可同時安裝**，其中
 `integrated-harness` 是整合另外兩者能力的完整版，而非疊加安裝。
 
+> **實驗性：GitHub Copilot (VS Code)**（Preview）——新增第三平台的第一個模式
+> `decomposition-gate`，見 [`copilot/plugins/decomposition-gate/`](copilot/plugins/decomposition-gate/)
+> 與下方「快速開始 › GitHub Copilot」。目前僅此一種模式、Windows 主線實機驗證、
+> macOS／Linux 附帶未驗；不影響上述 Claude／Codex 四模式的互斥語意。
+
 ## 需求環境
 
 - [Claude Code](https://docs.claude.com/en/docs/claude-code) CLI
@@ -99,6 +104,23 @@ chmod +x your-project/.claude/hooks/*.py
 ```
 
 詳細設定與核准流程請見各目錄的 `README.md`。
+
+### GitHub Copilot (VS Code)（實驗性，Preview）
+
+第三平台的第一個模式 `decomposition-gate`，透過 VS Code Agent hooks（Preview）在
+`PreToolUse` 封鎖寫入向量（`create_file`／`multi_replace_string_in_file`／
+`run_in_terminal`）。copy-in 安裝（無 marketplace／selector）：
+
+```bash
+mkdir -p your-project/.github/hooks your-project/.github/guardrail/plan
+cp copilot/plugins/decomposition-gate/hooks/* your-project/.github/hooks/
+cp copilot/plugins/decomposition-gate/plan/decomposition.template.md your-project/.github/guardrail/plan/
+```
+
+接著在 VS Code 使用者設定加入 `"chat.useCustomAgentHooks": true` 與
+`"chat.hookFilesLocations": { ".github/hooks": true }`，Reload Window。僅 Copilot
+Agent mode 生效；Windows 已實機驗證，macOS／Linux 未驗。完整說明與限制見
+[`copilot/plugins/decomposition-gate/README.md`](copilot/plugins/decomposition-gate/README.md)。
 
 ## 移除 Plugin
 

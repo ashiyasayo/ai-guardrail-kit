@@ -48,3 +48,19 @@ codex plugin marketplace add "$(pwd)"
 完整 marketplace 生命週期與限制請見
 [`docs/claude-marketplace.md`](docs/claude-marketplace.md) 與
 [`docs/codex-marketplace.md`](docs/codex-marketplace.md)。
+
+## GitHub Copilot (VS Code)（實驗性，Preview）
+
+目前僅 `decomposition-gate` 一種模式，採 copy-in（無 marketplace／selector）：
+
+```bash
+mkdir -p your-project/.github/hooks your-project/.github/guardrail/plan
+cp copilot/plugins/decomposition-gate/hooks/* your-project/.github/hooks/
+cp copilot/plugins/decomposition-gate/plan/decomposition.template.md your-project/.github/guardrail/plan/
+```
+
+VS Code 使用者設定需含 `"chat.useCustomAgentHooks": true` 與
+`"chat.hookFilesLocations": { ".github/hooks": true }`，改後 Reload Window。
+若 Windows 探測不到 python，設定環境變數 `GUARDRAIL_PYTHON` 指向直譯器完整路徑。
+僅 Copilot Agent mode 生效；行為與限制見
+[`copilot/plugins/decomposition-gate/README.md`](copilot/plugins/decomposition-gate/README.md)。
