@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+    branches: [main, release]
+  pull_request:
+    branches: [main, release]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Full regression (all modes / platforms)
+        run: bash tests/run_all.sh
+      - name: Copilot decomposition-gate smoke
+        run: bash copilot/plugins/decomposition-gate/tests/smoke_test.sh

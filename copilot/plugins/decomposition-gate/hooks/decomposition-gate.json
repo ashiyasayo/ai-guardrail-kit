@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "windows": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& '.\\.github\\hooks\\launch.ps1'\"",
+        "osx": "sh './.github/hooks/launch.sh'",
+        "linux": "sh './.github/hooks/launch.sh'"
+      }
+    ]
+  }
+}
