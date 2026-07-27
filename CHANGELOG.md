@@ -105,7 +105,9 @@ All notable changes to this project are documented in this file.
   正式分支安裝。新增 GitHub Actions CI（`.github/workflows/ci.yml`）於 `main`／
   `release` 的 push/PR 執行 `tests/run_all.sh` 與 copilot smoke test；`release`
   分支套用 ruleset：禁止直接 push／刪除／force push、須經 PR、且 `tests` 狀態檢查
-  通過才能合併。
+  通過才能合併。並將 GitHub 預設分支設為 `release`，使無 `--ref` 的 Claude
+  marketplace 安裝亦從正式分支取得。決策與後續維運見
+  `.docs/vault/decisions/2026-07-27-release-branch-publishing-model.md`。
 
 - 將 `integrated-harness/ORCHESTRATOR.md` 從完整調度教學精簡為治理政策，只保留
   人類授權、外部副作用、修改範圍、驗收證據、成本與失敗揭露；一般任務分解、
