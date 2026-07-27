@@ -146,10 +146,13 @@ codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git 
   --ref v0.1.0 --sparse .agents --sparse codex/plugins
 ```
 
-Claude Code 側，本專案文件所記載的
-`claude plugin marketplace add <url> --scope project --sparse ...` 未使用 ref 參數，
-實際取得的是預設分支（`main`）的內容。該 CLI 是否另有指定 ref 的能力，本專案**未
-查證**，故不提供釘版寫法。需要固定版本時，請 clone 指定 tag 後以 copy-in 方式安裝
+Claude Code 側，**已查證**`claude plugin marketplace add`
+不提供指定 ref／tag 的能力（`claude plugin marketplace add --help` 未列出對應參數），
+只能取得預設分支（`main`）最新內容。2026-07-27 已對 GitHub 遠端來源實機驗證：
+註冊、`claude plugin marketplace update` 刷新快取、`claude plugin install
+decomposition-gate@ai-guardrail-kit` 安裝，快取版本正確讀出 `0.2.0`、6 個檔案與
+執行權限位（`100755`）均與 repo 逐位元組一致，過程未見任何釘版選項。因此
+Claude 側需要固定版本時，請 clone 指定 tag 後以 copy-in 方式安裝
 （見 README「copy-in 安裝」）：
 
 ```bash
