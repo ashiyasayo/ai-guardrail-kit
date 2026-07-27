@@ -51,11 +51,27 @@
   只有「同一 commit 快照」答得出來。
 - 維護成本乘上單位數，使用者得不到對應收益。
 
-## 未查證事項（誠實標記）
+## 追記（2026-07-27）：GitHub 遠端安裝實機驗證，補上先前的未查證事項
 
-`claude plugin marketplace add` 是否支援指定 ref／tag，**未查證**。本專案文件記載
-的註冊指令未帶 ref，實際取得預設分支內容。因此 Claude 側的釘版寫法一律建議
-`git clone --branch <tag>` 後 copy-in，不假設 CLI 有釘版能力。
+原「未查證：`claude plugin marketplace add` 是否支援指定 ref／tag」**已查證並確認**：
+`claude plugin marketplace add --help` 未列出任何 ref／tag 參數，只能取得預設分支
+最新內容。同時對 GitHub 遠端來源做了完整安裝實測（在隔離的 scratchpad 測試專案）：
+
+- 從 `https://github.com/ashiyasayo/ai-guardrail-kit.git` 註冊 marketplace
+  （`--scope project --sparse .claude-plugin claude/plugins`），`settings.json`
+  正確記錄 `source: git`。
+- `claude plugin marketplace update` 將快取刷新到 `main` HEAD `08512f6`（與
+  `v0.1.0` 一致）。
+- `claude plugin install decomposition-gate@ai-guardrail-kit --scope project`
+  安裝成功；`claude plugin details` 讀出版號 `0.2.0`，與 `plugin.json` 一致。
+- 快取目錄下 6 個檔案（hook、`hooks.json`、`plugin.json`、拆解範本、2 份協定
+  文件）與 repo 原始碼**逐位元組比對全數一致**；`decomposition_gate.py` 的執行
+  權限位在快取中為 `100755`，與 `git ls-files -s` 記錄一致——證實 PR #1 的
+  exec-bit 修正在真實遠端安裝路徑中正確生效。
+
+結論：Claude 側釘版寫法（`git clone --branch <tag>` 後 copy-in）維持不變，且
+GitHub 遠端安裝路徑本身已驗證無誤。依使用者指示，測試留下的 marketplace 註冊與
+已安裝 plugin（僅套用於隔離測試目錄的 project scope）保留，未清除。
 
 ## 影響範圍
 
