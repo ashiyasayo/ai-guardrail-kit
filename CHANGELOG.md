@@ -2,7 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+版本語意、各平台版號載體差異與發版流程見 [`VERSIONING.md`](VERSIONING.md)。
+發布座標是 Git tag `vX.Y.Z`；Claude plugin 的 `plugin.json` 版號是該模式自身的
+行為版本，不等於 repo 版本。
+
 ## [Unreleased]
+
+## [0.1.0] - 2026-07-27
+
+首個標記版本。`0.x` 表示 Preview，不承諾相容性——Copilot 側依賴仍為 Preview 的
+VS Code Agent hooks，且 macOS／Linux 路徑尚未實機驗證。以下彙整此標記點之前的
+全部變更。
+
+> 本節部分條目為 Codex／Copilot 的 plugin 敘述過版號，但這兩個平台的 plugin
+> 格式並無版號欄位，那些數字沒有檔案承載、不具查證性。條目作為歷史記錄保留，
+> 自本版起不再為 Codex／Copilot 宣稱版號（見 `VERSIONING.md`）。
 
 ### Added
 
@@ -205,3 +219,6 @@ All notable changes to this project are documented in this file.
 - The global plan gate defers only while a project has no decomposition plan;
   once a plan exists, normal integrated-harness scope, policy, and approval
   checks apply.
+
+[Unreleased]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/ashiyasayo/ai-guardrail-kit/releases/tag/v0.1.0

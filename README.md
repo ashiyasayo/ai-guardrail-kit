@@ -38,6 +38,8 @@ Python 3.9+，不可沿用下列 Claude copy-in 安裝步驟。
 codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref main --sparse .agents --sparse codex/plugins
 ```
 
+`--ref main` 取得最新主幹；若要固定在某個發布版本，改指 tag（例如 `--ref v0.1.0`），
+版本語意見 [`VERSIONING.md`](VERSIONING.md)。
 `--sparse .agents --sparse codex/plugins` 下載 marketplace manifest 與 plugin 套件。註冊後請依照
 [`docs/codex-marketplace.md`](docs/codex-marketplace.md) 使用 selector 選擇並啟用其中一種模式；也可先安裝
 單一 plugin，例如：
@@ -121,6 +123,18 @@ cp copilot/plugins/decomposition-gate/plan/decomposition.template.md your-projec
 `"chat.hookFilesLocations": { ".github/hooks": true }`，Reload Window。僅 Copilot
 Agent mode 生效；Windows 已實機驗證，macOS／Linux 未驗。完整說明與限制見
 [`copilot/plugins/decomposition-gate/README.md`](copilot/plugins/decomposition-gate/README.md)。
+
+## 版本與發布
+
+**Git tag `vX.Y.Z` 是本專案唯一的發布座標**，涵蓋三個平台。完整規則見
+[`VERSIONING.md`](VERSIONING.md)，重點如下：
+
+- 目前為 `0.x`（Preview），不承諾相容性：Copilot 依賴的 VS Code Agent hooks 仍是
+  Preview，且 macOS／Linux 路徑未實機驗證。
+- **只有 Claude 的 plugin 有版號欄位**（`.claude-plugin/plugin.json`），它代表該模式
+  自身的行為版本，**不等於** repo 版本；Codex 與 Copilot 的 plugin 格式沒有版號欄位，
+  一律以 repo tag 指稱版本。
+- 釘版本：Codex 用 `--ref v0.1.0`；Claude／Copilot 請 clone 指定 tag 後 copy-in。
 
 ## 移除 Plugin
 

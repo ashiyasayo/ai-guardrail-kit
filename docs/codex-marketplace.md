@@ -16,6 +16,11 @@ a mode for a project from a local checkout of this repository:
 codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref main --sparse .agents --sparse codex/plugins
 ```
 
+`--ref main` tracks the trunk. To pin a released snapshot, point `--ref` at a
+release tag instead (for example `--ref v0.1.0`). Codex plugins carry no version
+field of their own; the repository tag is the only release coordinate. See
+[`../VERSIONING.md`](../VERSIONING.md).
+
 For local development, register the local marketplace instead:
 
 ```bash

@@ -36,6 +36,20 @@ Claude 的 `PreToolUse` dispatcher 先執行秘密檢查，再執行個資遮罩
 OCR 引擎。二進位附件與影像內容的抽取、OCR、檔案型別驗證及隔離，仍屬後續
 `scan-and-redact` 附件掃描層的範圍。
 
+## 版號載體的不對稱
+
+三個平台的 plugin 格式不同，能承載版號的欄位也不同——這是結構事實，不是疏漏：
+
+| 平台 | 版號載體 |
+| --- | --- |
+| Claude Code | `claude/plugins/<mode>/.claude-plugin/plugin.json` 的 `version`（平台介面欄位） |
+| Codex | 無（plugin 目錄僅 `hooks/`、`skills/` 等內容） |
+| GitHub Copilot | 無（設定為 `.github/hooks/*.json`，格式無版號欄位） |
+
+因此發布座標統一為 **repo 的 Git tag**，而非 per-plugin 版號；本專案刻意不為
+Codex／Copilot 另建版號檔案，以免產生無平台讀取、無機制同步的第二套真相來源。
+語意與發版流程見 [`VERSIONING.md`](VERSIONING.md)。
+
 ## GitHub Copilot (VS Code) 平台移植（Preview，部分）
 
 第三平台移植的第一個模式為 `decomposition-gate`，位於
