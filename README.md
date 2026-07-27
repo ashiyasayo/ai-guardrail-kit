@@ -35,7 +35,7 @@ Python 3.9+，不可沿用下列 Claude copy-in 安裝步驟。
 從 GitHub 註冊 Codex marketplace：
 
 ```bash
-codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref main --sparse .agents --sparse codex/plugins
+codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref release --sparse .agents --sparse codex/plugins
 ```
 
 `--sparse .agents --sparse codex/plugins` 下載 marketplace manifest 與 plugin 套件。註冊後請依照

@@ -13,7 +13,7 @@ Use Codex and Python 3.9 or newer. Register the GitHub marketplace, then select
 a mode for a project from a local checkout of this repository:
 
 ```bash
-codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref main --sparse .agents --sparse codex/plugins
+codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref release --sparse .agents --sparse codex/plugins
 ```
 
 For local development, register the local marketplace instead:
