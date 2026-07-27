@@ -100,6 +100,13 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- 正式發布分支改為 `release`：`README.md` 與 `docs/codex-marketplace.md` 的 Codex
+  marketplace 註冊指令 `--ref` 由 `main` 改為 `release`，使 Codex 使用者從受保護的
+  正式分支安裝。新增 GitHub Actions CI（`.github/workflows/ci.yml`）於 `main`／
+  `release` 的 push/PR 執行 `tests/run_all.sh` 與 copilot smoke test；`release`
+  分支套用 ruleset：禁止直接 push／刪除／force push、須經 PR、且 `tests` 狀態檢查
+  通過才能合併。
+
 - 將 `integrated-harness/ORCHESTRATOR.md` 從完整調度教學精簡為治理政策，只保留
   人類授權、外部副作用、修改範圍、驗收證據、成本與失敗揭露；一般任務分解、
   模型選擇及代理調度改由 Claude／Codex 平台自行決定。Claude 的政策範本同步移除
