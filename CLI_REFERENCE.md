@@ -32,6 +32,35 @@ codex plugin marketplace add "$(pwd)"
 ./scripts/verify-codex-mode --no-managed-mode /path/to/project
 ```
 
+## 釘版本與發版
+
+從 GitHub 註冊 Codex marketplace 時，以 `--ref` 選擇來源快照：
+
+```bash
+# 最新主幹
+codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref main --sparse .agents --sparse codex/plugins
+
+# 固定在某個發布版本
+codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref v0.1.0 --sparse .agents --sparse codex/plugins
+```
+
+Claude／Copilot 需固定版本時，clone 指定 tag 後 copy-in：
+
+```bash
+git clone --depth 1 --branch v0.1.0 https://github.com/ashiyasayo/ai-guardrail-kit.git
+```
+
+維護者發版（`main` 受保護，CHANGELOG 定版須走 PR，合併後才打 tag）：
+
+```bash
+git switch main && git pull
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push origin vX.Y.Z
+gh release create vX.Y.Z --title "vX.Y.Z" --notes "<該版 CHANGELOG 段落>"
+```
+
+版本語意與各平台版號載體差異見 [`VERSIONING.md`](VERSIONING.md)。
+
 ## sensitive-data-guard 行為
 
 - 阻擋寫入內容或命令中的明文密碼、API Key、Token 與憑證。
