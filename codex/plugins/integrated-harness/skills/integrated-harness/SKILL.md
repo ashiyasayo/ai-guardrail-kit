@@ -12,6 +12,13 @@ orchestrate agents. Platform-native planning and delegation remain available but
 must not bypass authorization, external-side-effect, validation, cost, or failure
 disclosure requirements.
 
+Keep user-facing progress concise: update only for important findings, blockers,
+or direction changes, and lead the final response with the outcome. Delegate only
+work that is sizeable, genuinely independent, and parallelizable. Do not spawn an
+agent for a task that takes only a handful of tool calls, or solely to re-check the
+primary agent's work. Match validation depth to risk and observable impact; do not
+repeat checks without new evidence.
+
 Deterministic denials do not become approvable. Light mode may allow a provably
 scoped `apply_patch`, while a mutating `exec_command` still asks. Obtain explicit
 human authorization before production or shared-infrastructure changes,

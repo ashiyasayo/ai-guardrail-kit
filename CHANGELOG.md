@@ -8,6 +8,27 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- 新增根目錄 `AGENTS.md`，將每次變更必須盤點並同步所有平台、模式與發佈型態
+  設為專案級代理規則；`ARCHITECTURE.md` 新增多版本來源、入口與一致性保障矩陣，
+  並以 vault 決策記錄規則、架構文件及 CI 測試三層契約。此項只改變專案維護流程，
+  不改變 plugin 執行行為或版號。
+
+### Changed
+
+- Claude `decomposition-gate` 的 copy-in 與 marketplace 推理協定同步改為相同的
+  風險分級規則，移除每次固定三方案、兩次反駁及信心標示；新增 SessionStart hook，
+  修正 marketplace 雖打包協定卻未實際載入的缺口。Claude plugin 版號由 0.2.0
+  升為 0.3.0。Codex `integrated-harness` skill 亦加入相同的精簡播報、低委派與
+  風險相稱驗證規則；deprecated 的歷史 Fable 提示稿明確標示不會被執行流程載入。
+
+- Claude `integrated-harness` 的 SessionStart 推理協定改為風險分級：進度只在重要
+  發現、阻礙或方向改變時更新；一般與機械性工作不再強制對抗式審查或信心標示；
+  subagent 僅用於具一定規模且可真正獨立並行的工作，不再用於小型任務或單純複核；
+  並避免沒有新證據的重複檢查。copy-in 與 marketplace 協定同步更新，治理授權與
+  確定性 hooks 行為不變。Claude `integrated-harness` plugin 版號由 0.5.0 升為 0.6.0。
+
 ## [0.1.0] - 2026-07-27
 
 首個標記版本。`0.x` 表示 Preview，不承諾相容性——Copilot 側依賴仍為 Preview 的

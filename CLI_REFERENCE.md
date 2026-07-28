@@ -74,6 +74,13 @@ gh release create vX.Y.Z --title "vX.Y.Z" --notes "<該版 CHANGELOG 段落>"
 決定工作策略，但仍須遵守計畫與核准、外部副作用、敏感資料、成本、驗收及失敗揭露
 規則。`harness` 不提供編排功能；其歷史編排提示稿已 deprecated。
 
+Claude 版會在 SessionStart 載入風險分級的執行協定：精簡進度更新、避免無新證據的
+重複驗證，並將 subagent 限制於具一定規模且可真正獨立並行的工作。這不會放寬任何
+計畫、核准或安全 hook。
+
+Claude `decomposition-gate` 的 copy-in 與 marketplace 版本同樣會在 SessionStart
+載入風險分級協定；安裝或更新後必須開啟新 session 才會套用。
+
 完整 marketplace 生命週期與限制請見
 [`docs/claude-marketplace.md`](docs/claude-marketplace.md) 與
 [`docs/codex-marketplace.md`](docs/codex-marketplace.md)。

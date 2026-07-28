@@ -337,8 +337,9 @@ fail-closed 預設與六種現有行為的相容測試。
 
 以 PreToolUse hook 封鎖寫入類工具，直到 Claude 完成任務拆解並寫入
 `.claude/plan/decomposition.md`（須含「已知資訊」「缺少的資訊」與至少一個
-`【假設】` 標記）。搭配「深廣思考協定」五階段（拆解 → 探索 → 深化 →
-對抗式審查 → 輸出前驗證）。
+`【假設】` 標記）。Claude copy-in 與 marketplace 版本皆在 SessionStart 載入
+風險分級協定：依任務風險調整分析、播報、subagent 委派與驗證深度，避免小型工作
+被固定多方案、反方審查或重複驗證放大。
 
 - 屬「流程紀律」而非「授權控制」：拆解文件可由模型自行完成，不能視為
   人工審批或安全沙箱。
@@ -371,6 +372,11 @@ fail-closed 預設與六種現有行為的相容測試。
 `strict`／`standard`／`light` 三種核准模式（由人類在政策檔設定，模型不得修改）。政策檔以
 專案 `.claude/orchestration-policy.md` 優先，專案檔不存在時讀取個人層級
 `~/.claude/orchestration-policy.md`，兩處皆無一律回落 `strict`。
+
+Claude 的 SessionStart 推理協定另採風險分級校準：進度只在重要發現、阻礙或方向改變
+時更新；一般與機械性工作不強制對抗式審查或信心標示；小型工作與單純複核不啟動
+subagent；驗證深度依風險調整，避免沒有新證據的重複檢查。這些是執行行為提示，
+不改變 `ORCHESTRATOR.md`、政策檔及 hooks 的授權與安全邊界。
 
 - 適用：多人協作、高風險資料、正式系統，以及需要稽核軌跡的專案。
 - 除本目錄自帶的 `tests/` 外，儲存庫根層 `tests/` 的回歸測試涵蓋

@@ -88,6 +88,28 @@ integrated_root = root / "claude/plugins/integrated-harness"
 assert approval_command in (integrated_root / "orchestration-policy.md").read_text()
 assert approval_command in (integrated_root / "hooks/plan_gate.py").read_text()
 
+decomposition_copyin = root / "decomposition-gate"
+decomposition_plugin = root / "claude/plugins/decomposition-gate"
+for relative in (
+    "reasoning-protocol.md",
+    "reasoning-protocol-subagent.md",
+    "hooks/inject_protocol.py",
+):
+    copyin_path = decomposition_copyin / (".claude/" + relative)
+    plugin_path = decomposition_plugin / relative
+    assert copyin_path.read_bytes() == plugin_path.read_bytes(), (
+        f"decomposition protocol drift: {relative}"
+    )
+decomposition_hooks = json.loads(
+    (decomposition_plugin / "hooks/hooks.json").read_text()
+)["hooks"]
+assert "SessionStart" in decomposition_hooks
+assert any(
+    "inject_protocol.py" in hook["command"]
+    for group in decomposition_hooks["SessionStart"]
+    for hook in group["hooks"]
+)
+
 guide_path = root / "docs/claude-marketplace.md"
 assert guide_path.is_file(), f"missing {guide_path.relative_to(root)}"
 guide = guide_path.read_text()

@@ -1,8 +1,12 @@
-# Decomposition Gate — 深廣思考協定的 Claude Code 硬性關卡
+# Decomposition Gate — 風險分級思考協定的 Claude Code 硬性關卡
 
-將「深廣思考協定」從軟性提示（prompt）升級為 Claude Code 的硬性流程關卡。
+將「風險分級思考協定」從軟性提示（prompt）升級為 Claude Code 的硬性流程關卡。
 在 Claude 完成任務拆解（decomposition）之前，透過 PreToolUse hook 封鎖所有
 寫入類工具，強制它「先想清楚、再動手」。
+
+SessionStart 會載入協定，依任務風險調整分析、進度播報、subagent 委派及驗證深度：
+一般與機械性工作不強制多方案或反方審查，小型工作不委派，也不做沒有新證據的
+重複驗證。
 
 ## 功能與用途分析
 
@@ -45,10 +49,11 @@ decomposition-gate/
 ├── CLAUDE.md                              # 專案指引範本（引用思考協定 + 定義關卡流程）
 ├── .claude/
 │   ├── settings.json                      # PreToolUse hook 設定
-│   ├── reasoning-protocol.md              # 深廣思考協定完整版（Opus/Sonnet）
-│   ├── reasoning-protocol-subagent.md     # 精簡版（Haiku/subagent）
+│   ├── reasoning-protocol.md              # 風險分級思考協定
+│   ├── reasoning-protocol-subagent.md     # subagent 精簡協定
 │   ├── hooks/
-│   │   └── decomposition_gate.py           # PreToolUse hook 主程式
+│   │   ├── decomposition_gate.py           # PreToolUse hook 主程式
+│   │   └── inject_protocol.py              # SessionStart 協定注入
 │   └── plan/
 │       └── decomposition.template.md       # 拆解產出物範本
 └── tests/
