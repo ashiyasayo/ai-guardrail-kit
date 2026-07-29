@@ -24,6 +24,10 @@ for section in 1 2 3 4 5 6 7; do
   require "$ROOT/ORCHESTRATOR.md" "## $section\." "治理政策包含第 $section 節"
 done
 require "$ROOT/ORCHESTRATOR.md" '不教導模型如何思考' '治理政策不承擔模型調度教學'
+require "$ROOT/.claude/reasoning-protocol.md" '工作期間僅在重要發現' '主協定限制進度播報'
+require "$ROOT/.claude/reasoning-protocol.md" '少量工具呼叫可完成的任務不委派' '主協定限制小型任務委派'
+require "$ROOT/.claude/reasoning-protocol.md" '不要求沒有新證據的重複檢查' '主協定限制重複驗證'
+require "$ROOT/.claude/reasoning-protocol-subagent.md" '一般與機械性工作不得為滿足形式' 'subagent 協定採風險分級'
 if python3 - "$ROOT" <<'PY'
 import json
 import pathlib
@@ -124,11 +128,15 @@ install_section = readme.split(install_heading, 1)[1].split("\n## ", 1)[0]
 for install_item in (".claude/", "CLAUDE.md", "ORCHESTRATOR.md"):
     assert install_item in install_section
 assert "## Strict Bash 測試與建置 Allowlist" in policy
+repo_root = root.parent
+plugin_root = repo_root / "claude/plugins/integrated-harness"
+for protocol in ("reasoning-protocol.md", "reasoning-protocol-subagent.md"):
+    assert (root / ".claude" / protocol).read_bytes() == (plugin_root / protocol).read_bytes()
 PY
 then
-  printf 'PASS: 入口與安裝結構契約\n'
+  printf 'PASS: 入口、安裝與協定同步契約\n'
 else
-  printf 'FAIL: 入口與安裝結構契約\n'
+  printf 'FAIL: 入口、安裝與協定同步契約\n'
   fail=$((fail + 1))
 fi
 

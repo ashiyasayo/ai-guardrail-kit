@@ -37,6 +37,8 @@
 - `ORCHESTRATOR.md`：精簡治理政策；規範授權、外部副作用、驗收、成本與失敗揭露。
 - `MAINTENANCE.md`：各章理由、被否決方案、修改時機與已知限制。
 - `.claude/reasoning-protocol*.md`：orchestrator 與 subagent 的推理／驗證協定。
+  協定依風險調整進度播報、對抗式審查、信心標示與驗證深度；只在具一定規模且可
+  真正獨立並行時委派 subagent，不以代理重做或複核主要代理的工作。
 - `.claude/orchestration-policy.md`：由人類設定成本門檻與環境授權。
 - `.claude/hooks/`：計畫、人類核准、憑證及危險命令硬性關卡。`settings.json` 只掛載
   `guard.py` 統一進入點，於單一直譯器行程內依序執行三道檢查（危險指令 → 憑證 →

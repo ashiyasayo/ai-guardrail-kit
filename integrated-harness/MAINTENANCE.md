@@ -25,6 +25,9 @@
   涉及正式環境、個資或共享基礎設施的專案應維持 `strict`。
 - 新的失敗模式實際發生：先補可重現測試，再修改最接近的單一章節。
 - 驗收流程改變：更新第 5 節；不要藉機擴張允許的工作範圍。
+- 模型出現過度播報、重複驗證或不必要委派：修改 `reasoning-protocol*.md` 的風險
+  分級，不把模型世代或供應商名稱寫進 `ORCHESTRATOR.md`；copy-in 與 marketplace
+  兩份協定必須同步。
 - Hook 規則改變：hook 是確定性規則的單一事實來源；正文只引用 hook 的責任，
   不複製 regex 或實作細節。
 - `harness/` 與 `integrated-harness/` 是能力不同的產品，不要求 hooks 逐行同步。共同

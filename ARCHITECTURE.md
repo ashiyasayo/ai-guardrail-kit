@@ -12,10 +12,40 @@
 四種模式是互斥的產品邊界，不是可任意疊加的 feature flags。Claude 與
 Codex selector 會移除其他受管模式，再安裝並驗證目標模式。
 
+Claude `decomposition-gate` 的 copy-in 與 marketplace 發佈皆由 SessionStart 載入
+同一份風險分級協定；同步測試守護主協定、subagent 協定及注入 hook。Codex
+`integrated-harness` 則由 plugin skill 提供對等的執行行為校準。
+
+## 多版本一致性架構
+
+每次功能變更都必須以「平台 × 模式 × 發佈型態」盤點影響範圍；根目錄
+`AGENTS.md` 定義代理的施作與交付義務，本節記錄各版本的結構關係，CI 測試負責
+確定性阻止副本漂移。檔案名稱或實作語言不同不代表行為契約不同。
+
+| 平台 | 模式 | 發佈型態 | 主要來源或入口 | 一致性保障 |
+| --- | --- | --- | --- | --- |
+| Claude | `decomposition-gate` | copy-in、marketplace | `decomposition-gate/.claude/`、`claude/plugins/decomposition-gate/` | 協定與注入 hook 逐位元組比對、marketplace 結構測試、smoke test |
+| Claude | `sensitive-data-guard` | marketplace | `shared/claude/`、`claude/plugins/sensitive-data-guard/` | shared 同步檢查及 PII 行為測試 |
+| Claude | `harness` | copy-in、marketplace | `shared/claude/`、`harness/.claude/`、`claude/plugins/harness/` | shared 同步、copy-in parity 及 hook 行為測試 |
+| Claude | `integrated-harness` | copy-in、marketplace | `shared/claude/`、`integrated-harness/`、`claude/plugins/integrated-harness/` | 協定同步、copy-in parity、orchestration 與 hook 行為測試 |
+| Codex | 四種模式 | marketplace／selector | `shared/codex/`、`codex/plugins/`、`scripts/codex-mode-lib.sh` | shared 同步、marketplace、mode switch 及 guardrail 測試 |
+| Codex | `integrated-harness` | global install | `codex/plugins/integrated-harness/`、global installer | global install 交易與 rollback 測試 |
+| Copilot | `decomposition-gate` | copy-in | `copilot/plugins/decomposition-gate/` | Copilot smoke test；Preview 平台限制另見相關文件 |
+
+若某次變更對矩陣中的版本不適用，交付說明必須列出該版本及原因。已有 `shared/`
+單一事實來源的功能一律先改來源再同步；無法共用檔案者以共同測試語料驗證行為，
+不得依靠人工記憶維持一致。
+
 `integrated-harness` 的 `ORCHESTRATOR.md` 不負責教導一般任務分解、模型路由或
 代理調度；這些工作交由平台與模型。文件只保留人類授權、外部副作用、修改範圍、
 驗收證據、成本與失敗揭露。`harness/fable-orchestrator-prompt.md` 是 deprecated
 相容資產，不再是產品功能或建議工作流程。
+
+Claude `integrated-harness` 的執行行為校準位於 `reasoning-protocol.md` 與
+`reasoning-protocol-subagent.md`，由 SessionStart hook 注入。它依工作風險控制
+播報、對抗式審查、信心標示、驗證深度及 subagent 委派；治理授權仍只由
+`ORCHESTRATOR.md`、政策檔與確定性 hooks 決定。copy-in 與 marketplace 版本的兩份
+協定必須逐字節一致。
 
 ## sensitive-data-guard 資料流
 
