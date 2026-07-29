@@ -8,6 +8,18 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-29
+
+### Fixed
+
+- Claude `integrated-harness` 的計畫閘門（`plan_gate.py`）在 strict 模式核准失敗時，
+  deny 訊息內嵌字面文字 `${CLAUDE_PLUGIN_ROOT}`，要求人類在自己的終端機貼上執行；
+  該環境變數只在 Claude Code 內部工具執行環境展開，人類自己開的終端機沒有這個變數，
+  貼上執行會展開成空字串，導致 `approve_plan.py` 的路徑退化成無效目錄、無法核准
+  計畫。改為以 `__file__` 動態算出 `approve_plan.py` 的絕對路徑，讓訊息中的指令可
+  直接複製貼上執行；`orchestration-policy.md` 範本說明與相關 parity 測試同步更新。
+  Claude `integrated-harness` plugin 版號由 0.6.0 升為 0.6.1。
+
 ## [0.2.0] - 2026-07-29
 
 ### Added
