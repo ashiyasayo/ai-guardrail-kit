@@ -12,6 +12,7 @@ ROOT="$ROOT" python3 - <<'PY'
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -64,9 +65,12 @@ def run(hook, data, project, home=None):
 def normalize(result):
     status, decision, reason, stdout, stderr = result
     if reason is not None:
-        reason = reason.replace(
-            'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/approve_plan.py"',
-            "python3 .claude/hooks/approve_plan.py",
+        # 開發版用相對路徑、封裝版用動態絕對路徑，兩者實際指令不同但等價；
+        # 比對前抹除路徑差異，只留 approve_plan.py 呼叫本身。
+        reason = re.sub(
+            r'python3\s+"?[^`]*approve_plan\.py"?',
+            "python3 approve_plan.py",
+            reason,
         )
     return status, decision, reason, stdout, stderr
 

@@ -83,10 +83,19 @@ for mode in modes:
                     f"checkout-dependent hook path in {runtime_file.relative_to(root)}"
                 )
 
-approval_command = 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/approve_plan.py"'
+# ${CLAUDE_PLUGIN_ROOT} 只在 Claude Code 內部工具執行環境展開；若字面出現在給人類
+# 貼到自己終端機執行的核准指令中，會展開成空字串並讓 approve_plan.py 找不到檔案
+# （已回報的實際故障）。hooks.json 裡給 Claude Code 內部呼叫用的 ${CLAUDE_PLUGIN_ROOT}
+# 不受影響、不在此檢查範圍。
+misleading_literal = 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/approve_plan.py"'
 integrated_root = root / "claude/plugins/integrated-harness"
-assert approval_command in (integrated_root / "orchestration-policy.md").read_text()
-assert approval_command in (integrated_root / "hooks/plan_gate.py").read_text()
+assert misleading_literal not in (integrated_root / "orchestration-policy.md").read_text()
+assert misleading_literal not in (integrated_root / "hooks/plan_gate.py").read_text()
+# plan_gate.py 改為在執行當下用 __file__ 動態算出 approve_plan.py 的絕對路徑，
+# 確保訊息裡的指令可以讓人類直接複製貼上執行。
+plan_gate_source = (integrated_root / "hooks/plan_gate.py").read_text()
+assert "os.path.dirname(os.path.abspath(__file__))" in plan_gate_source
+assert '"approve_plan.py"' in plan_gate_source
 
 decomposition_copyin = root / "decomposition-gate"
 decomposition_plugin = root / "claude/plugins/decomposition-gate"

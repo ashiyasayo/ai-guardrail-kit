@@ -324,9 +324,13 @@ def check(data: dict) -> Optional[str]:
         return None
     passed, reason = check_approval(root)
     if not passed:
+        # 直接印出絕對路徑，而非 ${CLAUDE_PLUGIN_ROOT} 字面文字：
+        # 該變數只在 Claude Code 內部工具執行環境展開，人類自己的終端機沒有這個變數，
+        # 貼上字面文字會讓路徑退化成無效目錄（見 issue：approve_plan.py 找不到檔案）。
+        approve_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "approve_plan.py")
         return (
             f"計畫閘門：{reason} 請由人類審查計畫後執行 "
-            '`python3 "${CLAUDE_PLUGIN_ROOT}/hooks/approve_plan.py"`。（Windows 環境無 python3 時改用 python）'
+            f'`python3 "{approve_script}"`。（Windows 環境無 python3 時改用 python）'
         )
     return None
 

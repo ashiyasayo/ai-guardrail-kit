@@ -13,10 +13,12 @@ cd "$(dirname "$0")/.."
 # claude_shared_sync_test.sh 以 shared/claude 守護，不在此重複）。
 #
 # 唯一合法差異：integrated-harness 的 plan_gate.py 核准命令訊息——copy-in 指向
-# .claude/hooks/approve_plan.py，plugin 指向 ${CLAUDE_PLUGIN_ROOT}/hooks/approve_plan.py。
-# 此差異無法消除（claude_marketplace_test.sh 釘死 plugin 用 CLAUDE_PLUGIN_ROOT，
-# copy-in 需自身路徑），故以「單一連續差異區塊且涉及 approve_plan.py」精確放行，
-# 其餘任何位置的差異都視為漂移而失敗。
+# 相對路徑 .claude/hooks/approve_plan.py，plugin 指向以 __file__ 動態算出的
+# 絕對路徑（避免 ${CLAUDE_PLUGIN_ROOT} 字面文字——該變數只在 Claude Code 內部
+# 工具執行環境展開，人類自己的終端機沒有這個變數，貼上字面文字會展開成空字串
+# 導致 approve_plan.py 找不到檔案，見已修復的實際故障）。此差異無法消除（copy-in
+# 與 plugin 的安裝位置不同，需各自算出可執行的路徑），故以「單一連續差異區塊且
+# 涉及 approve_plan.py」精確放行，其餘任何位置的差異都視為漂移而失敗。
 python3 - <<'PY'
 import difflib
 import pathlib

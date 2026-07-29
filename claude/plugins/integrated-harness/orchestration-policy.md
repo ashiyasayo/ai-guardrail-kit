@@ -19,8 +19,12 @@ permissions 與 hook 支援，不會自動受到同等保護。
 `light`：基本拆解，免人工核准；只提供思考紀律，不提供授權控制。
 缺少本欄位或值無法辨識時，一律視為 `strict`。
 
-`strict` 下由人類執行 `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/approve_plan.py"`（Windows 環境無 `python3` 時改用 `python`）；核准紀錄綁定
-目前拆解文件的 SHA-256，有效期間為 60 分鐘。三種模式均不豁免憑證與危險命令 hooks。
+`strict` 下由人類在自己的終端機執行 `approve_plan.py` 核准；**注意**：`${CLAUDE_PLUGIN_ROOT}`
+只在 Claude Code 內部工具執行環境展開，人類自己開的終端機沒有這個變數，請勿直接貼上
+`${CLAUDE_PLUGIN_ROOT}` 字面文字。實際可執行的絕對路徑會顯示在計畫閘門的 deny 訊息中
+（例如 `` `python3 "<plugin_root>/hooks/approve_plan.py"` ``，Windows 環境無 `python3` 時
+改用 `python`），複製該訊息中的指令執行即可；核准紀錄綁定目前拆解文件的 SHA-256，有效期間
+為 60 分鐘。三種模式均不豁免憑證與危險命令 hooks。
 
 下方 allowlist 只允許啟動列出的測試／建置入口；不得包含 pipe、redirect、多命令串接、
 command substitution 或環境變數指派前綴。入口內部仍受 permissions、sandbox 與
