@@ -8,11 +8,11 @@
 | 項 | 主題 | 狀態 |
 | --- | --- | --- |
 | 1 | `UserPromptSubmit` 輸出形狀 | 未實機驗證，待處理 |
-| 2 | Claude／Codex 測試稽核 | 已稽核：路徑問題不適用；斷言問題確認成立，正在修 |
+| 2 | Claude／Codex 測試稽核 | **已關閉**：路徑問題不適用；斷言問題已修復並驗證 |
 | 3 | 排程豁免的環境變數 | 已緩解（改用 `standard` 政策），判定條件仍未修好 |
 
-三者都不阻擋目前發布，但都不該被「全綠」掩蓋。待辦 2 與 3 都已有部分結論，
-**但兩項的核心問題都還沒關閉**——詳見各節。
+三者都不阻擋目前發布，但都不該被「全綠」掩蓋。待辦 2 已於 2026-08-03 關閉；
+待辦 1 與 3 的核心問題仍開著（3 已緩解但未根治）——詳見各節。
 
 ## 待辦 1：`UserPromptSubmit` 輸出形狀尚未實機驗證
 
@@ -39,7 +39,7 @@
 背景見 [[2026-07-31-copilot-sensitive-data-guard]] 與
 [[2026-07-23-vscode-copilot-hook-wiring]]（fail-open 鐵律）。
 
-## 待辦 2：Claude／Codex 測試稽核（已完成，兩個查核點結論不同）
+## 待辦 2：Claude／Codex 測試稽核（已關閉，2026-08-03）
 
 Copilot smoke test 的 Windows 假性通過已修復，當時刻意未擴大檢查範圍到 Claude 與
 Codex 的測試。**稽核已於 2026-08-03 完成**，兩個查核點結論分歧：
@@ -47,7 +47,7 @@ Codex 的測試。**稽核已於 2026-08-03 完成**，兩個查核點結論分�
 | 查核點 | 結論 |
 | --- | --- |
 | POSIX 臨時路徑經 stdin | **不適用**。Claude／Codex 測試使用 Python `tempfile.TemporaryDirectory()` ＋進程內 `subprocess.run(input=...)`，不經 Git Bash 的原生執行檔通道，不構成同一根因鏈。 |
-| 「應被 deny」斷言只比對 `deny` | **確認成立**。`tests/claude_guardrail_test.sh` 的 `assert_denied()` 只檢查 `result[0] == 2 or result[1] == "deny"`；`tests/codex_guardrail_test.sh` 多處 `denied()` 呼叫未接住回傳的 reason。已有獨立拆解在處理。 |
+| 「應被 deny」斷言只比對 `deny` | **確認成立，已修復**。`tests/claude_guardrail_test.sh` 的 `assert_denied()` 只檢查 `result[0] == 2 or result[1] == "deny"`；`tests/codex_guardrail_test.sh` 多處 `denied()` 呼叫未接住回傳的 reason。已分別為 10 處與 16 處呼叫補上原因專屬片段，`reason_contains` 改為必填參數，全套回歸 18/18 通過。 |
 
 值得記下的是這兩點的關係：**當初把它們綁成一項是對的判斷**。若只查路徑問題，
 會因為「不適用」而收工，漏掉真正存在的斷言問題——而斷言問題才是讓缺陷長期隱形的
@@ -71,8 +71,17 @@ Windows Python 的測試都會中同一個坑。危險的不是失敗，而是**
 **不要因為「全綠」就判定沒事**，那正是 Copilot 那次長期無人察覺的原因。
 本次結果證實了這點：測試全綠，斷言問題依然存在。
 
-完整根因與診斷時踩到的二次陷阱（換通道驗證等於換掉受測條件）見
-[[2026-07-31-git-bash-posix-path-via-stdin]]，其「適用範圍」段落已預先標記本項。
+**收緊斷言後挖出的真實假性通過（本項關閉的實質收穫）：**
+`claude_guardrail_test.sh` 原本以 `plan.read_text() + "changed\n"` 模擬「計畫變動後
+核准應失效」，但那行純文字落在 `## 允許修改範圍` 區段內，`parse_scopes` 先以
+「允許修改範圍必須使用 Markdown 清單」攔截——**SHA-256 比對路徑從未被執行**，
+斷言卻因為「有 deny」而長期綠燈。改成附加合法清單項目後才真正驗到「拆解文件與
+核准版本不一致」。另發現 Claude 的 `harness` 版 `plan_gate` 以 exit code 2 ＋ stderr
+回饋原因而不輸出 JSON，故 reason 比對必須同時涵蓋 stderr。
+
+完整根因、診斷時踩到的二次陷阱（換通道驗證等於換掉受測條件），以及上述兩項加固
+教訓，均見 [[2026-07-31-git-bash-posix-path-via-stdin]]；其「適用範圍」段落已更新為
+本次稽核的結論。
 
 ## 待辦 3：排程豁免依賴的環境變數，實測並不存在（已緩解，未根治）
 
