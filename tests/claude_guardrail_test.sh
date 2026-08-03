@@ -85,8 +85,17 @@ def assert_pair(legacy, packaged, data, project, home=None):
     return old
 
 
-def assert_denied(result):
+def assert_denied(result, reason_contains):
+    """驗證 deny 決策，並要求原因含指定片段。
+
+    只比對 deny 會讓任何無關原因造成的普遍性攔截（例如 cwd 解析失敗）
+    也滿足斷言，即使受測關卡完全失效仍是綠燈；故 reason 為必填。
+    """
     assert result[0] == 2 or result[1] == "deny", result
+    # 攔截原因可能來自 JSON 的 permissionDecisionReason，或 exit code 2 的 stderr
+    # 回饋（harness 版 plan_gate 走後者），兩處都要納入比對。
+    detail = (result.reason or "") + result.stderr
+    assert reason_contains in detail, (reason_contains, result)
 
 
 def assert_allowed(result):
@@ -109,19 +118,31 @@ with tempfile.TemporaryDirectory() as td:
 
     legacy_dg = root / "decomposition-gate/.claude/hooks/decomposition_gate.py"
     packaged_dg = root / "claude/plugins/decomposition-gate/hooks/decomposition_gate.py"
-    assert_denied(assert_pair(legacy_dg, packaged_dg, event(project), project))
+    assert_denied(
+        assert_pair(legacy_dg, packaged_dg, event(project), project),
+        "找不到拆解產出物",
+    )
     plan = project / ".claude/plan/decomposition.md"
     plan.write_text("## 已知資訊\n## 缺少的資訊\n")
-    assert_denied(assert_pair(legacy_dg, packaged_dg, event(project), project))
+    assert_denied(
+        assert_pair(legacy_dg, packaged_dg, event(project), project),
+        "拆解產出物不完整",
+    )
     plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】none\n")
     assert_allowed(assert_pair(legacy_dg, packaged_dg, event(project), project))
 
+    # 兩種模式此時的攔截原因不同：harness 缺核准旗標，integrated-harness 另要求
+    # 拆解含 `## 允許修改範圍` 標記（此處尚未加入），故分別比對各自的原因。
+    plan_gate_reasons = {
+        "harness": "本操作屬寫入性行為",
+        "integrated-harness": "拆解文件缺少必要標記：## 允許修改範圍",
+    }
     for mode in ("harness", "integrated-harness"):
         legacy = root / mode / ".claude/hooks"
         packaged = root / "claude/plugins" / mode / "hooks"
         assert_denied(assert_pair(
             legacy / "plan_gate.py", packaged / "plan_gate.py", event(project), project
-        ))
+        ), plan_gate_reasons[mode])
         allow = fixture("allow.json")
         allow["cwd"] = str(project)
         assert_allowed(assert_pair(
@@ -136,13 +157,13 @@ with tempfile.TemporaryDirectory() as td:
         assert_denied(assert_pair(
             legacy / "block_dangerous_commands.py",
             packaged / "block_dangerous_commands.py", dangerous, project,
-        ))
+        ), "危險指令攔截：")
         secret = fixture("secret-write.json")
         secret["cwd"] = str(project)
         result = assert_pair(
             legacy / "block_secrets.py", packaged / "block_secrets.py", secret, project
         )
-        assert_denied(result)
+        assert_denied(result, "憑證攔截：")
         for hook in (legacy / "block_secrets.py", packaged / "block_secrets.py"):
             raw = run(hook, secret, project)
             assert "AKIA1234567890ABCDEF" not in raw.stdout, (hook, raw.stdout)
@@ -160,7 +181,7 @@ with tempfile.TemporaryDirectory() as td:
         integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py",
         event(project), project,
     )
-    assert_denied(strict)
+    assert_denied(strict, "尚未取得人類核准")
     digest = hashlib.sha256(plan.read_bytes()).hexdigest()
     approval = project / ".claude/.plan_approved"
     approval.write_text(json.dumps({"approved_at": time.time(), "plan_sha256": digest}))
@@ -168,12 +189,13 @@ with tempfile.TemporaryDirectory() as td:
         integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py",
         event(project), project,
     ))
-    plan.write_text(plan.read_text() + "changed\n")
+    # 變動後的計畫必須仍然合法，否則會攔在「範圍格式錯誤」而驗不到 SHA-256 比對
+    plan.write_text(plan.read_text() + "- `docs/`\n")
     stale = assert_pair(
         integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py",
         event(project), project,
     )
-    assert_denied(stale)
+    assert_denied(stale, "拆解文件與核准版本不一致")
     policy.write_text(policy.read_text().replace("- Approval Mode: strict", "- Approval Mode: light", 1))
     assert_allowed(assert_pair(
         integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py",
@@ -196,7 +218,10 @@ with tempfile.TemporaryDirectory() as td:
 
     # 兩處皆無政策檔：維持 strict fail closed，一般 Bash 攔截（防退化）
     bash_event = event(project, tool="Bash", tool_input={"command": "echo hi"})
-    assert_denied(assert_pair(*gates, bash_event, project, home=home))
+    assert_denied(
+        assert_pair(*gates, bash_event, project, home=home),
+        "strict 模式禁止一般 Bash",
+    )
 
     # 僅個人層級政策檔（standard）：免核准放行範圍內寫入
     personal = home / ".claude/orchestration-policy.md"
@@ -209,12 +234,14 @@ with tempfile.TemporaryDirectory() as td:
         event(project, tool_input={"file_path": str(personal), "content": "x"}),
         project, home=home,
     )
-    assert_denied(protect)
-    assert "政策檔" in (protect.reason or ""), protect
+    assert_denied(protect, "編排政策檔只能由人類修改")
 
     # 專案政策檔永遠優先：專案 strict 蓋過個人 standard，仍要求人工核准
     (project / ".claude/orchestration-policy.md").write_text(template)
-    assert_denied(assert_pair(*gates, event(project), project, home=home))
+    assert_denied(
+        assert_pair(*gates, event(project), project, home=home),
+        "尚未取得人類核准",
+    )
 
     # 範本 allowlist 於 strict 模式可用（回歸：範本必須能被解析器接受）
     digest = hashlib.sha256(plan.read_bytes()).hexdigest()
