@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Windows（Git Bash）環境通常只有 python 而沒有可用的 python3，實際探測後回退
-if ! python3 -V >/dev/null 2>&1 && python -V >/dev/null 2>&1; then
-  python3() { python "$@"; }
-fi
-# Windows 預設編碼為 cp950，強制 Python 使用 UTF-8 避免中文讀寫失敗
-export PYTHONUTF8=${PYTHONUTF8:-1}
+# 這支輔助程式刻意完全不使用 Python。它在 codex_mode_switch_test.sh 裡會被執行
+# 數百次，而先前每次呼叫都要先探測直譯器（Windows 上 python3 是 WindowsApps stub，
+# -V 會失敗，故探測本身就得啟動兩個直譯器），且 add／remove／marketplace 三個
+# 分支根本用不到 Python。這些啟動成本是該測試耗時的主要來源。
 state=${AI_GUARDRAIL_TEST_STATE:?AI_GUARDRAIL_TEST_STATE is required}
 mkdir -p "$state"
 installed="$state/installed"
@@ -39,15 +37,21 @@ case ${2:-} in
     count_operation list
     fail_if_requested list
     if [[ -n ${FAKE_CODEX_LIST_JSON:-} ]]; then printf '%s\n' "$FAKE_CODEX_LIST_JSON"; exit 0; fi
-    python3 - "$installed" <<'PY'
-import json, pathlib, sys
-names = [x for x in pathlib.Path(sys.argv[1]).read_text().splitlines() if x]
-print(json.dumps({"installed": [
-    {"pluginId": n, "name": n.split("@", 1)[0],
-     "marketplaceName": n.split("@", 1)[1], "installed": True,
-     "enabled": True} for n in names
-]}))
-PY
+    # 格式須與先前的 json.dumps 輸出逐字元一致（鍵間 ", "、鍵值間 ": "）；
+    # 呼叫端 codex-mode-lib.sh 以 json.loads 解析，格式不符會讓測試立刻變紅。
+    # 限制：不做 JSON 轉義。測試語料的 plugin id 皆為 name@marketplace 形式，
+    # 不含引號、反斜線或控制字元；若日後引入這類字元，這裡會產生無效 JSON，
+    # 使呼叫端解析失敗而讓測試變紅——屬可偵測的失敗，不會造成假性通過。
+    entries=""
+    while IFS= read -r line || [[ -n $line ]]; do
+      [[ -z $line ]] && continue
+      # 只切第一個 @，與原本 split("@", 1) 的語意一致
+      [[ -n $entries ]] && entries+=", "
+      entries+="{\"pluginId\": \"$line\", \"name\": \"${line%%@*}\""
+      entries+=", \"marketplaceName\": \"${line#*@}\""
+      entries+=", \"installed\": true, \"enabled\": true}"
+    done < "$installed"
+    printf '{"installed": [%s]}\n' "$entries"
     ;;
   add)
     plugin=${3:?missing plugin}; count_operation add; fail_if_requested add "$plugin"

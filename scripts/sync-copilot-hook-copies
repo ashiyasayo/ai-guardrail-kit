@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 將可攜式 Copilot plugin 內必須隨附的 hook 副本，從唯一審核來源 shared/copilot 同步。
+# Copilot 的來源佈局＝部署佈局（hooks/ 整包複製到目標 repo 的 .github/hooks/），
+# plugin 不能在執行期依賴儲存庫根目錄，故保留發佈副本，但不再以手動複製維護。
+#
+# 刻意不納入同步的檔案：
+# - launch.ps1／launch.sh：vault 記載 Windows 啟動器是整個 Copilot 移植風險最高的
+#   產物，且兩模式互斥安裝、永不共存，跨模式分歧沒有執行期交互風險。
+#   sensitive-data-guard 的啟動器為參數化版本（兩個進入點），與 decomposition-gate
+#   的硬寫版本刻意不同。
+# - block_secrets.py：與 Claude 版為刻意分歧分支（hook 輸入形狀不同），
+#   改由行為 parity 測試守護。
+script_dir=$(cd "$(dirname "$0")" && pwd -P)
+repo=${AI_GUARDRAIL_ROOT:-$(cd "$script_dir/.." && pwd -P)}
+mode=write
+
+case ${1:-} in
+  '') ;;
+  --check) mode=check ;;
+  --help|-h)
+    printf 'usage: sync-copilot-hook-copies [--check]\n'
+    exit 0
+    ;;
+  *)
+    printf 'sync-copilot-hook-copies: unknown option: %s\n' "$1" >&2
+    exit 2
+    ;;
+esac
+
+[[ -d $repo/shared/copilot && -d $repo/copilot/plugins ]] || {
+  printf 'sync-copilot-hook-copies: invalid repository root: %s\n' "$repo" >&2
+  exit 1
+}
+
+sync_file() {
+  local source=$1 target=$2
+  [[ -f $source && ! -L $source ]] || {
+    printf 'sync-copilot-hook-copies: invalid source: %s\n' "$source" >&2
+    return 1
+  }
+  [[ ! -e $target || ! -L $target ]] || {
+    printf 'sync-copilot-hook-copies: refusing symlink target: %s\n' "$target" >&2
+    return 1
+  }
+  if cmp -s "$source" "$target"; then
+    return 0
+  fi
+  if [[ $mode == check ]]; then
+    printf 'Copilot hook copy is out of sync: %s\n' "${target#"$repo/"}" >&2
+    return 1
+  fi
+  cp -p "$source" "$target"
+  printf 'Synced %s\n' "${target#"$repo/"}"
+}
+
+# hook_protocol.py 同步到全部模式：擴充為支援 UserPromptSubmit 屬純附加，
+# load_event 的 expected_event 預設值維持既有 decomposition-gate 呼叫端相容。
+for plugin in decomposition-gate sensitive-data-guard; do
+  sync_file "$repo/shared/copilot/hook_protocol.py" \
+    "$repo/copilot/plugins/$plugin/hooks/hook_protocol.py"
+done
+
+# pii_patterns.py 只有 sensitive-data-guard 需要
+sync_file "$repo/shared/copilot/pii_patterns.py" \
+  "$repo/copilot/plugins/sensitive-data-guard/hooks/pii_patterns.py"
