@@ -7,10 +7,13 @@ Claude Code 方案把 AI 協作開發從
 hooks）」。三個目錄**功能與用途各自獨立、不可同時安裝**，其中
 `integrated-harness` 是整合另外兩者能力的完整版，而非疊加安裝。
 
-> **實驗性：GitHub Copilot (VS Code)**（Preview）——新增第三平台的第一個模式
-> `decomposition-gate`，見 [`copilot/plugins/decomposition-gate/`](copilot/plugins/decomposition-gate/)
-> 與下方「快速開始 › GitHub Copilot」。目前僅此一種模式、Windows 主線實機驗證、
-> macOS／Linux 附帶未驗；不影響上述 Claude／Codex 四模式的互斥語意。
+> **實驗性：GitHub Copilot (VS Code)**（Preview）——第三平台目前提供兩種模式：
+> [`decomposition-gate`](copilot/plugins/decomposition-gate/) 與
+> [`sensitive-data-guard`](copilot/plugins/sensitive-data-guard/)，見下方
+> 「快速開始 › GitHub Copilot」。兩者**互斥、不得同時安裝**（都註冊 `PreToolUse`
+> 且都含 `hook_protocol.py`）。Windows 主線實機驗證、macOS／Linux 附帶未驗；
+> `sensitive-data-guard` 的提示詞阻擋輸出形狀另有未驗項。不影響上述 Claude／Codex
+> 四模式的互斥語意。
 
 ## 需求環境
 
@@ -109,9 +112,10 @@ chmod +x your-project/.claude/hooks/*.py
 
 ### GitHub Copilot (VS Code)（實驗性，Preview）
 
-第三平台的第一個模式 `decomposition-gate`，透過 VS Code Agent hooks（Preview）在
-`PreToolUse` 封鎖寫入向量（`create_file`／`multi_replace_string_in_file`／
-`run_in_terminal`）。copy-in 安裝（無 marketplace／selector）：
+兩種模式皆為 copy-in 安裝（無 marketplace／selector），且**互斥、不得同時安裝**。
+
+**`decomposition-gate`**——透過 `PreToolUse` 封鎖寫入向量
+（`create_file`／`multi_replace_string_in_file`／`run_in_terminal`）直到完成拆解：
 
 ```bash
 mkdir -p your-project/.github/hooks your-project/.github/guardrail/plan
@@ -119,10 +123,25 @@ cp copilot/plugins/decomposition-gate/hooks/* your-project/.github/hooks/
 cp copilot/plugins/decomposition-gate/plan/decomposition.template.md your-project/.github/guardrail/plan/
 ```
 
+**`sensitive-data-guard`**——`PreToolUse` 阻擋明文憑證與個資，`UserPromptSubmit`
+阻擋提示詞個資：
+
+```bash
+mkdir -p your-project/.github/hooks
+cp copilot/plugins/sensitive-data-guard/hooks/* your-project/.github/hooks/
+```
+
 接著在 VS Code 使用者設定加入 `"chat.useCustomAgentHooks": true` 與
 `"chat.hookFilesLocations": { ".github/hooks": true }`，Reload Window。僅 Copilot
-Agent mode 生效；Windows 已實機驗證，macOS／Linux 未驗。完整說明與限制見
-[`copilot/plugins/decomposition-gate/README.md`](copilot/plugins/decomposition-gate/README.md)。
+Agent mode 生效；Windows 已實機驗證，macOS／Linux 未驗。
+
+`sensitive-data-guard` 與 Claude／Codex 版有三項**刻意的行為差異**：個資採 deny 而非
+遮罩改寫（`updatedInput` 在 VS Code 未驗，失效會無聲放行未遮罩內容）、個資與憑證都
+掃描 `run_in_terminal`（Claude 版不掃 Bash）、遞迴掃描整個 `tool_input` 而不依賴工具名
+白名單。另有未驗項：`UserPromptSubmit` 的阻擋輸出形狀尚未實機驗證，該道防線在驗證前
+不可宣稱有效。完整說明與限制見各模式 README：
+[`decomposition-gate`](copilot/plugins/decomposition-gate/README.md)、
+[`sensitive-data-guard`](copilot/plugins/sensitive-data-guard/README.md)。
 
 ## 版本與發布
 

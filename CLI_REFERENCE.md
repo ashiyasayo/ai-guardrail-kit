@@ -87,12 +87,28 @@ Claude `decomposition-gate` 的 copy-in 與 marketplace 版本同樣會在 Sessi
 
 ## GitHub Copilot (VS Code)（實驗性，Preview）
 
-目前僅 `decomposition-gate` 一種模式，採 copy-in（無 marketplace／selector）：
+兩種模式皆採 copy-in（無 marketplace／selector），且**互斥、不得同時安裝**。
+
+`decomposition-gate`：
 
 ```bash
 mkdir -p your-project/.github/hooks your-project/.github/guardrail/plan
 cp copilot/plugins/decomposition-gate/hooks/* your-project/.github/hooks/
 cp copilot/plugins/decomposition-gate/plan/decomposition.template.md your-project/.github/guardrail/plan/
+```
+
+`sensitive-data-guard`（無拆解產出物，故不需要 guardrail/plan 目錄）：
+
+```bash
+mkdir -p your-project/.github/hooks
+cp copilot/plugins/sensitive-data-guard/hooks/* your-project/.github/hooks/
+```
+
+維護者同步 Copilot 的共用 hook 來源（`shared/copilot/`）：
+
+```bash
+scripts/sync-copilot-hook-copies            # 套用
+scripts/sync-copilot-hook-copies --check    # 驗證無漂移
 ```
 
 VS Code 使用者設定需含 `"chat.useCustomAgentHooks": true` 與
