@@ -8,6 +8,36 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- GitHub Copilot (VS Code) 新增第二個模式 `sensitive-data-guard`（實驗性，Preview），
+  提供明文憑證阻擋、待寫入內容個資阻擋與提示詞個資阻擋，涵蓋 `PreToolUse` 與
+  `UserPromptSubmit` 兩個事件。與 Claude／Codex 版有三項**刻意的產品行為差異**：
+  ① 個資採 deny 而非遮罩改寫——Claude／Codex 依賴的 `updatedInput` 改寫機制在
+  VS Code 上未經實機驗證，若失效會退化成「allow 未遮罩的原始內容」，屬安全控制
+  無聲失效；② 個資與憑證都掃描 `run_in_terminal`（Claude 版刻意不掃 Bash），
+  因 spike 實測 agent 會用終端機繞過檔案寫入的 deny；③ 不依賴工具名白名單，
+  改為遞迴掃描整個 `tool_input` 的所有字串值，避免猜錯欄位名導致靜默放行。
+  **已知限制**：`UserPromptSubmit` 的阻擋輸出形狀尚未實機驗證，該道防線在驗證前
+  不可宣稱有效；`send_to_terminal` 未納入涵蓋範圍。兩個 Copilot 模式互斥，
+  不得同時安裝。
+
+- 新增 `shared/copilot/` 作為 Copilot 端 hook 的唯一審核來源（`hook_protocol.py`、
+  `pii_patterns.py`）與同步腳本 `scripts/sync-copilot-hook-copies`；新增
+  `tests/copilot_shared_sync_test.sh` 守護副本無漂移。另新增
+  `tests/pii_cross_platform_parity_test.sh`，以共同語料驗證 Claude、Codex、Copilot
+  三份 PII 規則的命中種類與遮罩輸出完全一致，避免第三份副本造成規則漂移。
+  Copilot 的 hook 測試首次納入根層 `tests/run_all.sh` 回歸範圍。
+
+### Changed
+
+- Copilot `hook_protocol.py` 擴充為支援 `PreToolUse` 與 `UserPromptSubmit` 兩個事件，
+  並改由 `shared/copilot/` 同步到兩個模式。擴充為純附加（`load_event` 的
+  `expected_event` 預設為 `PreToolUse`），`decomposition-gate` 的行為不變，
+  由其既有 16 情境 smoke test 把關。啟動器（`launch.ps1`／`launch.sh`）刻意不納入
+  共用：Windows 啟動器是 Copilot 移植風險最高的產物，且兩模式互斥安裝、
+  永不共存，跨模式分歧沒有執行期交互風險。
+
 ## [0.2.1] - 2026-07-29
 
 ### Fixed

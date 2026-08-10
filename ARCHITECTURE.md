@@ -10,7 +10,9 @@
 | `integrated-harness` | 有 | 有 | 有 | 有 | 精簡治理政策 |
 
 四種模式是互斥的產品邊界，不是可任意疊加的 feature flags。Claude 與
-Codex selector 會移除其他受管模式，再安裝並驗證目標模式。
+Codex selector 會移除其他受管模式，再安裝並驗證目標模式。Copilot 為 copy-in、
+無 selector，互斥性由安裝者負責：兩個 Copilot 模式都註冊 `PreToolUse` 且都含
+`hook_protocol.py`，同時複製進 `.github/hooks/` 會衝突。
 
 Claude `decomposition-gate` 的 copy-in 與 marketplace 發佈皆由 SessionStart 載入
 同一份風險分級協定；同步測試守護主協定、subagent 協定及注入 hook。Codex
@@ -30,7 +32,8 @@ Claude `decomposition-gate` 的 copy-in 與 marketplace 發佈皆由 SessionStar
 | Claude | `integrated-harness` | copy-in、marketplace | `shared/claude/`、`integrated-harness/`、`claude/plugins/integrated-harness/` | 協定同步、copy-in parity、orchestration 與 hook 行為測試 |
 | Codex | 四種模式 | marketplace／selector | `shared/codex/`、`codex/plugins/`、`scripts/codex-mode-lib.sh` | shared 同步、marketplace、mode switch 及 guardrail 測試 |
 | Codex | `integrated-harness` | global install | `codex/plugins/integrated-harness/`、global installer | global install 交易與 rollback 測試 |
-| Copilot | `decomposition-gate` | copy-in | `copilot/plugins/decomposition-gate/` | Copilot smoke test；Preview 平台限制另見相關文件 |
+| Copilot | `decomposition-gate` | copy-in | `shared/copilot/`、`copilot/plugins/decomposition-gate/` | shared 同步檢查、Copilot smoke test；Preview 平台限制另見相關文件 |
+| Copilot | `sensitive-data-guard` | copy-in | `shared/copilot/`、`copilot/plugins/sensitive-data-guard/` | shared 同步檢查、三平台 PII 行為一致性測試、Copilot smoke test |
 
 若某次變更對矩陣中的版本不適用，交付說明必須列出該版本及原因。已有 `shared/`
 單一事實來源的功能一律先改來源再同步；無法共用檔案者以共同測試語料驗證行為，
@@ -54,11 +57,22 @@ Claude 的 `PreToolUse` dispatcher 先執行秘密檢查，再執行個資遮罩
 註冊為 hooks：`exec_command`／`apply_patch` 先做秘密檢查，`apply_patch`
 另做個資遮罩，`UserPromptSubmit` 則攔截提示詞個資。
 
-規則引擎只使用 Python 標準函式庫。兩平台的 PII 規則各有唯一審核來源：Claude
-位於 `shared/claude/`（PII 三件組），Codex 位於 `shared/codex/`；發佈的 plugin
-與 copy-in 保留可攜副本，分別由 `scripts/sync-claude-hook-copies` 與
-`scripts/sync-codex-hook-copies` 檢查同步。平台 hook 協定不同，但敏感資料
-規則與產品邊界保持對等。
+Copilot 的 `PreToolUse` 依序執行秘密檢查與個資檢查，任一命中即 deny；
+`UserPromptSubmit` 只檢查個資。**Copilot 的個資採 deny 而非遮罩改寫**——遮罩依賴的
+`updatedInput` 在 VS Code 上未經實機驗證，失效時會退化成「allow 未遮罩的原始內容」，
+屬安全控制無聲失效；deny 沒有這種失敗模式。Copilot 另以遞迴掃描整個 `tool_input`
+取代欄位名對應，並將 `run_in_terminal` 納入個資涵蓋範圍（Claude 版的遮罩刻意排除
+Bash，因改寫指令字串會破壞語法；deny 無此問題）。這三項為刻意的平台差異，
+記錄於 `.docs/vault/decisions/2026-07-31-copilot-sensitive-data-guard.md`。
+
+規則引擎只使用 Python 標準函式庫。三平台的 PII 規則各有唯一審核來源：Claude
+位於 `shared/claude/`（PII 三件組），Codex 位於 `shared/codex/`，Copilot 位於
+`shared/copilot/`；發佈的 plugin 與 copy-in 保留可攜副本，分別由
+`scripts/sync-claude-hook-copies`、`scripts/sync-codex-hook-copies` 與
+`scripts/sync-copilot-hook-copies` 檢查同步。三份來源的規則行為由
+`tests/pii_cross_platform_parity_test.sh` 以共同語料守護（命中種類與遮罩輸出須完全
+一致），不依靠人工記憶維持。平台 hook 協定不同，但敏感資料規則保持對等；
+產品邊界則有上述刻意差異。
 
 ## 安全邊界
 
@@ -82,12 +96,19 @@ Codex／Copilot 另建版號檔案，以免產生無平台讀取、無機制同�
 
 ## GitHub Copilot (VS Code) 平台移植（Preview，部分）
 
-第三平台移植的第一個模式為 `decomposition-gate`，位於
-`copilot/plugins/decomposition-gate/`；與 Claude／Codex 共用同一套思考協定，僅平台接線不同。
+第三平台目前移植兩個模式：`decomposition-gate` 與 `sensitive-data-guard`，
+分別位於 `copilot/plugins/` 下同名目錄；與 Claude／Codex 共用同一套思考協定與
+偵測規則，平台接線不同，`sensitive-data-guard` 另有三項刻意的產品行為差異
+（見上方「sensitive-data-guard 資料流」）。
 
-- **執行模型**：VS Code Agent hooks（Preview）的 `PreToolUse` → 平台薄啟動器
-  （`launch.ps1`／`launch.sh`）→ 單一 Python 邏輯（`decomposition_gate.py` +
-  `hook_protocol.py`）。來源佈局＝部署佈局：`hooks/` 整包複製到目標 repo 的 `.github/hooks/`。
+- **執行模型**：VS Code Agent hooks（Preview）的 `PreToolUse`（`sensitive-data-guard`
+  另含 `UserPromptSubmit`）→ 平台薄啟動器（`launch.ps1`／`launch.sh`）→ 單一 Python
+  邏輯。來源佈局＝部署佈局：`hooks/` 整包複製到目標 repo 的 `.github/hooks/`。
+- **共用來源**：`hook_protocol.py` 與 `pii_patterns.py` 以 `shared/copilot/` 為唯一
+  審核來源，由 `scripts/sync-copilot-hook-copies` 同步。**啟動器刻意不共用**：
+  Windows 啟動器是 Copilot 移植風險最高的產物，且兩模式互斥安裝、永不共存，
+  跨模式分歧沒有執行期交互風險；`sensitive-data-guard` 的啟動器為參數化版本
+  （兩個進入點、錯誤路徑的 `hookEventName` 依事件而異）。
 - **管制向量**：`create_file`、`multi_replace_string_in_file`（依本質），以及
   `run_in_terminal`（**整體 gate**——shell 語法無法證明無寫入，比照 Codex `exec_command`；
   spike 證明對抗性 agent 會用終端機繞過寫入意圖正則）。唯讀與未知工具放行。
@@ -96,5 +117,10 @@ Codex／Copilot 另建版號檔案，以免產生無平台讀取、無機制同�
   **工作區相對路徑**（`${workspaceFolder}` 不可用，與 PowerShell `${var}` 語法衝突）；
   入站讀原始位元組解 UTF-8、出站 ASCII-safe JSON；**VS Code 對 hook 錯誤／非 JSON 輸出
   fail-open**，故啟動器對任何錯誤自印 deny。
+- **fail-closed 的可恢復性邊界**：`sensitive-data-guard` 的 `UserPromptSubmit` 刻意只
+  驗證最小欄位集（`hook_event_name`、`prompt`）。PreToolUse 擋一次工具呼叫是可恢復的；
+  UserPromptSubmit 若因欄位驗證過嚴而擋掉所有提示，使用者連排除問題的提示都送不出去，
+  屬不可恢復的鎖死。fail-closed 的代價必須可恢復。
 - **狀態**：Windows 主線已實機驗證，macOS／Linux 附帶未驗；僅 Copilot Agent mode 生效。
-  決策與踩坑見 `.docs/vault/`。
+  `sensitive-data-guard` 的 `UserPromptSubmit` 阻擋輸出形狀尚未實機驗證，該道防線在
+  驗證前不可宣稱有效；`send_to_terminal` 未納入涵蓋範圍。決策與踩坑見 `.docs/vault/`。
