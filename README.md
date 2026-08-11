@@ -211,10 +211,10 @@ rm your-project/CLAUDE.md your-project/ORCHESTRATOR.md 2>/dev/null
 
 | 目錄 | 一句話定位 | 拆解檢查 | 人類核准 | 安全 Hook | 治理政策 |
 | --- | --- | --- | --- | --- | --- |
-| [`decomposition-gate/`](decomposition-gate/) | 任務拆解品質閘門（流程紀律） | 有 | 無 | 無 | 無 |
-| `sensitive-data-guard` plugin | 明文秘密與個資的獨立防線 | 無 | 無 | 僅敏感資料 | 無 |
-| [`harness/`](harness/) | 人類核准與安全 hook 防線（授權控制） | 無 | 有 | 有 | 無；歷史編排提示稿已淘汰 |
-| [`integrated-harness/`](integrated-harness/) | 前兩者的整合版 ＋ 精簡治理政策 | 有 | strict 模式有 | 有 | 內建授權、外部副作用、驗收、成本與失敗揭露規範 |
+| [`decomposition-gate/`](decomposition-gate/) | 只要求先完成任務拆解的低摩擦流程閘門 | 有 | 無 | 無 | 無 |
+| `sensitive-data-guard` plugin | 只檢查明文秘密與個資、維持既有工作流程的資料保護防線 | 無 | 無 | 僅敏感資料 | 無 |
+| [`harness/`](harness/) | 不介入拆解與編排、專注人類核准及危險操作與敏感資料防護的授權安全層 | 無 | 有 | 有 | 無；歷史編排提示稿已淘汰 |
+| [`integrated-harness/`](integrated-harness/) | 整合拆解、資料保護、人類核准與危險操作防線，附精簡治理政策的完整方案 | 有 | strict 模式有 | 有 | 內建授權、外部副作用、驗收、成本與失敗揭露規範 |
 
 ## Claude Code／Codex 完整功能對照
 

@@ -8,6 +8,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-11
+
 ### Added
 
 - GitHub Copilot (VS Code) 新增第二個模式 `sensitive-data-guard`（實驗性，Preview），
@@ -37,6 +39,8 @@ All notable changes to this project are documented in this file.
   由其既有 16 情境 smoke test 把關。啟動器（`launch.ps1`／`launch.sh`）刻意不納入
   共用：Windows 啟動器是 Copilot 移植風險最高的產物，且兩模式互斥安裝、
   永不共存，跨模式分歧沒有執行期交互風險。
+- 重新修正 README「四種模式總覽」的一句話定位，明確區分流程紀律、資料保護、
+  授權安全與完整治理四個產品邊界。
 
 ## [0.2.1] - 2026-07-29
 
@@ -285,6 +289,8 @@ VS Code Agent hooks，且 macOS／Linux 路徑尚未實機驗證。以下彙整�
   once a plan exists, normal integrated-harness scope, policy, and approval
   checks apply.
 
-[Unreleased]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ashiyasayo/ai-guardrail-kit/releases/tag/v0.1.0
