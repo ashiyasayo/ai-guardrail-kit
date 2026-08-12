@@ -19,6 +19,8 @@ All notable changes to this project are documented in this file.
   測試；可用 `AGK_TEST_PROFILE=full` 手動執行，CI 也提供手動與每週排程的完整回歸入口。
 - Codex 完整模式切換測試在 Windows Git Bash 缺少 `shasum` 時改用 `sha256sum` fallback，
   避免完整回歸在測試初始化階段失敗。
+- Codex selector／verify 合併重複的 Python 啟動：一次同一台 Windows 主機的單支專測由
+  1,004 秒降至 955 秒，節省約 4.9%；完整回歸時間仍會受主機 I/O 波動影響。
 
 ## [0.3.0] - 2026-08-11
 

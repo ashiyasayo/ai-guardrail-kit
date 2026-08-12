@@ -33,16 +33,27 @@ config="$project/.codex/config.toml"
 actual=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-actual.XXXXXX")
 wanted=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-wanted.XXXXXX")
 trap 'rm -f "$actual" "$wanted"' EXIT
-python3 - "$config" "$actual" "$AGK_BEGIN" "$AGK_END" <<'PY'
-import pathlib, sys
+if ! hook_paths=$(python3 - "$config" "$actual" "$AGK_BEGIN" "$AGK_END" <<'PY'
+import pathlib, shlex, sys, tomllib
 source, target = map(pathlib.Path, sys.argv[1:3]); begin, end = sys.argv[3:5]
-s = source.read_text()
+s = source.read_text(encoding="utf-8")
 if s.count(begin) != 1 or s.count(end) != 1:
     raise SystemExit(1)
 start, finish = s.index(begin), s.index(end) + len(end)
+block = s[start:finish]
 # Windows 上 write_text 會把換行轉成 CRLF，改用位元組寫入確保與 printf 產出一致
-target.write_bytes((s[start:finish] + "\n").encode("utf-8"))
+target.write_bytes((block + "\n").encode("utf-8"))
+d = tomllib.loads(block)
+for group in d['hooks']['PreToolUse']:
+    argv = shlex.split(group['hooks'][0]['command'])
+    if len(argv) != 3 or argv[:2] not in (['python3', '--'], ['python', '--']):
+        raise SystemExit(1)
+    print(argv[2])
 PY
+); then
+  agk_die 'managed hooks are malformed'
+  exit 1
+fi
 agk_render_block "$mode" "$repo" > "$wanted"
 cmp -s "$actual" "$wanted" || { agk_die "managed hooks do not match installed mode $mode"; exit 1; }
 # Windows（Git Bash/MSYS）檔案系統沒有可靠的執行位元，僅檢查檔案存在
@@ -51,16 +62,5 @@ while IFS= read -r path; do
   path=${path%$'\r'}  # Windows 上 Python stdout 會輸出 CRLF，剝除行尾 CR
   [[ -f $path ]] || { agk_die "hook file is missing: $path"; exit 1; }
   (( ! exec_check )) || [[ -x $path ]] || { agk_die "hook file is not executable: $path"; exit 1; }
-done < <(python3 - "$actual" <<'PY'
-import shlex, sys, tomllib
-# Windows 上 stdout 預設會將換行翻譯為 CRLF，重設為 LF 供 bash 讀取
-sys.stdout.reconfigure(newline=chr(10))
-d=tomllib.load(open(sys.argv[1], 'rb'))
-for group in d['hooks']['PreToolUse']:
-    argv=shlex.split(group['hooks'][0]['command'])
-    if len(argv) != 3 or argv[:2] not in (['python3', '--'], ['python', '--']): raise SystemExit(1)
-    print(argv[2])
-PY
-)
-"$AGK_PYTHON_BIN" -c 'import sys; raise SystemExit(sys.version_info < (3, 9))' || { agk_die 'Python 3.9 or newer is required'; exit 1; }
+done <<< "$hook_paths"
 printf 'Verified Codex mode %s.\n' "$mode"

@@ -8,7 +8,8 @@ set -uo pipefail
 # 在 Windows（Git Bash）上耗時甚久，屬正常慢而非掛住。
 #
 # 預設值選定依據（2026-07-31 於 Windows／Git Bash 實測，18 支測試全通過）：
-# codex_mode_switch_test.sh 1167 秒、claude_mode_switch_test.sh 116 秒、
+# codex_mode_switch_test.sh 歷史 1167 秒（近期單支專測實測 955 秒）、
+# claude_mode_switch_test.sh 116 秒、
 # codex_global_install_test.sh 64 秒，其餘皆在 20 秒內。最慢者與次慢者相差一個
 # 數量級，且原本的 1200 秒上限只剩 33 秒餘裕，機器稍慢即會誤判為失敗，
 # 故提高為 2400 秒（約 2 倍餘裕）。若日後仍逾時，應調查該測試為何變慢，

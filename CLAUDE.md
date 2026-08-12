@@ -64,7 +64,8 @@ The two `copilot_*_test.sh` files are thin wrappers around each mode's own `test
 (`AGK_TEST_TIMEOUT`, default 2400s). Smoke skips `claude_mode_switch_test.sh` and
 `codex_mode_switch_test.sh`; use the `full` profile for those complete mode-switch checks.
 The Codex test is legitimately slow on Windows/Git Bash (~1170s measured, many Python
-interpreter spawns), not hung.
+interpreter spawns), not hung; a recent isolated optimized run measured ~955s on the same
+host, while full-run timings remain sensitive to host I/O.
 
 After editing `shared/claude/*`, `shared/codex/*`, or `shared/copilot/*`, always run the corresponding sync script before testing:
 

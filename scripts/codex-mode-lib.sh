@@ -2,10 +2,11 @@
 # Shared implementation for select-codex-mode and verify-codex-mode.
 
 # Windows（Git Bash）環境通常只有 python 而沒有可用的 python3
-#（WindowsApps 的 python3 別名 stub 找得到卻不能執行），故以實際執行 -V 探測後回退
-if python3 -V >/dev/null 2>&1; then
+#（WindowsApps 的 python3 別名 stub 找得到卻不能執行），故以實際執行版本檢查探測後回退。
+# 版本檢查與支援性檢查合併，避免每次 selector／verify 額外啟動一次 Python。
+if python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 9))' >/dev/null 2>&1; then
   AGK_PYTHON_BIN=python3
-elif python -V >/dev/null 2>&1; then
+elif python -c 'import sys; raise SystemExit(sys.version_info < (3, 9))' >/dev/null 2>&1; then
   AGK_PYTHON_BIN=python
   python3() { python "$@"; }
 else
@@ -153,46 +154,69 @@ agk_copy_mode() {
 }
 
 agk_render_block() {
-  local mode=$1 repo=$2 root="$repo/codex/plugins/$1/hooks"
+  local mode=$1 repo=$2 root="$repo/codex/plugins/$1/hooks" rendered
+  local command1 command2 command3 command4
   printf '%s\n' "$AGK_BEGIN"
   case $mode in
     decomposition-gate)
+      rendered=$(agk_command_values "$root/decomposition_gate.py") || return 1
+      IFS= read -r command1 <<< "$rendered"
       printf '[[hooks.PreToolUse]]\nmatcher = "exec_command|apply_patch"\n\n'
-      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n' "$(agk_command_value "$root/decomposition_gate.py")"
+      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n' "$command1"
       ;;
     sensitive-data-guard)
+      rendered=$(agk_command_values "$root/block_secrets.py" "$root/pii_guard.py") || return 1
+      {
+        IFS= read -r command1
+        IFS= read -r command2
+      } <<< "$rendered"
       printf '[[hooks.PreToolUse]]\nmatcher = "exec_command|apply_patch"\n\n'
-      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/block_secrets.py")"
+      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$command1"
       printf '[[hooks.PreToolUse]]\nmatcher = "apply_patch"\n\n'
-      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/pii_guard.py")"
+      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$command2"
       printf '[[hooks.UserPromptSubmit]]\n\n'
-      printf '[[hooks.UserPromptSubmit.hooks]]\ntype = "command"\ncommand = %s\n' "$(agk_command_value "$root/pii_guard.py")"
+      printf '[[hooks.UserPromptSubmit.hooks]]\ntype = "command"\ncommand = %s\n' "$command2"
       ;;
     harness|integrated-harness)
+      if [[ $mode == integrated-harness ]]; then
+        rendered=$(agk_command_values "$root/plan_gate.py" "$root/security_guard.py" "$root/pii_guard.py" "$root/session_start.py") || return 1
+      else
+        rendered=$(agk_command_values "$root/plan_gate.py" "$root/security_guard.py" "$root/pii_guard.py") || return 1
+      fi
+      {
+        IFS= read -r command1
+        IFS= read -r command2
+        IFS= read -r command3
+        if [[ $mode == integrated-harness ]]; then
+          IFS= read -r command4
+        fi
+      } <<< "$rendered"
       printf '[[hooks.PreToolUse]]\nmatcher = "exec_command|apply_patch"\n\n'
-      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/plan_gate.py")"
+      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$command1"
       printf '[[hooks.PreToolUse]]\nmatcher = "exec_command|apply_patch"\n\n'
-      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/security_guard.py")"
+      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$command2"
       printf '[[hooks.PreToolUse]]\nmatcher = "apply_patch"\n\n'
-      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$(agk_command_value "$root/pii_guard.py")"
+      printf '[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = %s\n\n' "$command3"
       printf '[[hooks.UserPromptSubmit]]\n\n'
-      printf '[[hooks.UserPromptSubmit.hooks]]\ntype = "command"\ncommand = %s\n' "$(agk_command_value "$root/pii_guard.py")"
+      printf '[[hooks.UserPromptSubmit.hooks]]\ntype = "command"\ncommand = %s\n' "$command3"
       if [[ $mode == integrated-harness ]]; then
         printf '\n[[hooks.SessionStart]]\nmatcher = "startup|resume|clear|compact"\n\n'
-        printf '[[hooks.SessionStart.hooks]]\ntype = "command"\ncommand = %s\n' "$(agk_command_value "$root/session_start.py")"
+        printf '[[hooks.SessionStart.hooks]]\ntype = "command"\ncommand = %s\n' "$command4"
       fi
       ;;
   esac
   printf '%s\n' "$AGK_END"
 }
 
-agk_command_value() {
-  "$AGK_PYTHON_BIN" - "$AGK_PYTHON_BIN" "$1" <<'PY'
+agk_command_values() {
+  "$AGK_PYTHON_BIN" - "$AGK_PYTHON_BIN" "$@" <<'PY'
 import json, shlex, sys
 # Windows 上 stdout 預設會將換行翻譯為 CRLF，重設為 LF 供 bash 讀取
 sys.stdout.reconfigure(newline=chr(10))
 # sys.argv[0] 是 stdin 指令碼標記「-」；實際的直譯器與 hook 路徑從位置參數取得。
-print(json.dumps(sys.argv[1] + " -- " + shlex.quote(sys.argv[2])))
+python_bin = sys.argv[1]
+for path in sys.argv[2:]:
+    print(json.dumps(python_bin + " -- " + shlex.quote(path)))
 PY
 }
 
