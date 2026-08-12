@@ -38,13 +38,13 @@ def resolve_policy_path(root):
     return project_policy
 
 def policy(root):
-    try: text = resolve_policy_path(root).read_text()
+    try: text = resolve_policy_path(root).read_text(encoding="utf-8")
     except (OSError, UnicodeError): return "strict", []
     match = MODE.search(text)
     return (match.group(1) if match else "strict"), section(text, "## Strict Bash 測試與建置 Allowlist")
 
 def plan(root):
-    try: text = (root / PLAN).read_text()
+    try: text = (root / PLAN).read_text(encoding="utf-8")
     except (OSError, UnicodeError): deny("計畫閘門：找不到拆解文件。")
     if any(marker not in text for marker in MARKERS): deny("計畫閘門：拆解文件缺少必要標記。")
     return text

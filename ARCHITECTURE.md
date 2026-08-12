@@ -39,6 +39,11 @@ Claude `decomposition-gate` 的 copy-in 與 marketplace 發佈皆由 SessionStar
 單一事實來源的功能一律先改來源再同步；無法共用檔案者以共同測試語料驗證行為，
 不得依靠人工記憶維持一致。
 
+根層 `tests/run_all.sh` 預設執行快速 `smoke` profile，保留共享同步、marketplace、
+guardrail 及 global install 等日常回歸；Claude 與 Codex 的完整模式切換測試改由
+`AGK_TEST_PROFILE=full` 手動執行，或由 CI 的排程／手動 workflow 執行。這是測試執行
+策略的分層，不代表矩陣中的模式或發佈型態被移除。
+
 `integrated-harness` 的 `ORCHESTRATOR.md` 不負責教導一般任務分解、模型路由或
 代理調度；這些工作交由平台與模型。文件只保留人類授權、外部副作用、修改範圍、
 驗收證據、成本與失敗揭露。`harness/fable-orchestrator-prompt.md` 是 deprecated

@@ -21,6 +21,15 @@ export HOME="$tmp/home"
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 # BSD 與 GNU stat 的檔案模式參數不同，依序嘗試以支援 macOS/Linux/Git Bash
 file_mode() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" 2>/dev/null; }
+sha256_files() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$@"
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$@"
+  else
+    fail 'sha256sum or shasum is required'
+  fi
+}
 assert_file() { [[ -f $1 ]] || fail "missing $1"; }
 assert_mode() { "$repo/scripts/verify-codex-mode" "$1" "$2" >/dev/null || fail "verify $1"; }
 wait_for_file() {
@@ -37,16 +46,16 @@ assert_bad_json() { export FAKE_CODEX_LIST_JSON=$1; ! "$repo/scripts/verify-code
 project="$tmp/project"
 new_project "$project"
 printf 'prefix = "unchanged"\n\n# suffix stays too\n' > "$project/.codex/config.toml"
-before=$(shasum -a 256 "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")
+before=$(sha256_files "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")
 if "$repo/scripts/select-codex-mode" bogus "$project" >/dev/null 2>&1; then fail 'invalid mode accepted'; fi
-[[ $before == "$(shasum -a 256 "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'invalid mode mutated state'
+[[ $before == "$(sha256_files "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'invalid mode mutated state'
 
 "$repo/scripts/select-codex-mode" decomposition-gate "$project"
 assert_mode decomposition-gate "$project"
 [[ ! -e "$HOME/.codex/guardrail/orchestration-policy.md" ]] || fail 'non-integrated mode installed personal policy'
 grep -Fq 'prefix = "unchanged"' "$project/.codex/config.toml" || fail 'prefix changed'
 grep -Fq '# suffix stays too' "$project/.codex/config.toml" || fail 'suffix changed'
-first=$(shasum -a 256 "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")
+first=$(sha256_files "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")
 generation_file="$AI_GUARDRAIL_TEST_STATE/generation.decomposition-gate_ai-guardrail-kit"
 [[ $(<"$generation_file") -eq 1 ]] || fail 'initial install generation missing'
 assert_bad_json '{"installed":[{"pluginId":"decomposition-gate@ai-guardrail-kit","name":"decomposition-gate","marketplaceName":"ai-guardrail-kit","installed":true,"enabled":false}]}'
@@ -59,14 +68,14 @@ assert_bad_json '{"installed":["bad"]}'
 assert_bad_json '{"installed":[{"pluginId":7,"name":"decomposition-gate","marketplaceName":"ai-guardrail-kit","installed":true,"enabled":true}]}'
 "$repo/scripts/select-codex-mode" decomposition-gate "$project"
 [[ $(<"$AI_GUARDRAIL_TEST_STATE/add.count") -eq 2 ]] || fail 'same mode was not refreshed'
-[[ $first == "$(shasum -a 256 "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'refresh changed final state'
+[[ $first == "$(sha256_files "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'refresh changed final state'
 [[ $(<"$generation_file") -eq 2 ]] || fail 'successful refresh did not advance generation'
 
-config_before=$(shasum -a 256 "$project/.codex/config.toml"); plugins_before=$(cat "$AI_GUARDRAIL_TEST_STATE/installed")
+config_before=$(sha256_files "$project/.codex/config.toml"); plugins_before=$(cat "$AI_GUARDRAIL_TEST_STATE/installed")
 export FAKE_CODEX_FAIL_OPERATION=add:3
 if "$repo/scripts/select-codex-mode" decomposition-gate "$project" >/dev/null 2>&1; then fail 'refresh add failure accepted'; fi
 unset FAKE_CODEX_FAIL_OPERATION
-[[ $config_before == "$(shasum -a 256 "$project/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'failed refresh add changed old state'
+[[ $config_before == "$(sha256_files "$project/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'failed refresh add changed old state'
 [[ $(<"$generation_file") -eq 2 ]] || fail 'failed refresh add changed installed generation'
 
 list_count=$(<"$AI_GUARDRAIL_TEST_STATE/list.count")
@@ -113,46 +122,46 @@ PY
 done
 
 sed -i.bak 's|decomposition-gate/hooks|harness/hooks|' "$project/.codex/config.toml"
-config_before=$(shasum -a 256 "$project/.codex/config.toml"); generation_before=$(<"$generation_file")
+config_before=$(sha256_files "$project/.codex/config.toml"); generation_before=$(<"$generation_file")
 output=$("$repo/scripts/select-codex-mode" decomposition-gate "$project" 2>&1) && fail 'mismatched same-mode state refreshed'
 grep -Fq 'run a normal mode switch to repair state' <<<"$output" || fail 'refresh mismatch repair guidance missing'
-[[ $config_before == "$(shasum -a 256 "$project/.codex/config.toml")" && $generation_before == "$(<"$generation_file")" ]] || fail 'refresh mismatch mutated state'
+[[ $config_before == "$(sha256_files "$project/.codex/config.toml")" && $generation_before == "$(<"$generation_file")" ]] || fail 'refresh mismatch mutated state'
 sed -i.bak 's|harness/hooks|decomposition-gate/hooks|' "$project/.codex/config.toml"
 
 printf '%s\n' unrelated@elsewhere >> "$AI_GUARDRAIL_TEST_STATE/installed"
-before_bytes=$(shasum -a 256 "$project/.codex/config.toml")
+before_bytes=$(sha256_files "$project/.codex/config.toml")
 "$repo/scripts/select-codex-mode" --remove "$project"
 "$repo/scripts/verify-codex-mode" --no-managed-mode "$project" >/dev/null || fail 'removed mode did not verify'
 grep -Fxq unrelated@elsewhere "$AI_GUARDRAIL_TEST_STATE/installed" || fail 'remove deleted unrelated plugin'
 grep -Fq 'prefix = "unchanged"' "$project/.codex/config.toml" || fail 'remove changed unrelated config'
 grep -Fq '# suffix stays too' "$project/.codex/config.toml" || fail 'remove changed suffix'
 ! grep -Fq '# ai-guardrail-kit:begin' "$project/.codex/config.toml" || fail 'remove retained managed block'
-removed=$(shasum -a 256 "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")
+removed=$(sha256_files "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")
 "$repo/scripts/select-codex-mode" --remove "$project"
-[[ $removed == "$(shasum -a 256 "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'remove not idempotent'
+[[ $removed == "$(sha256_files "$project/.codex/config.toml" "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'remove not idempotent'
 
 if "$repo/scripts/verify-codex-mode" --no-managed-mode harness "$project" >/dev/null 2>&1; then fail 'contradictory verifier syntax accepted'; fi
 
 new_project "$tmp/remove-fail"; "$repo/scripts/select-codex-mode" harness "$tmp/remove-fail" >/dev/null
-remove_before=$(shasum -a 256 "$tmp/remove-fail/.codex/config.toml"); plugins_before=$(cat "$AI_GUARDRAIL_TEST_STATE/installed")
+remove_before=$(sha256_files "$tmp/remove-fail/.codex/config.toml"); plugins_before=$(cat "$AI_GUARDRAIL_TEST_STATE/installed")
 export FAKE_CODEX_FAIL_OPERATION=remove
 output=$("$repo/scripts/select-codex-mode" --remove "$tmp/remove-fail" 2>&1) && fail 'uninstall remove failure accepted'
 unset FAKE_CODEX_FAIL_OPERATION
 grep -Fq 'rollback succeeded' <<<"$output" || fail 'uninstall failure rollback missing'
-[[ $remove_before == "$(shasum -a 256 "$tmp/remove-fail/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'uninstall failure changed state'
+[[ $remove_before == "$(sha256_files "$tmp/remove-fail/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'uninstall failure changed state'
 
 export AI_GUARDRAIL_TEST_FAIL_CONFIG_WRITE=1
 output=$("$repo/scripts/select-codex-mode" --remove "$tmp/remove-fail" 2>&1) && fail 'uninstall config failure accepted'
 unset AI_GUARDRAIL_TEST_FAIL_CONFIG_WRITE
 grep -Fq 'rollback succeeded' <<<"$output" || fail 'uninstall config rollback missing'
-[[ $remove_before == "$(shasum -a 256 "$tmp/remove-fail/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'uninstall config failure changed state'
+[[ $remove_before == "$(sha256_files "$tmp/remove-fail/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'uninstall config failure changed state'
 
 list_count=$(<"$AI_GUARDRAIL_TEST_STATE/list.count")
 export FAKE_CODEX_FAIL_OPERATION="list:$((list_count + 2))"
 output=$("$repo/scripts/select-codex-mode" --remove "$tmp/remove-fail" 2>&1) && fail 'uninstall final verification failure accepted'
 unset FAKE_CODEX_FAIL_OPERATION
 grep -Fq 'rollback succeeded' <<<"$output" || fail 'uninstall final verification rollback missing'
-[[ $remove_before == "$(shasum -a 256 "$tmp/remove-fail/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'uninstall final verification changed state'
+[[ $remove_before == "$(sha256_files "$tmp/remove-fail/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'uninstall final verification changed state'
 
 for from in decomposition-gate sensitive-data-guard harness integrated-harness; do
   for to in decomposition-gate sensitive-data-guard harness integrated-harness; do
@@ -215,18 +224,18 @@ PY
 
 new_project "$tmp/rollback-add"
 "$repo/scripts/select-codex-mode" harness "$tmp/rollback-add" >/dev/null
-config_before=$(shasum -a 256 "$tmp/rollback-add/.codex/config.toml")
+config_before=$(sha256_files "$tmp/rollback-add/.codex/config.toml")
 plugins_before=$(cat "$AI_GUARDRAIL_TEST_STATE/installed")
 export FAKE_CODEX_FAIL_OPERATION=add FAKE_CODEX_FAIL_PLUGIN=integrated-harness@ai-guardrail-kit
 if "$repo/scripts/select-codex-mode" integrated-harness "$tmp/rollback-add" >/dev/null 2>&1; then fail 'add failure accepted'; fi
 unset FAKE_CODEX_FAIL_OPERATION FAKE_CODEX_FAIL_PLUGIN
-[[ $config_before == "$(shasum -a 256 "$tmp/rollback-add/.codex/config.toml")" ]] || fail 'config not rolled back after add failure'
+[[ $config_before == "$(sha256_files "$tmp/rollback-add/.codex/config.toml")" ]] || fail 'config not rolled back after add failure'
 [[ $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'plugins not rolled back after add failure'
 
 export FAKE_CODEX_FAIL_OPERATION=remove FAKE_CODEX_FAIL_PLUGIN=harness@ai-guardrail-kit
 if "$repo/scripts/select-codex-mode" decomposition-gate "$tmp/rollback-add" >/dev/null 2>&1; then fail 'remove failure accepted'; fi
 unset FAKE_CODEX_FAIL_OPERATION FAKE_CODEX_FAIL_PLUGIN
-[[ $config_before == "$(shasum -a 256 "$tmp/rollback-add/.codex/config.toml")" ]] || fail 'config changed after remove failure'
+[[ $config_before == "$(sha256_files "$tmp/rollback-add/.codex/config.toml")" ]] || fail 'config changed after remove failure'
 [[ $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'plugins changed after remove failure'
 
 new_project "$tmp/snapshot-copy"; printf 'snapshot-original\n' > "$tmp/snapshot-copy/.codex/config.toml"
@@ -268,12 +277,12 @@ kill -TERM "$pid"; set +e; wait "$pid"; status=$?; set -e
 
 new_project "$tmp/rollback-write"
 "$repo/scripts/select-codex-mode" harness "$tmp/rollback-write" >/dev/null
-config_before=$(shasum -a 256 "$tmp/rollback-write/.codex/config.toml")
+config_before=$(sha256_files "$tmp/rollback-write/.codex/config.toml")
 plugins_before=$(cat "$AI_GUARDRAIL_TEST_STATE/installed")
 export AI_GUARDRAIL_TEST_FAIL_CONFIG_WRITE=1
 if "$repo/scripts/select-codex-mode" integrated-harness "$tmp/rollback-write" >/dev/null 2>&1; then fail 'write failure accepted'; fi
 unset AI_GUARDRAIL_TEST_FAIL_CONFIG_WRITE
-[[ $config_before == "$(shasum -a 256 "$tmp/rollback-write/.codex/config.toml")" ]] || fail 'config not rolled back after write failure'
+[[ $config_before == "$(sha256_files "$tmp/rollback-write/.codex/config.toml")" ]] || fail 'config not rolled back after write failure'
 [[ $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'plugins not rolled back after write failure'
 
 new_project "$tmp/partial"; printf 'decomposition-gate@ai-guardrail-kit\nharness@ai-guardrail-kit\n' > "$AI_GUARDRAIL_TEST_STATE/installed"
@@ -302,11 +311,11 @@ expected_mode=$(file_mode "$tmp/mode/.codex/config.toml")
 "$repo/scripts/select-codex-mode" harness "$tmp/mode" >/dev/null
 [[ $(file_mode "$tmp/mode/.codex/config.toml") == "$expected_mode" ]] || fail 'forward write changed mode'
 
-config_before=$(shasum -a 256 "$tmp/mode/.codex/config.toml"); plugins_before=$(cat "$AI_GUARDRAIL_TEST_STATE/installed")
+config_before=$(sha256_files "$tmp/mode/.codex/config.toml"); plugins_before=$(cat "$AI_GUARDRAIL_TEST_STATE/installed")
 export AI_GUARDRAIL_TEST_FAIL_MODE_COPY=1
 if "$repo/scripts/select-codex-mode" integrated-harness "$tmp/mode" >/dev/null 2>&1; then fail 'mode copy failure accepted'; fi
 unset AI_GUARDRAIL_TEST_FAIL_MODE_COPY
-[[ $config_before == "$(shasum -a 256 "$tmp/mode/.codex/config.toml")" ]] || fail 'mode failure changed config'
+[[ $config_before == "$(sha256_files "$tmp/mode/.codex/config.toml")" ]] || fail 'mode failure changed config'
 [[ $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'mode failure changed plugins'
 [[ $(file_mode "$tmp/mode/.codex/config.toml") == "$expected_mode" ]] || fail 'mode failure rollback changed mode'
 
@@ -364,12 +373,12 @@ if "$repo/scripts/select-codex-mode" --update "$tmp/update" >/dev/null 2>&1; the
 
 update_generation="$AI_GUARDRAIL_TEST_STATE/generation.decomposition-gate_ai-guardrail-kit"
 generation_before=$(<"$update_generation")
-config_before=$(shasum -a 256 "$tmp/update/.codex/config.toml"); plugins_before=$(cat "$AI_GUARDRAIL_TEST_STATE/installed")
+config_before=$(sha256_files "$tmp/update/.codex/config.toml"); plugins_before=$(cat "$AI_GUARDRAIL_TEST_STATE/installed")
 export FAKE_CODEX_FAIL_OPERATION=upgrade
 output=$("$repo/scripts/select-codex-mode" --update decomposition-gate "$tmp/update" 2>&1) && fail 'update accepted marketplace upgrade failure'
 unset FAKE_CODEX_FAIL_OPERATION
 grep -Fq 'marketplace upgrade failed' <<<"$output" || fail 'upgrade failure message missing'
-[[ $config_before == "$(shasum -a 256 "$tmp/update/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'upgrade failure mutated state'
+[[ $config_before == "$(sha256_files "$tmp/update/.codex/config.toml")" && $plugins_before == "$(cat "$AI_GUARDRAIL_TEST_STATE/installed")" ]] || fail 'upgrade failure mutated state'
 [[ $(<"$update_generation") -eq $generation_before ]] || fail 'upgrade failure advanced installed generation'
 
 "$repo/scripts/select-codex-mode" --update decomposition-gate "$tmp/update" >/dev/null

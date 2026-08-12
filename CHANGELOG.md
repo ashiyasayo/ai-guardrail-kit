@@ -8,6 +8,18 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Codex `decomposition-gate` 與 `integrated-harness` 明確以 UTF-8 讀取計畫及治理政策檔，
+  避免 Windows 未啟用 UTF-8 mode 時，含繁體中文的有效計畫被誤判為不存在或無法讀取。
+
+### Changed
+
+- `tests/run_all.sh` 預設改跑快速 `smoke` profile，略過耗時的 Claude／Codex 完整模式切換
+  測試；可用 `AGK_TEST_PROFILE=full` 手動執行，CI 也提供手動與每週排程的完整回歸入口。
+- Codex 完整模式切換測試在 Windows Git Bash 缺少 `shasum` 時改用 `sha256sum` fallback，
+  避免完整回歸在測試初始化階段失敗。
+
 ## [0.3.0] - 2026-08-11
 
 ### Added

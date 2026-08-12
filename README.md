@@ -424,8 +424,11 @@ Codex 請使用 marketplace plugin 與 selector，不可沿用 copy-in 步驟。
   [`integrated-harness/MAINTENANCE.md`](integrated-harness/MAINTENANCE.md)），
   並把攻擊樣本加入 `tests/claude_hook_parity_test.sh` 的共同行為語料，
   由該測試守護兩邊判定一致。
-- 回歸測試統一入口為 `tests/run_all.sh`，CI 與人工回歸皆應以它執行
-  全部測試；也可單獨執行個別 `tests/*_test.sh`。
+- 回歸測試統一入口為 `tests/run_all.sh`：預設執行快速 `smoke` profile，略過耗時的
+  `claude_mode_switch_test.sh` 與 `codex_mode_switch_test.sh`；需要完整模式切換回歸時，
+  執行 `AGK_TEST_PROFILE=full bash tests/run_all.sh`，或從 CI workflow 手動選擇 `full`；
+  CI 每週排程也會固定執行 `full`。
+  也可單獨執行個別 `tests/*_test.sh`。
 - `harness` 與 `integrated-harness` 的 `settings.json` 只掛載 `guard.py` 統一進入點，
   由它在單一直譯器行程內依序執行三道檢查；hook 檔案須整組複製，
   修改任一檢查腳本後應執行 `tests/claude_guard_test.sh` 回歸。
@@ -443,7 +446,8 @@ Codex 請使用 marketplace plugin 與 selector，不可沿用 copy-in 步驟。
   已知刻意例外。修改上述任一份後，兩份都要一起改。
 - Codex plugin 的共用 hook 以 `shared/codex/` 為唯一審核來源；修改該目錄後執行
   `scripts/sync-codex-hook-copies` 更新可攜式 plugin 副本，再以
-  `scripts/sync-codex-hook-copies --check` 與完整回歸測試確認沒有漂移。
+  `scripts/sync-codex-hook-copies --check` 與 `bash tests/run_all.sh`（預設 smoke）確認
+  沒有漂移；若同時涉及模式切換，再以 `AGK_TEST_PROFILE=full` 執行完整回歸。
 - Codex `harness` 與 `integrated-harness` 以 `security_guard.py` 在單一 Python
   程序內依序執行危險命令與秘密寫入檢查；計畫閘門與個資改寫因決策語意不同，
   仍維持獨立 hook。
