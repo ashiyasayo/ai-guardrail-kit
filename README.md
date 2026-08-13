@@ -28,6 +28,20 @@ hooks）」。三個目錄**功能與用途各自獨立、不可同時安裝**�
 
 ## 快速開始
 
+### 在 Codex 或 Claude Code 內執行命令
+
+不必離開 Codex 或 Claude Code，也不必另外開終端機；在互動輸入列的開頭加上 `!`，即可
+直接執行 shell 命令並在目前 session 看到結果：
+
+```text
+!git status
+!python --version
+```
+
+`!` 會讓目前輸入直接進入命令模式；命令結束後仍留在原本的 Codex thread 或 Claude
+Code session，接著可以繼續對話。命令會在目前工作目錄執行，實際 shell 語法依作業系統
+與平台 CLI 的行為為準。
+
 ### Codex
 
 Codex 使用 repository marketplace manifest、[`codex/`](codex/) 內的 plugin 與專案 hook

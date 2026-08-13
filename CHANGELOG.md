@@ -15,6 +15,8 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- README 與 CLI reference 補充 Codex／Claude Code 的互動命令模式：可在輸入列以 `!`
+  直接執行 shell 命令，無須離開目前 thread／session 或另開終端機。
 - `tests/run_all.sh` 預設改跑快速 `smoke` profile，略過耗時的 Claude／Codex 完整模式切換
   測試；可用 `AGK_TEST_PROFILE=full` 手動執行，CI 也提供手動與每週排程的完整回歸入口。
 - Codex 完整模式切換測試在 Windows Git Bash 缺少 `shasum` 時改用 `sha256sum` fallback，

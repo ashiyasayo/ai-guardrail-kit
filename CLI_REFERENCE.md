@@ -3,6 +3,19 @@
 本專案提供四種互斥模式：`decomposition-gate`、`sensitive-data-guard`、
 `harness`、`integrated-harness`。同一平台、同一專案只能啟用一種。
 
+## 互動命令模式
+
+在 Codex 或 Claude Code 的互動輸入列開頭加上 `!`，可直接執行 shell 命令，不必離開
+目前的 thread／session 或另外開終端機：
+
+```text
+!git status
+!python --version
+```
+
+命令會在目前工作目錄執行，結束後回到原本的互動對話；實際 shell 語法依作業系統與
+平台 CLI 的行為為準。
+
 ## Claude Code
 
 ```bash
