@@ -39,19 +39,46 @@ agk_validate_config() {
   if [[ -L $config ]]; then agk_die "refusing symlinked config: $config"; return 1; fi
   if [[ -e $config && ! -f $config ]]; then agk_die "refusing non-regular config: $config"; return 1; fi
   [[ ! -e $config || -r $config ]] || { agk_die "config is not readable: $config"; return 1; }
-  python3 - "$config" "$AGK_BEGIN" "$AGK_END" <<'PY'
-import pathlib, sys
-p = pathlib.Path(sys.argv[1])
-s = p.read_text() if p.exists() else ""
-b, e = s.count(sys.argv[2]), s.count(sys.argv[3])
-if b != e or b > 1:
-    raise SystemExit("codex mode: malformed managed block delimiters")
-lines = s.splitlines()
-if b and (lines.count(sys.argv[2]) != 1 or lines.count(sys.argv[3]) != 1):
-    raise SystemExit("codex mode: delimiters must each occupy a complete line")
-if b and s.index(sys.argv[2]) > s.index(sys.argv[3]):
-    raise SystemExit("codex mode: managed block end precedes begin")
-PY
+  [[ ! -e $config ]] && return 0
+
+  # 分隔符只含 ASCII；以 awk 逐位元組檢查可避免為了基本結構驗證啟動 Python，
+  # 同時不會受 Windows code page 或計畫內容的 UTF-8 影響。
+  local error
+  error=$(awk -v begin="$AGK_BEGIN" -v end="$AGK_END" '
+    function occurrences(text, needle, position, total) {
+      total = 0
+      while ((position = index(text, needle)) != 0) {
+        total++
+        text = substr(text, position + length(needle))
+      }
+      return total
+    }
+    {
+      begin_count += occurrences($0, begin)
+      end_count += occurrences($0, end)
+      line = $0
+      sub(/\r$/, "", line)
+      if (line == begin) begin_line = NR
+      if (line == end) end_line = NR
+    }
+    END {
+      if (begin_count != end_count || begin_count > 1) {
+        print "malformed managed block delimiters"
+        exit 1
+      }
+      if (begin_count && (begin_line == 0 || end_line == 0)) {
+        print "delimiters must each occupy a complete line"
+        exit 1
+      }
+      if (begin_count && begin_line > end_line) {
+        print "managed block end precedes begin"
+        exit 1
+      }
+    }
+  ' "$config") || {
+    agk_die "$error"
+    return 1
+  }
 }
 
 agk_personal_policy_path() {
@@ -113,7 +140,7 @@ agk_installed_modes() {
   local listing
   listing=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-plugins.XXXXXX") || return 1
   if ! codex plugin list --json > "$listing"; then rm -f "$listing"; return 1; fi
-  python3 - "$AGK_MARKETPLACE" "$listing" <<'PY'
+  "$AGK_PYTHON_BIN" - "$AGK_MARKETPLACE" "$listing" <<'PY'
 import json, pathlib, sys
 # Windows 上 stdout 預設會將換行翻譯為 CRLF，重設為 LF 供 bash 讀取
 sys.stdout.reconfigure(newline=chr(10))
@@ -220,10 +247,94 @@ for path in sys.argv[2:]:
 PY
 }
 
+agk_extract_managed_block() {
+  local config=$1
+  awk -v begin="$AGK_BEGIN" -v end="$AGK_END" '
+    index($0, begin) { inside = 1 }
+    inside { print }
+    inside && index($0, end) { found = 1; exit }
+    END { if (!found) exit 1 }
+  ' "$config"
+}
+
+agk_verify_hook_files() {
+  local mode=$1 repo=$2 root="$repo/codex/plugins/$mode/hooks" path
+  local -a paths
+  case $mode in
+    decomposition-gate) paths=("$root/decomposition_gate.py");;
+    sensitive-data-guard) paths=("$root/block_secrets.py" "$root/pii_guard.py");;
+    harness) paths=("$root/plan_gate.py" "$root/security_guard.py" "$root/pii_guard.py");;
+    integrated-harness) paths=("$root/plan_gate.py" "$root/security_guard.py" "$root/pii_guard.py" "$root/session_start.py");;
+    *) agk_die "unknown managed mode: $mode"; return 1;;
+  esac
+
+  local exec_check
+  case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) exec_check=0;; *) exec_check=1;; esac
+  for path in "${paths[@]}"; do
+    [[ -f $path ]] || { agk_die "hook file is missing: $path"; return 1; }
+    (( ! exec_check )) || [[ -x $path ]] || { agk_die "hook file is not executable: $path"; return 1; }
+  done
+}
+
+agk_verify_mode() {
+  local expected=$1 project=$2 repo=$3 installed='' wanted_file='' mode count=0 line config actual wanted
+  local installed_supplied=0
+  if (( $# >= 4 )) && [[ -n ${4:-} ]]; then
+    installed=$4
+    installed_supplied=1
+  fi
+  if (( $# >= 5 )); then
+    wanted_file=$5
+  fi
+  if (( ! installed_supplied )); then
+    installed=$(agk_installed_modes) || { agk_die 'could not inspect installed plugins'; return 1; }
+  fi
+  while IFS= read -r line; do
+    [[ -n $line ]] || continue
+    count=$((count + 1))
+    [[ -n ${mode:-} ]] || mode=$line
+  done <<< "$installed"
+  (( count == 1 )) || { agk_die "expected exactly one installed managed plugin, found $count"; return 1; }
+  [[ -z $expected || $expected == "$mode" ]] || { agk_die "installed mode $mode does not match expected $expected"; return 1; }
+  AGK_VERIFIED_MODE=$mode
+  if [[ $mode == integrated-harness ]]; then
+    agk_validate_personal_policy || return 1
+  fi
+
+  config="$project/.codex/config.toml"
+  [[ -f $config ]] || { agk_die 'managed config block is missing'; return 1; }
+  agk_validate_config "$project" || return 1
+  actual=$(agk_extract_managed_block "$config") || { agk_die 'managed hooks are malformed'; return 1; }
+  if [[ -n $wanted_file ]]; then
+    wanted=$(<"$wanted_file")
+  else
+    wanted=$(agk_render_block "$mode" "$repo") || return 1
+  fi
+  [[ $actual == "$wanted" ]] || { agk_die "managed hooks do not match installed mode $mode"; return 1; }
+  agk_verify_hook_files "$mode" "$repo" || return 1
+}
+
+agk_verify_no_managed_mode() {
+  local project=$1 installed count=0 line config
+  if (( $# >= 2 )); then
+    installed=$2
+  else
+    installed=$(agk_installed_modes) || { agk_die 'could not inspect installed plugins'; return 1; }
+  fi
+  while IFS= read -r line; do
+    [[ -n $line ]] || continue
+    count=$((count + 1))
+  done <<< "$installed"
+  (( count == 0 )) || { agk_die "expected no installed managed plugin, found $count"; return 1; }
+  agk_validate_config "$project" || return 1
+  config="$project/.codex/config.toml"
+  [[ ! -e $config ]] || ! grep -Fq "$AGK_BEGIN" "$config" || { agk_die 'managed config block remains'; return 1; }
+}
+
 agk_replace_config() {
   local project=$1 block_file=$2 config="$1/.codex/config.toml" tmp
   tmp=$(mktemp "$project/.codex/.config.toml.ai-guardrail.XXXXXX") || return 1
-  if ! python3 - "$config" "$tmp" "$block_file" "$AGK_BEGIN" "$AGK_END" <<'PY'
+  if ! "$AGK_PYTHON_BIN" - "$config" "$tmp" "$block_file" "$AGK_BEGIN" "$AGK_END" <<'PY'
 import pathlib, sys
 source, target, block_path = map(pathlib.Path, sys.argv[1:4])
 begin, end = sys.argv[4:6]
@@ -252,7 +363,7 @@ agk_remove_config_block() {
   local project=$1 config="$1/.codex/config.toml" tmp
   [[ -e $config ]] || return 0
   tmp=$(mktemp "$project/.codex/.config.toml.ai-guardrail.XXXXXX") || return 1
-  if ! python3 - "$config" "$tmp" "$AGK_BEGIN" "$AGK_END" <<'PY'
+  if ! "$AGK_PYTHON_BIN" - "$config" "$tmp" "$AGK_BEGIN" "$AGK_END" <<'PY'
 import pathlib, sys
 source, target = map(pathlib.Path, sys.argv[1:3]); begin, end = map(str.encode, sys.argv[3:5])
 old = source.read_bytes()

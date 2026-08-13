@@ -89,7 +89,9 @@ trap 'on_signal HUP 129' HUP
 # official add command replaces cached content in place: failure preserves the
 # old install, while success cannot be rolled back to the prior content bytes.
 if (( ! remove )) && [[ $(<"$snapshot/modes") == "$mode" ]]; then
-  if ! "$script_dir/verify-codex-mode" "$mode" "$project" >/dev/null; then
+  block="$snapshot/block"
+  agk_render_block "$mode" "$repo" > "$block" || exit 1
+  if ! agk_verify_mode "$mode" "$project" "$repo" "$(<"$snapshot/modes")" "$block"; then
     agk_die 'current mode is not exact; run a normal mode switch to repair state'
     exit 1
   fi
@@ -102,7 +104,7 @@ if (( ! remove )) && [[ $(<"$snapshot/modes") == "$mode" ]]; then
     exit 1
   fi
   refresh_committed=1
-  if ! "$script_dir/verify-codex-mode" "$mode" "$project" >/dev/null; then
+  if ! agk_verify_mode "$mode" "$project" "$repo" '' "$block"; then
     agk_die 'update applied but verification failed'
     exit 1
   fi
@@ -124,12 +126,12 @@ fi
 
 if (( remove )); then
   agk_remove_config_block "$project" || { rollback; exit 1; }
-  "$script_dir/verify-codex-mode" --no-managed-mode "$project" >/dev/null || { rollback; exit 1; }
+  agk_verify_no_managed_mode "$project" || { rollback; exit 1; }
   printf 'Removed Codex guardrail mode; start a new thread to deactivate it.\n'
 else
   block="$snapshot/block"
   agk_render_block "$mode" "$repo" > "$block"
   agk_replace_config "$project" "$block" || { rollback; exit 1; }
-  "$script_dir/verify-codex-mode" "$mode" "$project" >/dev/null || { rollback; exit 1; }
+  agk_verify_mode "$mode" "$project" "$repo" '' "$block" || { rollback; exit 1; }
   printf 'Selected Codex mode %s; start a new thread to activate it.\n' "$mode"
 fi

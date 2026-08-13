@@ -79,7 +79,9 @@ unset FAKE_CODEX_FAIL_OPERATION
 [[ $(<"$generation_file") -eq 2 ]] || fail 'failed refresh add changed installed generation'
 
 list_count=$(<"$AI_GUARDRAIL_TEST_STATE/list.count")
-export FAKE_CODEX_FAIL_OPERATION="list:$((list_count + 3))"
+# 同模式刷新沿用尚未變更前的安裝快照，故刷新後驗證是下一次 list（+2，
+# 另包含本次 selector 的初始 snapshot），不再有獨立的刷新前 list。
+export FAKE_CODEX_FAIL_OPERATION="list:$((list_count + 2))"
 output=$("$repo/scripts/select-codex-mode" decomposition-gate "$project" 2>&1) && fail 'refresh post-check failure accepted'
 unset FAKE_CODEX_FAIL_OPERATION
 grep -Fq 'update applied but verification failed' <<<"$output" || fail 'post-commit refresh failure message missing'
@@ -96,7 +98,7 @@ for signal_case in INT:130 TERM:143 HUP:129; do
   signal_generation="$AI_GUARDRAIL_TEST_STATE/generation.decomposition-gate_ai-guardrail-kit"
   generation_before_signal=$(<"$signal_generation")
   signal_output="$tmp/refresh-signal-$signal.output"
-  delayed_list=$(( $(<"$AI_GUARDRAIL_TEST_STATE/list.count") + 3 ))
+  delayed_list=$(( $(<"$AI_GUARDRAIL_TEST_STATE/list.count") + 2 ))
   FAKE_CODEX_DELAY_OPERATION="list:$delayed_list" python3 - "$repo/scripts/select-codex-mode" "$signal_project" "$signal_output" "$AI_GUARDRAIL_TEST_STATE/delay.list.$delayed_list.ready" "$signal" "$expected" <<'PY' || fail "$signal post-add refresh signal status"
 import os, pathlib, signal, subprocess, sys, time
 command, project, output, ready, signal_name, expected = sys.argv[1:]

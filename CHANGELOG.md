@@ -21,6 +21,9 @@ All notable changes to this project are documented in this file.
   避免完整回歸在測試初始化階段失敗。
 - Codex selector／verify 合併重複的 Python 啟動：一次同一台 Windows 主機的單支專測由
   1,004 秒降至 955 秒，節省約 4.9%；完整回歸時間仍會受主機 I/O 波動影響。
+- Codex selector 將驗證改為共用 Bash 流程，並以 `awk` 執行 ASCII 設定分隔符檢查，
+  避免另開 verify 子程序及不必要的 Python 啟動；同一台 Windows 主機的專測由
+  955 秒降至約 652 秒，節省約 32%。完整模式轉換、rollback 與訊號測試覆蓋維持不變。
 
 ## [0.3.0] - 2026-08-11
 
