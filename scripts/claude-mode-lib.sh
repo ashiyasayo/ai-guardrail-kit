@@ -15,7 +15,7 @@ AGK_CLAUDE_MODES=(decomposition-gate sensitive-data-guard harness integrated-har
 agk_claude_modes() { printf '%s\n' "${AGK_CLAUDE_MODES[@]}"; }
 
 agk_claude_validate_scope() {
-  case ${1:-} in project|local) return 0;; *) printf 'claude mode: unsupported scope: %s\n' "${1:-}" >&2; return 1;; esac
+  case ${1:-} in project|local|user) return 0;; *) printf 'claude mode: unsupported scope: %s\n' "${1:-}" >&2; return 1;; esac
 }
 
 agk_claude_list_scope() {
@@ -65,10 +65,11 @@ agk_claude_is_enabled() {
 }
 
 agk_claude_effective_modes() {
-  local project local
+  local project local user
   project=$(agk_claude_list_scope project) || return 1
   local=$(agk_claude_list_scope local) || return 1
-  printf '%s\n%s\n' "$project" "$local" | awk 'NF && !seen[$0]++' | sort
+  user=$(agk_claude_list_scope user) || return 1
+  printf '%s\n%s\n%s\n' "$project" "$local" "$user" | awk 'NF && !seen[$0]++' | sort
 }
 
 agk_claude_validate_package() {

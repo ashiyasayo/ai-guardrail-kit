@@ -15,6 +15,9 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- Claude 與 Codex selector／verifier 現在都支援 `project`、`local`、`user` 三種 scope；
+  Claude user scope 使用 plugin scope，Codex local/user 分別使用專案與使用者的
+  `hooks.json` 層。README、CLI reference 與兩份 marketplace guide 已同步說明對應路徑。
 - README 與 CLI reference 補充 Codex／Claude Code 的互動命令模式：可在輸入列以 `!`
   直接執行 shell 命令，無須離開目前 thread／session 或另開終端機。
 - `tests/run_all.sh` 預設改跑快速 `smoke` profile，略過耗時的 Claude／Codex 完整模式切換

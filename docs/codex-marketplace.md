@@ -2,7 +2,9 @@
 
 The Codex marketplace manifest is at `.agents/plugins/marketplace.json`, with
 four complete plugins under `codex/plugins/` named `decomposition-gate`,
-`sensitive-data-guard`, `harness`, and `integrated-harness`. Select exactly one.
+`sensitive-data-guard`, `harness`, and `integrated-harness`. Select exactly one
+managed mode and choose where its hooks are enabled with `project`, `local`, or
+`user` scope.
 These plugins implement the same product
 intent as the top-level Claude packages, but Codex hook, approval, installation,
 and policy semantics are platform-specific and are not claimed to be identical.
@@ -30,16 +32,36 @@ codex plugin marketplace add "$(pwd)"
 Then select and verify a mode:
 
 ```bash
-./scripts/select-codex-mode decomposition-gate .
-./scripts/verify-codex-mode decomposition-gate .
+./scripts/select-codex-mode decomposition-gate --scope project .
+./scripts/verify-codex-mode decomposition-gate --scope project .
 ```
 
-Substitute `harness` or `integrated-harness` in both repository commands. Use an
+Codex does not expose Claude's named plugin-install scopes; this repository maps
+the three selector scopes to the native hook layers as follows:
+
+| Scope | Managed layer | Intended reach |
+| --- | --- | --- |
+| `project` | `<project>/.codex/config.toml` managed block | project-shared configuration |
+| `local` | `<project>/.codex/hooks.json` managed commands | current project local configuration |
+| `user` | `$CODEX_HOME/hooks.json` (default `~/.codex/hooks.json`) | every project for the user |
+
+Examples for the other two layers:
+
+```bash
+./scripts/select-codex-mode harness --scope local .
+./scripts/verify-codex-mode harness --scope local .
+./scripts/select-codex-mode integrated-harness --scope user .
+./scripts/verify-codex-mode integrated-harness --scope user .
+```
+
+Substitute any of the four mode names in the repository commands. Use an
 explicit project directory instead of `.` when configuring another project.
-Selection installs the target, removes the other two managed plugins, writes the
-selector-owned hook block in the project's `.codex/config.toml`, and verifies that
-the installed plugin and active hooks agree. Marketplace metadata itself does not
-provide mutual exclusion, and plugin installation alone does not activate hooks.
+Selection installs the target, removes the other managed plugins, writes the
+selector-owned hooks in the selected layer, and verifies that the installed
+plugin and active hooks agree. Marketplace metadata itself does not provide
+mutual exclusion, and plugin installation alone does not activate hooks. Since
+Codex plugin installation is user-global, do not keep different selector-managed
+modes in different scope layers at the same time.
 
 After every selection or reinstall, start a new thread. Existing threads do not
 reliably reload newly installed skills and hooks.
@@ -110,14 +132,17 @@ not override them, in strict or light mode.
 
 ## Managed state and verification
 
-The selector exclusively owns the text from
+For `project`, the selector exclusively owns the text from
 `# ai-guardrail-kit:begin` through `# ai-guardrail-kit:end` in
-`.codex/config.toml`. Do not edit that block. Content outside it is preserved.
-The selector rejects malformed delimiters, symlinks, and non-regular config
-targets. Run the verifier after any suspected state change:
+`.codex/config.toml`. For `local` and `user`, it owns only commands carrying
+the corresponding scope marker in `hooks.json`; unrelated hooks are preserved.
+The selector rejects malformed delimiters, malformed hook JSON, symlinks, and
+non-regular targets. Run the verifier after any suspected state change:
 
 ```bash
-./scripts/verify-codex-mode integrated-harness /path/to/project
+./scripts/verify-codex-mode integrated-harness --scope project /path/to/project
+./scripts/verify-codex-mode integrated-harness --scope local /path/to/project
+./scripts/verify-codex-mode integrated-harness --scope user /path/to/project
 ```
 
 Direct `codex plugin add/remove` can desynchronize installed plugin state from
@@ -125,13 +150,14 @@ the project hook block. Use the selector for installation, switching, refreshing
 and safe removal:
 
 ```bash
-./scripts/select-codex-mode --remove /path/to/project
-./scripts/verify-codex-mode --no-managed-mode /path/to/project
+./scripts/select-codex-mode --remove --scope project /path/to/project
+./scripts/verify-codex-mode --no-managed-mode --scope project /path/to/project
 ```
 
-Removal transactionally removes all managed plugins and only the selector-owned
-config block. Unrelated plugins and config bytes are preserved. Repeating it is
-safe.
+Use the same `--scope` value for local or user removal. Removal transactionally
+removes all managed plugins and only the selector-owned block or marked hook
+commands for that scope. Unrelated plugins, hooks, and config bytes are
+preserved. Repeating it is safe.
 
 ## Remote update workflow
 
@@ -139,8 +165,8 @@ For a marketplace registered from GitHub, refresh this marketplace's Git
 snapshot and reinstall the selected mode in one selector command:
 
 ```bash
-./scripts/select-codex-mode --update <mode> <project>
-./scripts/verify-codex-mode <mode> <project>
+./scripts/select-codex-mode --update <mode> --scope project <project>
+./scripts/verify-codex-mode <mode> --scope project <project>
 ```
 
 `--update` first runs `codex plugin marketplace upgrade ai-guardrail-kit`
@@ -158,12 +184,14 @@ Codex caches installed local plugin content. During repository development,
 refresh the selected plugin through the selector:
 
 ```bash
-./scripts/select-codex-mode <mode> .
-./scripts/verify-codex-mode <mode> .
+./scripts/select-codex-mode <mode> --scope project .
+./scripts/verify-codex-mode <mode> --scope project .
 ```
 
+Replace `project` with `local` or `user` when refreshing another hook layer.
+
 For a same-mode refresh, the selector first requires the installed plugin,
-managed config block, repository hook paths, and executables to be exact. A
+selected scope layer, repository hook paths, and executables to be exact. A
 mismatch is rejected without mutation; run a normal switch to another mode and
 back to repair it. The final `codex plugin add <mode>@ai-guardrail-kit` is the
 irreversible update commit point. If it fails, the old cached generation remains.

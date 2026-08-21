@@ -393,4 +393,28 @@ assert_mode decomposition-gate "$tmp/update"
 [[ $(<"$AI_GUARDRAIL_TEST_STATE/upgrade.count") -eq 3 ]] || fail 'update switch did not call marketplace upgrade'
 assert_mode harness "$tmp/update"
 
+# Codex 沒有 Claude 式的 local 名稱：local 對應目前專案的 hooks.json，
+# user 對應 CODEX_HOME（測試中為 HOME/.codex）的 hooks.json。
+scope_project="$tmp/scope"
+new_project "$scope_project"
+printf '{"hooks":{"PreToolUse":[{"matcher":"other","hooks":[{"type":"command","command":"other-command"}]}]}}\n' > "$scope_project/.codex/hooks.json"
+"$repo/scripts/select-codex-mode" harness --scope local "$scope_project" >/dev/null
+"$repo/scripts/verify-codex-mode" harness --scope local "$scope_project" >/dev/null || fail 'local scope did not verify'
+assert_file "$scope_project/.codex/hooks.json"
+grep -Fq 'other-command' "$scope_project/.codex/hooks.json" || fail 'local scope removed unrelated hook'
+"$repo/scripts/select-codex-mode" --remove --scope local "$scope_project" >/dev/null
+"$repo/scripts/verify-codex-mode" --no-managed-mode --scope local "$scope_project" >/dev/null || fail 'local scope did not remove'
+grep -Fq 'other-command' "$scope_project/.codex/hooks.json" || fail 'local removal removed unrelated hook'
+
+new_project "$tmp/user-scope"
+mkdir -p "$HOME/.codex"
+printf '{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"user-command"}]}]}}\n' > "$HOME/.codex/hooks.json"
+"$repo/scripts/select-codex-mode" integrated-harness --scope user "$tmp/user-scope" >/dev/null
+"$repo/scripts/verify-codex-mode" integrated-harness --scope user "$tmp/user-scope" >/dev/null || fail 'user scope did not verify'
+assert_file "$HOME/.codex/hooks.json"
+grep -Fq 'user-command' "$HOME/.codex/hooks.json" || fail 'user scope removed unrelated hook'
+"$repo/scripts/select-codex-mode" --remove --scope user "$tmp/user-scope" >/dev/null
+"$repo/scripts/verify-codex-mode" --no-managed-mode --scope user "$tmp/user-scope" >/dev/null || fail 'user scope did not remove'
+grep -Fq 'user-command' "$HOME/.codex/hooks.json" || fail 'user removal removed unrelated hook'
+
 printf 'PASS: transactional Codex mode switching\n'

@@ -9,11 +9,18 @@ expected=''
 no_managed=0
 if [[ ${1:-} == --no-managed-mode ]]; then no_managed=1; shift; fi
 if (( ! no_managed )) && [[ $# -gt 0 ]] && agk_valid_mode "$1"; then expected=$1; shift; fi
-[[ $# -le 1 ]] || { agk_die 'usage: verify-codex-mode [--no-managed-mode | expected-mode] [project-dir]'; exit 2; }
+scope=project
+if [[ ${1:-} == --scope ]]; then
+  [[ $# -ge 2 ]] || { agk_die 'usage: verify-codex-mode [--no-managed-mode | expected-mode] [--scope project|local|user] [project-dir]'; exit 2; }
+  scope=$2
+  shift 2
+fi
+agk_validate_scope "$scope" >/dev/null || exit 2
+[[ $# -le 1 ]] || { agk_die 'usage: verify-codex-mode [--no-managed-mode | expected-mode] [--scope project|local|user] [project-dir]'; exit 2; }
 project=$(agk_resolve_project "${1:-.}") || exit 1
 if (( no_managed )); then
-  agk_verify_no_managed_mode "$project" || exit 1
-  printf 'Verified no managed Codex mode.\n'; exit 0
+  agk_verify_no_managed_mode "$project" "$scope" || exit 1
+  printf 'Verified no managed Codex mode (%s).\n' "$scope"; exit 0
 fi
-agk_verify_mode "$expected" "$project" "$repo" || exit 1
-printf 'Verified Codex mode %s.\n' "$AGK_VERIFIED_MODE"
+agk_verify_mode "$expected" "$project" "$repo" "$scope" || exit 1
+printf 'Verified Codex mode %s (%s).\n' "$AGK_VERIFIED_MODE" "$scope"

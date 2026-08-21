@@ -9,7 +9,8 @@ no_installed=0
 if [[ ${1:-} == --no-installed ]]; then no_installed=1; shift; fi
 [[ $# -le 1 ]] || { agk_die 'usage: verify-codex-global-integrated-harness [--no-installed] [repo-dir]'; exit 2; }
 [[ $# -eq 0 ]] || repo=$(cd "$1" && pwd -P)
-hooks="$HOME/.codex/hooks.json"
+codex_home=$(agk_codex_home)
+hooks="$codex_home/hooks.json"
 installed=$(agk_installed_modes) || { agk_die 'could not inspect installed plugins'; exit 1; }
 count=$(printf '%s\n' "$installed" | awk 'NF { n++ } END { print n+0 }')
 if (( no_installed )); then

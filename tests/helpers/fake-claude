@@ -23,7 +23,7 @@ scope_arg() {
   while (($#)); do
     if [[ $1 == --scope ]]; then SCOPE=${2:?missing scope}; shift 2; else shift; fi
   done
-  case $SCOPE in project|local) :;; *) printf 'fake claude: unsupported scope %s\n' "$SCOPE" >&2; exit 2;; esac
+  case $SCOPE in project|local|user) :;; *) printf 'fake claude: unsupported scope %s\n' "$SCOPE" >&2; exit 2;; esac
 }
 
 mutate() {
@@ -65,7 +65,7 @@ case ${2:-} in
     [[ ${3:-} == --json ]] || exit 2
     if [[ -n ${FAKE_CLAUDE_LIST_OUTPUT:-} ]]; then printf '%s\n' "$FAKE_CLAUDE_LIST_OUTPUT"; exit 0; fi
     if [[ ${FAKE_CLAUDE_CORRUPT_LIST:-0} == 1 || -e $state/corrupt-next-list ]]; then rm -f "$state/corrupt-next-list"; printf '{corrupt\n'; exit 0; fi
-    python3 - "$state/project.json" "$state/local.json" <<'PY'
+    python3 - "$state/project.json" "$state/local.json" "$state/user.json" <<'PY'
 import json, pathlib, sys
 out=[]
 for name in sys.argv[1:]:
@@ -85,7 +85,7 @@ PY
 import json,pathlib,sys
 # 模擬實際 CLI 的結構化來源格式：{"source":"directory","path":...}
 root=pathlib.Path(sys.argv[1]); out=[]
-for scope in ('project','local'):
+for scope in ('project','local','user'):
  p=root/f'marketplace.{scope}'
  if p.exists():
   path=p.read_text().strip()

@@ -24,25 +24,60 @@ claude plugin marketplace add "$(pwd)" --scope project
 ./scripts/verify-claude-mode sensitive-data-guard .
 ```
 
-可將 `project` 改為 `local`。移除目前受管模式：
+可將 `project` 改為 `local` 或 `user`。Codex／Claude 的 `user` selector 流程都需要
+先在對應 scope 註冊本機 marketplace；Claude user scope 會套用到所有 Claude Code
+專案。移除所有目前找到的受管模式：
 
 ```bash
 ./scripts/select-claude-mode --remove --scope project .
 ```
 
+Claude user scope 的 repository selector 流程：
+
+```bash
+claude plugin marketplace add "$(pwd)" --scope user
+./scripts/select-claude-mode integrated-harness --scope user .
+./scripts/verify-claude-mode integrated-harness .
+```
+
+若沒有本機 checkout，也可使用 Claude 原生 CLI；這條替代流程不使用本專案的
+selector／verifier：
+
+```bash
+claude plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --scope user --sparse .claude-plugin claude/plugins
+claude plugin install integrated-harness@ai-guardrail-kit --scope user
+claude plugin list --json
+```
+
+確認 plugin 清單中的 `scope` 為 `user` 且 `enabled` 為 `true`。全域 user scope
+不要與 `project`／`local` managed mode 混用；安裝、更新或移除後請開新的 Claude
+Code session。
+
 ## Codex
 
 ```bash
 codex plugin marketplace add "$(pwd)"
-./scripts/select-codex-mode sensitive-data-guard .
-./scripts/verify-codex-mode sensitive-data-guard .
+./scripts/select-codex-mode sensitive-data-guard --scope project .
+./scripts/verify-codex-mode sensitive-data-guard --scope project .
+```
+
+Codex 三種 scope 的設定層如下：`project` 是專案共享的
+`.codex/config.toml` managed block；`local` 是目前專案的
+`.codex/hooks.json`；`user` 是 `$CODEX_HOME/hooks.json`（預設
+`~/.codex/hooks.json`）。範例：
+
+```bash
+./scripts/select-codex-mode harness --scope local .
+./scripts/verify-codex-mode harness --scope local .
+./scripts/select-codex-mode integrated-harness --scope user .
+./scripts/verify-codex-mode integrated-harness --scope user .
 ```
 
 移除目前受管模式：
 
 ```bash
-./scripts/select-codex-mode --remove /path/to/project
-./scripts/verify-codex-mode --no-managed-mode /path/to/project
+./scripts/select-codex-mode --remove --scope project /path/to/project
+./scripts/verify-codex-mode --no-managed-mode --scope project /path/to/project
 ```
 
 ## 釘版本與發版

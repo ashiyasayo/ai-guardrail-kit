@@ -35,7 +35,7 @@ if [[ $group == lifecycle ]]; then
   managed_state() { python3 - "$AI_GUARDRAIL_CLAUDE_TEST_STATE" <<'PY'
 import json, pathlib, sys
 root=pathlib.Path(sys.argv[1]); rows=[]
-for scope in ('project','local'):
+for scope in ('project','local','user'):
  p=root/f'{scope}.json'
  for x in json.loads(p.read_text()) if p.exists() else []:
   if x['id'].endswith('@ai-guardrail-kit') and x['id'].split('@')[0] in ('decomposition-gate','sensitive-data-guard','harness','integrated-harness'):
@@ -47,8 +47,11 @@ PY
   reset_state
   before=$(state_digest)
   ! select_mode bogus >/dev/null 2>&1 || fail 'invalid mode accepted'
-  ! select_mode harness --scope user >/dev/null 2>&1 || fail 'user scope accepted'
   [[ $before == "$(state_digest)" ]] || fail 'invalid input mutated state'
+  select_mode harness --scope user >/dev/null || fail 'user scope was rejected'
+  assert_effective harness
+  [[ -f $AI_GUARDRAIL_CLAUDE_TEST_STATE/user.json ]] || fail 'user scope was not recorded'
+  reset_state
 
   output=$(select_mode decomposition-gate); grep -Fq 'start a new Claude Code session' <<<"$output" || fail 'selection omitted session restart'
   assert_effective decomposition-gate
@@ -125,11 +128,11 @@ PY
   awk -F '\t' -v project="$project" '$1 != project { print "unexpected cwd: " $0 > "/dev/stderr"; exit 1 }' "$AI_GUARDRAIL_CLAUDE_TEST_STATE/calls.log" || fail 'Claude operation ran outside project cwd'
 
   export FAKE_CLAUDE_LIST_OUTPUT='[{"id":"harness@ai-guardrail-kit","scope":"user","enabled":false}]'
-  ! verify_mode harness >/dev/null 2>&1 || fail 'named verifier accepted managed user scope'
-  ! verify_mode --no-managed-mode >/dev/null 2>&1 || fail 'empty verifier accepted managed user scope'
+  ! verify_mode harness >/dev/null 2>&1 || fail 'named verifier accepted disabled user scope'
+  verify_mode --no-managed-mode >/dev/null || fail 'empty verifier rejected disabled user scope'
   unset FAKE_CLAUDE_LIST_OUTPUT
 
-  for conflict_scope in project local; do
+  for conflict_scope in project local user; do
     export FAKE_CLAUDE_LIST_OUTPUT="[{\"id\":\"harness@ai-guardrail-kit\",\"scope\":\"project\",\"enabled\":true},{\"id\":\"decomposition-gate@ai-guardrail-kit\",\"scope\":\"$conflict_scope\",\"enabled\":false}]"
     output=$(verify_mode harness 2>&1) && fail "disabled $conflict_scope non-target accepted"
     grep -Fq "conflict: decomposition-gate ($conflict_scope)" <<<"$output" || fail "disabled $conflict_scope conflict diagnostic missing"
@@ -140,12 +143,12 @@ PY
     reset_state; export FAKE_CLAUDE_MISSING_SUBCOMMAND=$missing
     output=$(select_mode harness 2>&1) && fail "missing $missing capability accepted"
     unset FAKE_CLAUDE_MISSING_SUBCOMMAND
-    [[ ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/project.json && ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/local.json ]] || fail "missing $missing capability mutated lifecycle state"
+    [[ ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/project.json && ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/local.json && ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/user.json ]] || fail "missing $missing capability mutated lifecycle state"
   done
   reset_state; export FAKE_CLAUDE_UNREGISTERED_MARKETPLACE=1
   output=$(select_mode harness 2>&1) && fail 'unregistered marketplace accepted'
   unset FAKE_CLAUDE_UNREGISTERED_MARKETPLACE
-  [[ ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/project.json && ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/local.json ]] || fail 'unregistered marketplace mutated lifecycle state'
+  [[ ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/project.json && ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/local.json && ! -e $AI_GUARDRAIL_CLAUDE_TEST_STATE/user.json ]] || fail 'unregistered marketplace mutated lifecycle state'
 
   expected_marketplace=$(cd "$repo" && pwd -P)
   assert_bad_marketplace_resolution() {
@@ -256,15 +259,17 @@ fi
 assert_output $'decomposition-gate\nsensitive-data-guard\nharness\nintegrated-harness' agk_claude_modes
 agk_claude_validate_scope project || fail 'project scope rejected'
 agk_claude_validate_scope local || fail 'local scope rejected'
-! agk_claude_validate_scope user >/dev/null 2>&1 || fail 'user scope accepted'
+agk_claude_validate_scope user || fail 'user scope rejected'
 
 reset_state
 assert_output '' agk_claude_list_scope project
+assert_output '' agk_claude_list_scope user
 assert_output '' agk_claude_effective_modes
 
 install harness project
 assert_output harness agk_claude_list_scope project
 assert_output '' agk_claude_list_scope local
+assert_output '' agk_claude_list_scope user
 agk_claude_is_enabled harness project || fail 'project harness not enabled'
 ! agk_claude_is_enabled harness local || fail 'project harness leaked into local'
 assert_output harness agk_claude_effective_modes
@@ -272,6 +277,10 @@ assert_output harness agk_claude_effective_modes
 reset_state; install decomposition-gate local
 assert_output decomposition-gate agk_claude_list_scope local
 assert_output decomposition-gate agk_claude_effective_modes
+
+reset_state; install harness user
+assert_output harness agk_claude_list_scope user
+assert_output harness agk_claude_effective_modes
 
 reset_state; install harness project; install harness local
 assert_output harness agk_claude_effective_modes
@@ -300,8 +309,10 @@ reset_state
 marketplace="$tmp/marketplace"
 claude plugin marketplace add "$marketplace" --scope project >/dev/null
 claude plugin marketplace add "$marketplace" --scope local >/dev/null
+claude plugin marketplace add "$marketplace" --scope user >/dev/null
 [[ $(<"$AI_GUARDRAIL_CLAUDE_TEST_STATE/marketplace.project") == "$marketplace" ]] || fail 'project marketplace scope not recorded'
 [[ $(<"$AI_GUARDRAIL_CLAUDE_TEST_STATE/marketplace.local") == "$marketplace" ]] || fail 'local marketplace scope not recorded'
+[[ $(<"$AI_GUARDRAIL_CLAUDE_TEST_STATE/marketplace.user") == "$marketplace" ]] || fail 'user marketplace scope not recorded'
 
 install harness project
 install decomposition-gate local
