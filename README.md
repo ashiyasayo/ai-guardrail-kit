@@ -65,6 +65,56 @@ codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git 
 codex plugin add decomposition-gate@ai-guardrail-kit
 ```
 
+#### Codex marketplace、git clone 與 selector 的關係
+
+這三個步驟的職責不同，不能把 marketplace 註冊視為 selector 的替代品：
+
+| 步驟 | 作用 | 是否切換模式 |
+| --- | --- | --- |
+| `git clone` | 取得本專案的 selector、verifier、global installer 與本機 checkout | 否；只取得管理工具與本機檔案 |
+| `codex plugin marketplace add` | 註冊 marketplace manifest 與 plugin 套件來源，讓 Codex 能找到 `mode@ai-guardrail-kit` | 否；只註冊來源 |
+| `select-codex-mode` | 安裝選定 plugin、移除其他受管模式、寫入指定 scope 的 hooks，並執行驗證與 rollback | 是 |
+| `verify-codex-mode` | 檢查已安裝 plugin、scope hooks 與選定模式是否一致 | 否；只檢查 |
+
+因此，Codex 的支援流程需要先取得一份本機 `git clone`，再註冊 marketplace，最後由
+selector 管理模式切換。marketplace 只提供插件來源；marketplace metadata 本身不負責
+互斥，也不會替 `project`、`local` 或 `user` scope 寫入 hooks。直接使用
+`codex plugin add/remove` 可能造成已安裝 plugin 與 hooks 設定不同步，請使用 selector
+進行安裝、切換、更新及移除。
+
+註冊 marketplace 通常只需執行一次；之後切換模式不必重新 clone 或重新註冊 marketplace，
+但仍要從該 clone 的根目錄執行 selector。以下相對路徑命令的執行位置是必要條件：
+
+```text
+ai-guardrail-kit/             # git clone 的根目錄
+└─ scripts/select-codex-mode
+```
+
+先切換到 clone 根目錄，再執行：
+
+```bash
+cd /path/to/ai-guardrail-kit
+./scripts/select-codex-mode harness --scope user .
+./scripts/verify-codex-mode harness --scope user .
+```
+
+命令最後的 `.` 代表要設定的目標專案。如果要設定另一個專案，仍須在 clone 根目錄執行，
+並將 `.` 改成目標專案路徑：
+
+```bash
+./scripts/select-codex-mode harness --scope user /path/to/target-project
+./scripts/verify-codex-mode harness --scope user /path/to/target-project
+```
+
+Windows PowerShell 不會直接執行這些沒有副檔名的 shell script；請在 Git Bash 或 WSL 中
+執行 `./scripts/...`，或在 PowerShell 且已安裝 `bash` 時執行：
+
+```powershell
+Set-Location C:\path\to\ai-guardrail-kit
+bash ./scripts/select-codex-mode harness --scope user .
+bash ./scripts/verify-codex-mode harness --scope user .
+```
+
 Selector 支援三種 scope：`project` 將受管 block 寫入
 `<project>/.codex/config.toml`，`local` 將受管 hooks 寫入
 `<project>/.codex/hooks.json`，`user` 則寫入
