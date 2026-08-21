@@ -5,10 +5,10 @@ repo=$(cd "$script_dir/.." && pwd -P)
 # shellcheck source=claude-mode-lib.sh
 source "$script_dir/claude-mode-lib.sh"
 
-usage() { printf 'usage: select-claude-mode <mode>|--remove [--scope project|local] [project-dir]\n' >&2; exit 2; }
+usage() { printf 'usage: select-claude-mode <mode>|--remove [--scope project|local|user] [project-dir]\n' >&2; exit 2; }
 action=${1:-}; shift || true
 remove=0
-case $action in --remove) remove=1;; decomposition-gate|harness|integrated-harness) target=$action;; *) usage;; esac
+case $action in --remove) remove=1;; decomposition-gate|sensitive-data-guard|harness|integrated-harness) target=$action;; *) usage;; esac
 scope=project
 if [[ ${1:-} == --scope ]]; then [[ $# -ge 2 ]] || usage; scope=$2; shift 2; fi
 agk_claude_validate_scope "$scope" >/dev/null 2>&1 || usage
@@ -28,7 +28,7 @@ marketplaces=$(mktemp "${TMPDIR:-/tmp}/ai-guardrail-claude-marketplaces.XXXXXX")
 if ! ccli plugin marketplace list --json >"$marketplaces"; then rm -f "$marketplaces"; printf 'required Claude marketplace capability is unavailable\n' >&2; exit 1; fi
 expected_marketplace=$(cd "$repo" && pwd -P) || { rm -f "$marketplaces"; exit 1; }
 python3 - "$marketplaces" "$AGK_CLAUDE_MARKETPLACE" "$expected_marketplace" <<'PY' || { rm -f "$marketplaces"; printf 'ai-guardrail-kit marketplace is not registered as a resolvable local directory source\n' >&2; exit 1; }
-import json,pathlib,sys
+import json,pathlib,re,sys
 try: data=json.loads(pathlib.Path(sys.argv[1]).read_text())
 except (OSError,UnicodeError,json.JSONDecodeError): raise SystemExit(1)
 if not isinstance(data,list) or any(not isinstance(x,dict) or not isinstance(x.get('name'),str) for x in data): raise SystemExit(1)
@@ -38,9 +38,17 @@ entry=matches[0]
 # 僅接受 directory 來源：selector 驗證的是本地 checkout 的套件內容，
 # git/github 來源安裝自遠端快取，與本地驗證結果無法對應
 if entry.get('source')!='directory' or not isinstance(entry.get('path'),str): raise SystemExit(1)
-try: actual=pathlib.Path(entry['path']).expanduser().resolve(strict=True)
+def resolve_cli_path(value):
+    # Git Bash 會把 Windows 路徑傳成 /c/...；Python 原生 Windows Path
+    # 會誤解為目前磁碟根目錄下的 c 目錄，先轉成真正的 drive path。
+    if sys.platform == 'win32' and re.match(r'^/[A-Za-z]/', value):
+        value = value[1].upper() + ':' + value[2:]
+    return pathlib.Path(value).expanduser().resolve(strict=True)
+try: actual=resolve_cli_path(entry['path'])
 except (OSError,RuntimeError): raise SystemExit(1)
-if actual != pathlib.Path(sys.argv[3]).resolve(strict=True): raise SystemExit(1)
+try: expected=resolve_cli_path(sys.argv[3])
+except (OSError,RuntimeError): raise SystemExit(1)
+if actual != expected: raise SystemExit(1)
 PY
 rm -f "$marketplaces"
 
@@ -59,7 +67,6 @@ for x in data:
     if '@' in x['id']:
         name, origin=x['id'].rsplit('@',1)
         if origin==market and name in modes:
-            if x['scope']=='user': raise SystemExit(1)
             rows.append((name,x['scope'],'1' if x['enabled'] else '0'))
 # 快照檔供 bash grep 逐行比對，位元組寫入避免 Windows 換行翻譯成 CRLF
 pathlib.Path(dest).write_bytes(''.join('\t'.join(x)+'\n' for x in sorted(rows)).encode())
@@ -74,7 +81,7 @@ remove_all() {
 restore() {
   local m s enabled
   # Clear whatever managed state remains, then replay the exact saved tuples.
-  for s in project local; do for m in "${AGK_CLAUDE_MODES[@]}"; do ccli plugin uninstall "$(plugin "$m")" --scope "$s" >/dev/null 2>&1 || true; done; done
+  for s in project local user; do for m in "${AGK_CLAUDE_MODES[@]}"; do ccli plugin uninstall "$(plugin "$m")" --scope "$s" >/dev/null 2>&1 || true; done; done
   while IFS=$'\t' read -r m s enabled; do
     [[ -z $m ]] && continue
     ccli plugin install "$(plugin "$m")" --scope "$s" >/dev/null 2>&1 || continue
@@ -88,7 +95,7 @@ source,wanted,market,*modes=sys.argv[1:]; data=json.loads(pathlib.Path(source).r
 for x in data:
  if '@' in x.get('id',''):
   n,o=x['id'].rsplit('@',1)
-  if o==market and n in modes and x.get('scope') in ('project','local'): rows.append((n,x['scope'],'1' if x.get('enabled') else '0'))
+  if o==market and n in modes and x.get('scope') in ('project','local','user'): rows.append((n,x['scope'],'1' if x.get('enabled') else '0'))
 actual=''.join('\t'.join(x)+'\n' for x in sorted(rows))
 raise SystemExit(0 if actual==pathlib.Path(wanted).read_text() else 1)
 PY

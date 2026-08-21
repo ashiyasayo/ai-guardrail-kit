@@ -9,8 +9,9 @@ remove=0
 if [[ ${1:-} == --remove ]]; then remove=1; shift; fi
 [[ $# -le 1 ]] || { agk_die 'usage: install-codex-global-integrated-harness [--remove] [repo-dir]'; exit 2; }
 [[ $# -eq 0 ]] || repo=$(cd "$1" && pwd -P)
-hooks="$HOME/.codex/hooks.json"
-backup="$HOME/.codex/guardrail/global-integrated-harness-hooks.json"
+codex_home=$(agk_codex_home)
+hooks="$codex_home/hooks.json"
+backup="$codex_home/guardrail/global-integrated-harness-hooks.json"
 backup_missing="$backup.missing"
 backup_created=0
 snapshot=$(mktemp -d "${TMPDIR:-/tmp}/ai-guardrail-global.XXXXXX")

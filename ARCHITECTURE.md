@@ -18,6 +18,17 @@ Claude `decomposition-gate` 的 copy-in 與 marketplace 發佈皆由 SessionStar
 同一份風險分級協定；同步測試守護主協定、subagent 協定及注入 hook。Codex
 `integrated-harness` 則由 plugin skill 提供對等的執行行為校準。
 
+Claude selector／verifier 支援 `project`、`local`、`user` 三種 scope；其中
+`user` 會讓 plugin 對該使用者的所有 Claude Code 專案生效。若改用 Claude
+原生 CLI 從遠端 marketplace 安裝 user scope，則不經本專案的 package
+validation、互斥及 rollback 邊界。
+
+Codex CLI 的 plugin 安裝狀態是使用者層級，但 hooks 可分別落在三個設定層：
+`project` 使用 `<project>/.codex/config.toml` managed block，`local` 使用
+`<project>/.codex/hooks.json`，`user` 使用 `$CODEX_HOME/hooks.json`（預設
+`~/.codex/hooks.json`）。selector 會依 scope 驗證並更新對應層；Codex 的
+`integrated-harness` global installer 是另一條相容流程，不應與 user selector 混用。
+
 ## 多版本一致性架構
 
 每次功能變更都必須以「平台 × 模式 × 發佈型態」盤點影響範圍；根目錄
@@ -30,7 +41,9 @@ Claude `decomposition-gate` 的 copy-in 與 marketplace 發佈皆由 SessionStar
 | Claude | `sensitive-data-guard` | marketplace | `shared/claude/`、`claude/plugins/sensitive-data-guard/` | shared 同步檢查及 PII 行為測試 |
 | Claude | `harness` | copy-in、marketplace | `shared/claude/`、`harness/.claude/`、`claude/plugins/harness/` | shared 同步、copy-in parity 及 hook 行為測試 |
 | Claude | `integrated-harness` | copy-in、marketplace | `shared/claude/`、`integrated-harness/`、`claude/plugins/integrated-harness/` | 協定同步、copy-in parity、orchestration 與 hook 行為測試 |
-| Codex | 四種模式 | marketplace／selector | `shared/codex/`、`codex/plugins/`、`scripts/codex-mode-lib.sh` | shared 同步、marketplace、mode switch 及 guardrail 測試 |
+| Claude | 四種模式 | marketplace／selector（project、local、user） | `shared/claude/`、`claude/plugins/`、`scripts/claude-mode-lib.sh` | shared 同步、marketplace、三 scope mode switch 及 guardrail 測試 |
+| Claude | 四種模式 | native user fallback | Claude 原生 `plugin install --scope user`；不經 repository selector | marketplace 文件與 CLI 操作契約測試 |
+| Codex | 四種模式 | marketplace／selector（project、local、user） | `shared/codex/`、`codex/plugins/`、`scripts/codex-mode-lib.sh` | shared 同步、marketplace、三 scope mode switch 及 guardrail 測試 |
 | Codex | `integrated-harness` | global install | `codex/plugins/integrated-harness/`、global installer | global install 交易與 rollback 測試 |
 | Copilot | `decomposition-gate` | copy-in | `shared/copilot/`、`copilot/plugins/decomposition-gate/` | shared 同步檢查、Copilot smoke test；Preview 平台限制另見相關文件 |
 | Copilot | `sensitive-data-guard` | copy-in | `shared/copilot/`、`copilot/plugins/sensitive-data-guard/` | shared 同步檢查、三平台 PII 行為一致性測試、Copilot smoke test |
@@ -38,6 +51,11 @@ Claude `decomposition-gate` 的 copy-in 與 marketplace 發佈皆由 SessionStar
 若某次變更對矩陣中的版本不適用，交付說明必須列出該版本及原因。已有 `shared/`
 單一事實來源的功能一律先改來源再同步；無法共用檔案者以共同測試語料驗證行為，
 不得依靠人工記憶維持一致。
+
+根層 `tests/run_all.sh` 預設執行快速 `smoke` profile，保留共享同步、marketplace、
+guardrail 及 global install 等日常回歸；Claude 與 Codex 的完整模式切換測試改由
+`AGK_TEST_PROFILE=full` 手動執行，或由 CI 的排程／手動 workflow 執行。這是測試執行
+策略的分層，不代表矩陣中的模式或發佈型態被移除。
 
 `integrated-harness` 的 `ORCHESTRATOR.md` 不負責教導一般任務分解、模型路由或
 代理調度；這些工作交由平台與模型。文件只保留人類授權、外部副作用、修改範圍、

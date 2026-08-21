@@ -32,10 +32,16 @@ Read `AGENTS.md` and `ARCHITECTURE.md` before changing any hook/protocol/skill �
 
 ## Common commands
 
-Run the full regression suite (the canonical entry point for CI and manual regression):
+Run the default smoke regression suite (the canonical entry point for push/PR and routine manual regression):
 
 ```bash
 bash tests/run_all.sh
+```
+
+Run the complete mode-switch regression when needed:
+
+```bash
+AGK_TEST_PROFILE=full bash tests/run_all.sh
 ```
 
 Run one test file directly, e.g.:
@@ -54,7 +60,12 @@ bash tests/pii_cross_platform_parity_test.sh   # Claude/Codex/Copilot PII rules 
 
 The two `copilot_*_test.sh` files are thin wrappers around each mode's own `tests/smoke_test.sh`, so the test logic lives in one place. Note that `bash copilot/plugins/…/tests/smoke_test.sh` cannot be run directly under this repo's `strict` policy (only `bash tests/…` is allowlisted) — use the wrappers.
 
-`tests/run_all.sh` applies a per-test timeout (`AGK_TEST_TIMEOUT`, default 2400s); `codex_mode_switch_test.sh` is legitimately slow on Windows/Git Bash (~1170s measured, many Python interpreter spawns), not hung.
+`tests/run_all.sh` defaults to the `smoke` profile and applies a per-test timeout
+(`AGK_TEST_TIMEOUT`, default 2400s). Smoke skips `claude_mode_switch_test.sh` and
+`codex_mode_switch_test.sh`; use the `full` profile for those complete mode-switch checks.
+The Codex test is legitimately slow on Windows/Git Bash (~1170s measured, many Python
+interpreter spawns), not hung; a recent isolated optimized run measured ~955s on the same
+host, while full-run timings remain sensitive to host I/O.
 
 After editing `shared/claude/*`, `shared/codex/*`, or `shared/copilot/*`, always run the corresponding sync script before testing:
 
@@ -93,7 +104,8 @@ Copilot tests must also pass `cwd` through `cygpath -w` (with backslashes escape
 1. Identify the single source of truth for the feature (`shared/claude/`, `shared/codex/`, or — if none exists yet — every duplicated copy) and every published copy/entry point.
 2. Build the platform × mode × distribution impact matrix (see `ARCHITECTURE.md` "多版本一致性架構" table).
 3. Edit the source of truth, run the sync script, or hand-edit every duplicated copy plus add/extend a byte-for-byte or behavioral parity test.
-4. Run the relevant mode-specific tests, then `bash tests/run_all.sh`.
+4. Run the relevant mode-specific tests, then `bash tests/run_all.sh` (smoke); use
+   `AGK_TEST_PROFILE=full bash tests/run_all.sh` when complete mode-switch coverage is required.
 5. Update `README.md` / `CLI_REFERENCE.md` / `ARCHITECTURE.md` / `CHANGELOG.md` if the change affects public interface or behavior; bump `claude/plugins/<mode>/.claude-plugin/plugin.json` `version` if that mode's Claude plugin behavior changed. Codex/Copilot have no version field — never invent one (see `VERSIONING.md`).
 6. State explicitly in your final report which platform/mode/distribution combos were changed, which were checked-but-not-applicable (and why), and what tests were run.
 

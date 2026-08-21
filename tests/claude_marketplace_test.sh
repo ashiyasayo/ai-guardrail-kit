@@ -127,20 +127,29 @@ assert "docs/claude-marketplace.md" in readme, "README does not link Claude mark
 required_documentation = {
     'claude plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --scope project --sparse .claude-plugin claude/plugins': "remote marketplace registration",
     'claude plugin marketplace add "$(pwd)" --scope project': "marketplace registration",
+    'claude plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --scope user --sparse .claude-plugin claude/plugins': "global marketplace registration",
+    'claude plugin install integrated-harness@ai-guardrail-kit --scope user': "global plugin installation",
+    'claude plugin list --json': "global installation verification",
     "./scripts/select-claude-mode decomposition-gate --scope project .": "decomposition selection",
     "./scripts/select-claude-mode harness --scope project .": "harness selection",
     "./scripts/select-claude-mode integrated-harness --scope project .": "integrated selection",
     "./scripts/select-claude-mode decomposition-gate --scope local .": "local selection",
+    "./scripts/select-claude-mode integrated-harness --scope user .": "user selection",
     "./scripts/verify-claude-mode decomposition-gate .": "verification",
     "./scripts/select-claude-mode --remove --scope project .": "removal",
 }
 for text, purpose in required_documentation.items():
     assert text in guide, f"missing {purpose}: {text}"
+for text in (
+    'claude plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --scope user --sparse .claude-plugin claude/plugins',
+    'claude plugin install integrated-harness@ai-guardrail-kit --scope user',
+):
+    assert text in readme, f"README missing global user-scope command: {text}"
 coupled_requirements = {
     r"Selecting the same mode at the same scope is the update workflow": "same-mode update semantics",
     r"Start a new Claude Code session after every successful selection, update, or\s+removal": "lifecycle session restart",
     r"existing top-level `decomposition-gate/`,\s+`harness/`, and `integrated-harness/` copy-in distributions remain supported": "specific copy-in compatibility",
-    r"`user`-scope\s+installation is unsupported and the selector and verifier reject it as a\s+conflict": "unsupported user-scope behavior",
+    r"native commands bypass the selector's package source validation,\s+mutual-exclusion, and rollback boundary": "native user-scope boundary",
     r"direct native commands such as `claude plugin install`,\s+`uninstall`, `enable`, or `disable` bypass selector mutual exclusion": "specific native CLI bypass",
 }
 for pattern, purpose in coupled_requirements.items():

@@ -3,7 +3,9 @@
 The Claude marketplace manifest is at `.claude-plugin/marketplace.json`, with
 four complete plugins under `claude/plugins/` named `decomposition-gate`,
 `sensitive-data-guard`, `harness`, and `integrated-harness`. Use the repository selector to keep
-exactly one managed mode effective across project and local scope.
+exactly one managed mode effective across the supported `project`, `local`, and `user` scopes.
+The selector validates a local checkout as its package source; a separate native Claude CLI
+user-scope path is also documented below for remote installation without the selector.
 
 `sensitive-data-guard` is the standalone data-protection option. It blocks
 plaintext secrets and prompt PII, and redacts supported PII from write content.
@@ -55,11 +57,46 @@ claude plugin marketplace add "$(pwd)" --scope local
 ./scripts/select-claude-mode decomposition-gate --scope local .
 ```
 
-Only `project` and `local` are supported managed scopes. A `user`-scope
-installation is unsupported and the selector and verifier reject it as a
-conflict. The remove command clears all managed modes it finds across both
-supported scopes; its `--scope` argument is validated CLI syntax but does not
-limit that cleanup to one scope.
+For a user-scope installation managed by this repository, register the local
+checkout at `user` scope and select the mode with the same scope:
+
+```bash
+claude plugin marketplace add "$(pwd)" --scope user
+./scripts/select-claude-mode integrated-harness --scope user .
+./scripts/verify-claude-mode integrated-harness .
+```
+
+The user scope applies to every Claude Code project for that user. The selector
+still owns the mutual-exclusion and rollback boundary across all three scopes.
+
+## Global user-scope installation (native Claude CLI)
+
+To run one managed mode in every Claude Code project, install it through the
+native CLI at `user` scope:
+
+```bash
+claude plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --scope user --sparse .claude-plugin claude/plugins
+claude plugin install integrated-harness@ai-guardrail-kit --scope user
+claude plugin list --json
+```
+
+Replace `integrated-harness` with one of the four modes. Confirm that the
+selected plugin reports `scope` as `user` and `enabled` as `true`. This path
+does not use `scripts/select-claude-mode` or `scripts/verify-claude-mode`: the
+native commands bypass the selector's package source validation,
+mutual-exclusion, and rollback boundary. Keep exactly one managed mode at user
+scope and do not combine it with a selector-managed mode.
+
+Remove a native user-scope installation with the native CLI, then start a new
+Claude Code session:
+
+```bash
+claude plugin uninstall integrated-harness@ai-guardrail-kit --scope user
+```
+
+The repository selector's remove command clears all managed modes it finds
+across the supported `project`, `local`, and `user` scopes; its `--scope`
+argument is validated CLI syntax but does not limit that cleanup to one scope.
 
 Start a new Claude Code session after every successful selection, update, or
 removal. An existing session does not reliably reload changed plugins and hooks.

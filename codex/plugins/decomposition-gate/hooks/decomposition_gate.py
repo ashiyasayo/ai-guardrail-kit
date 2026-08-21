@@ -52,7 +52,7 @@ def main():
     else:
         deny("Plan gate: unknown tool is not proven read-only.")
     try:
-        content = (root / PLAN).read_text()
+        content = (root / PLAN).read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         deny("Plan gate: 找不到或無法讀取拆解產出物。")
     if any(marker not in content for marker in MARKERS):

@@ -198,10 +198,12 @@ def event(cwd, tool="apply_patch", tool_input=None):
             "permission_mode": "default", "session_id": "s", "tool_input": tool_input or {"patch": "*** Begin Patch\n*** Add File: src/app.py\n+x\n*** End Patch"},
             "tool_name": tool, "tool_use_id": "u", "transcript_path": "", "turn_id": "t"}
 
-def run(hook, data, home=None, global_default=False):
+def run(hook, data, home=None, global_default=False, python_utf8=None):
     env = os.environ.copy()
     if home is not None: env["HOME"] = str(home)
     if global_default: env["AI_GUARDRAIL_GLOBAL_DEFAULT"] = "1"
+    if python_utf8 is not None:
+        env["PYTHONUTF8"] = "1" if python_utf8 else "0"
     proc = subprocess.run([sys.executable, str(hook)], input=json.dumps(data), text=True, capture_output=True, env=env)
     assert proc.returncode == 0, (hook, proc.stderr)
     return json.loads(proc.stdout)["hookSpecificOutput"] if proc.stdout.strip() else None
@@ -211,17 +213,17 @@ def run_raw(hook, data):
     assert proc.returncode == 0, (hook, proc.stderr)
     return json.loads(proc.stdout) if proc.stdout.strip() else None
 
-def denied(hook, data, reason_contains, home=None):
+def denied(hook, data, reason_contains, home=None, python_utf8=None):
     # 只比對 deny 會讓任何無關原因造成的普遍性攔截也滿足斷言，即使受測關卡
     # 完全失效仍是綠燈；故一律要求比對原因專屬片段。
-    result = run(hook, data, home)
+    result = run(hook, data, home, python_utf8=python_utf8)
     assert result and result["permissionDecision"] == "deny", (hook, result)
     reason = result["permissionDecisionReason"]
     assert reason_contains in reason, (hook, reason_contains, reason)
     return reason
 
-def asked(hook, data, home=None):
-    result = run(hook, data, home)
+def asked(hook, data, home=None, python_utf8=None):
+    result = run(hook, data, home, python_utf8=python_utf8)
     assert result and result["permissionDecision"] == "ask", (hook, result)
     return result["permissionDecisionReason"]
 
@@ -251,6 +253,10 @@ with tempfile.TemporaryDirectory() as td:
     denied(dg, event(project), "拆解產出物不完整")
     plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】x\n")
     assert run(dg, event(project)) is None
+
+    # 驗證計畫檔以 UTF-8 儲存時，不依賴 PYTHONUTF8 或 Windows 系統 code page。
+    plan.write_bytes("## 已知資訊\n## 缺少的資訊\n【假設】x\n".encode("utf-8"))
+    assert run(dg, event(project), python_utf8=False) is None
 
     hp = install / "harness/hooks/plan_gate.py"
     assert not (install / "harness/scripts/approve_plan.py").exists()
@@ -352,6 +358,7 @@ with tempfile.TemporaryDirectory() as td:
     policy = guard / "orchestration-policy.md"
     shutil.copy(install / "integrated-harness/orchestration-policy.md", policy)
     plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】x\n## 允許修改範圍\n- `src/`\n")
+    assert asked(ip, event(project), python_utf8=False)
     first_reason = asked(ip, event(project))
     assert hashlib.sha256(plan.read_bytes()).hexdigest() in first_reason
     denied(ip, event(project, tool_input={"patch": "*** Begin Patch\n*** Add File: other/x\n+x\n*** End Patch"}), "目標不在計畫允許修改範圍")

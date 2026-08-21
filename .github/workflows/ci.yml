@@ -5,16 +5,33 @@ on:
     branches: [main, release]
   pull_request:
     branches: [main, release]
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "回歸測試 profile"
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - full
+  schedule:
+    - cron: "0 18 * * 0"
 
 jobs:
   tests:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
+    env:
+      AGK_TEST_PROFILE: ${{ github.event_name == 'schedule' && 'full' || (github.event_name == 'workflow_dispatch' && inputs.profile || 'smoke') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
-      - name: Full regression (all modes / platforms)
-        run: bash tests/run_all.sh
+      - name: Regression (selected profile)
+        run: |
+          echo "AGK_TEST_PROFILE=$AGK_TEST_PROFILE"
+          bash tests/run_all.sh
       - name: Copilot decomposition-gate smoke
         run: bash copilot/plugins/decomposition-gate/tests/smoke_test.sh

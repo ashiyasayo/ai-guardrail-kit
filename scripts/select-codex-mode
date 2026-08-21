@@ -6,17 +6,26 @@ repo=$(cd "$script_dir/.." && pwd -P)
 source "$script_dir/codex-mode-lib.sh"
 
 mode=${1:-}
+shift || true
 remove=0
 update=0
-if [[ $mode == --update ]]; then update=1; shift; mode=${1:-}; fi
+if [[ $mode == --update ]]; then update=1; mode=${1:-}; shift || true; fi
 if [[ $mode == --remove ]]; then
   (( update )) && { agk_die '--update cannot be combined with --remove'; exit 2; }
   remove=1
 else
-  agk_valid_mode "$mode" || { agk_die "expected --remove, --update <mode>, or one of: decomposition-gate, harness, integrated-harness"; exit 2; }
+  agk_valid_mode "$mode" || { agk_die "expected --remove, --update <mode>, or one of: decomposition-gate, sensitive-data-guard, harness, integrated-harness"; exit 2; }
 fi
-project=$(agk_resolve_project "${2:-.}") || exit 1
-agk_validate_config "$project" || exit 1
+scope=project
+if [[ ${1:-} == --scope ]]; then
+  [[ $# -ge 2 ]] || { agk_die 'usage: select-codex-mode [--update] <mode>|--remove [--scope project|local|user] [project-dir]'; exit 2; }
+  scope=$2
+  shift 2
+fi
+agk_validate_scope "$scope" >/dev/null || exit 2
+[[ $# -le 1 ]] || { agk_die 'usage: select-codex-mode [--update] <mode>|--remove [--scope project|local|user] [project-dir]'; exit 2; }
+project=$(agk_resolve_project "${1:-.}") || exit 1
+agk_prepare_scope_target "$scope" "$project" || exit 1
 
 # 遠端更新：先重抓本 marketplace 的 Git 快照，失敗即中止且不動既有安裝；
 # 成功後沿用既有選擇／refresh 流程，由 codex plugin add 從新快照重裝。
@@ -27,17 +36,17 @@ if (( update )); then
   fi
 fi
 
-config="$project/.codex/config.toml"
 snapshot=$(mktemp -d "${TMPDIR:-/tmp}/ai-guardrail-rollback.XXXXXX") || exit 1
 trap '(( BASH_SUBSHELL > 0 )) || rm -rf "$snapshot"' EXIT
-config_existed=0
-if [[ -e $config ]]; then
+scope_file=$(agk_scope_path "$scope" "$project") || { rm -rf "$snapshot"; exit 1; }
+scope_existed=0
+if [[ -e $scope_file ]]; then
   # Validation and snapshotting cannot be atomic across this external path; the
-  # documented TOCTOU boundary remains between agk_validate_config and cp.
-  if [[ ${AI_GUARDRAIL_TEST_FAIL_SNAPSHOT_COPY:-0} == 1 ]] || ! cp -p "$config" "$snapshot/config"; then
-    agk_die 'could not snapshot config'; rm -rf "$snapshot"; exit 1
+  # documented TOCTOU boundary remains between scope validation and cp.
+  if [[ ${AI_GUARDRAIL_TEST_FAIL_SNAPSHOT_COPY:-0} == 1 ]] || ! cp -p "$scope_file" "$snapshot/scope-file"; then
+    agk_die 'could not snapshot scope file'; rm -rf "$snapshot"; exit 1
   fi
-  config_existed=1
+  scope_existed=1
 fi
 if ! agk_installed_modes > "$snapshot/modes"; then agk_die 'could not inspect installed plugins'; exit 1; fi
 
@@ -54,13 +63,13 @@ rollback() {
     [[ -z $old ]] && continue
     grep -Fxq "$old" <<<"$current" || codex plugin add "$(agk_plugin_path "$old")" >/dev/null 2>&1 || failed=1
   done < "$snapshot/modes"
-  agk_restore_config "$project" "$snapshot/config" "$config_existed" || failed=1
+  agk_restore_scope "$scope" "$project" "$snapshot/scope-file" "$scope_existed" || failed=1
   agk_remove_created_personal_policy "$repo" || failed=1
   original=$(<"$snapshot/modes")
   if ! current=$(agk_installed_modes 2>/dev/null) || [[ $original != "$current" ]] ||
-     { [[ $config_existed == 1 ]] && ! cmp -s "$snapshot/config" "$config"; } ||
-     { [[ $config_existed == 1 ]] && [[ $(agk_file_mode "$snapshot/config") != $(agk_file_mode "$config") ]]; } ||
-     { [[ $config_existed == 0 ]] && [[ -e $config ]]; }; then failed=1; fi
+     { [[ $scope_existed == 1 ]] && ! cmp -s "$snapshot/scope-file" "$scope_file"; } ||
+     { [[ $scope_existed == 1 ]] && [[ $(agk_file_mode "$snapshot/scope-file") != $(agk_file_mode "$scope_file") ]]; } ||
+     { [[ $scope_existed == 0 ]] && [[ -e $scope_file ]]; }; then failed=1; fi
   if (( failed )); then agk_die 'switch failed; rollback also failed'; else agk_die 'switch failed; rollback succeeded'; fi
   return 1
 }
@@ -89,7 +98,12 @@ trap 'on_signal HUP 129' HUP
 # official add command replaces cached content in place: failure preserves the
 # old install, while success cannot be rolled back to the prior content bytes.
 if (( ! remove )) && [[ $(<"$snapshot/modes") == "$mode" ]]; then
-  if ! "$script_dir/verify-codex-mode" "$mode" "$project" >/dev/null; then
+  block=''
+  if [[ $scope == project ]]; then
+    block="$snapshot/block"
+    agk_render_block "$mode" "$repo" > "$block" || exit 1
+  fi
+  if ! agk_verify_mode "$mode" "$project" "$repo" "$scope" "$(<"$snapshot/modes")" "$block"; then
     agk_die 'current mode is not exact; run a normal mode switch to repair state'
     exit 1
   fi
@@ -102,7 +116,7 @@ if (( ! remove )) && [[ $(<"$snapshot/modes") == "$mode" ]]; then
     exit 1
   fi
   refresh_committed=1
-  if ! "$script_dir/verify-codex-mode" "$mode" "$project" >/dev/null; then
+  if ! agk_verify_mode "$mode" "$project" "$repo" "$scope" '' "$block"; then
     agk_die 'update applied but verification failed'
     exit 1
   fi
@@ -123,13 +137,16 @@ if (( ! remove )); then
 fi
 
 if (( remove )); then
-  agk_remove_config_block "$project" || { rollback; exit 1; }
-  "$script_dir/verify-codex-mode" --no-managed-mode "$project" >/dev/null || { rollback; exit 1; }
-  printf 'Removed Codex guardrail mode; start a new thread to deactivate it.\n'
+  agk_remove_scope "$scope" "$project" "$repo" || { rollback; exit 1; }
+  agk_verify_no_managed_mode "$project" "$scope" || { rollback; exit 1; }
+  printf 'Removed Codex guardrail mode (%s); start a new thread to deactivate it.\n' "$scope"
 else
-  block="$snapshot/block"
-  agk_render_block "$mode" "$repo" > "$block"
-  agk_replace_config "$project" "$block" || { rollback; exit 1; }
-  "$script_dir/verify-codex-mode" "$mode" "$project" >/dev/null || { rollback; exit 1; }
-  printf 'Selected Codex mode %s; start a new thread to activate it.\n' "$mode"
+  block=''
+  if [[ $scope == project ]]; then
+    block="$snapshot/block"
+    agk_render_block "$mode" "$repo" > "$block" || { rollback; exit 1; }
+  fi
+  agk_replace_scope "$scope" "$project" "$block" "$mode" "$repo" || { rollback; exit 1; }
+  agk_verify_mode "$mode" "$project" "$repo" "$scope" '' "$block" || { rollback; exit 1; }
+  printf 'Selected Codex mode %s (%s); start a new thread to activate it.\n' "$mode" "$scope"
 fi

@@ -8,6 +8,30 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-21
+
+### Fixed
+
+- Codex `decomposition-gate` 與 `integrated-harness` 明確以 UTF-8 讀取計畫及治理政策檔，
+  避免 Windows 未啟用 UTF-8 mode 時，含繁體中文的有效計畫被誤判為不存在或無法讀取。
+
+### Changed
+
+- Claude 與 Codex selector／verifier 現在都支援 `project`、`local`、`user` 三種 scope；
+  Claude user scope 使用 plugin scope，Codex local/user 分別使用專案與使用者的
+  `hooks.json` 層。README、CLI reference 與兩份 marketplace guide 已同步說明對應路徑。
+- README 與 CLI reference 補充 Codex／Claude Code 的互動命令模式：可在輸入列以 `!`
+  直接執行 shell 命令，無須離開目前 thread／session 或另開終端機。
+- `tests/run_all.sh` 預設改跑快速 `smoke` profile，略過耗時的 Claude／Codex 完整模式切換
+  測試；可用 `AGK_TEST_PROFILE=full` 手動執行，CI 也提供手動與每週排程的完整回歸入口。
+- Codex 完整模式切換測試在 Windows Git Bash 缺少 `shasum` 時改用 `sha256sum` fallback，
+  避免完整回歸在測試初始化階段失敗。
+- Codex selector／verify 合併重複的 Python 啟動：一次同一台 Windows 主機的單支專測由
+  1,004 秒降至 955 秒，節省約 4.9%；完整回歸時間仍會受主機 I/O 波動影響。
+- Codex selector 將驗證改為共用 Bash 流程，並以 `awk` 執行 ASCII 設定分隔符檢查，
+  避免另開 verify 子程序及不必要的 Python 啟動；同一台 Windows 主機的專測由
+  955 秒降至約 652 秒，節省約 32%。完整模式轉換、rollback 與訊號測試覆蓋維持不變。
+
 ## [0.3.0] - 2026-08-11
 
 ### Added
@@ -289,7 +313,8 @@ VS Code Agent hooks，且 macOS／Linux 路徑尚未實機驗證。以下彙整�
   once a plan exists, normal integrated-harness scope, policy, and approval
   checks apply.
 
-[Unreleased]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.1.0...v0.2.0
