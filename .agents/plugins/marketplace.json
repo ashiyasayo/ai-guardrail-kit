@@ -5,10 +5,10 @@
   },
   "plugins": [
     {
-      "name": "decomposition-gate",
+      "name": "ai-guardrail-loader",
       "source": {
         "source": "local",
-        "path": "./codex/plugins/decomposition-gate"
+        "path": "./codex/plugins/ai-guardrail-loader"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -17,9 +17,21 @@
       "category": "Security"
     },
     {
+      "name": "decomposition-gate",
+      "source": {
+        "source": "local",
+        "path": "./codex/plugins/decomposition-gate"
+      },
+      "policy": {
+        "installation": "DEPRECATED",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Security"
+    },
+    {
       "name": "sensitive-data-guard",
       "source": {"source": "local", "path": "./codex/plugins/sensitive-data-guard"},
-      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "policy": {"installation": "DEPRECATED", "authentication": "ON_INSTALL"},
       "category": "Security"
     },
     {
@@ -29,7 +41,7 @@
         "path": "./codex/plugins/harness"
       },
       "policy": {
-        "installation": "AVAILABLE",
+        "installation": "DEPRECATED",
         "authentication": "ON_INSTALL"
       },
       "category": "Security"
@@ -41,7 +53,7 @@
         "path": "./codex/plugins/integrated-harness"
       },
       "policy": {
-        "installation": "AVAILABLE",
+        "installation": "DEPRECATED",
         "authentication": "ON_INSTALL"
       },
       "category": "Security"
