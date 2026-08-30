@@ -1,77 +1,52 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# 這支輔助程式刻意完全不使用 Python。它在 codex_mode_switch_test.sh 裡會被執行
-# 數百次，而先前每次呼叫都要先探測直譯器（Windows 上 python3 是 WindowsApps stub，
-# -V 會失敗，故探測本身就得啟動兩個直譯器），且 add／remove／marketplace 三個
-# 分支根本用不到 Python。這些啟動成本是該測試耗時的主要來源。
+
+# 測試模型固定模擬 Codex 的 user-global plugin scope：只允許 loader 由安裝器
+# 管理，project A/B 的 mode identity 僅存在各自 selector/cache，不會互相移除。
 state=${AI_GUARDRAIL_TEST_STATE:?AI_GUARDRAIL_TEST_STATE is required}
 mkdir -p "$state"
 installed="$state/installed"
-touch "$installed"
-
-fail_if_requested() {
-  local operation=$1 plugin=${2:-}
-  if [[ ${FAKE_CODEX_FAIL_OPERATION:-} == "$operation" &&
-        ( -z ${FAKE_CODEX_FAIL_PLUGIN:-} || ${FAKE_CODEX_FAIL_PLUGIN} == "$plugin" ) ]]; then
-    printf 'fake codex: forced %s failure for %s\n' "$operation" "$plugin" >&2
-    exit 42
-  fi
-}
+if [[ ! -e $installed ]]; then
+  printf '%s\n' "${FAKE_CODEX_INITIAL_PLUGINS:-}" | sed '/^$/d' > "$installed"
+fi
 
 count_operation() {
-  local operation=$1 count_file n=0
-  count_file="$state/${operation}.count"
+  local operation=$1 count_file="$state/${1}.count" n=0
   [[ -f $count_file ]] && read -r n < "$count_file"
   n=$((n + 1)); printf '%s\n' "$n" > "$count_file"
-  if [[ ${FAKE_CODEX_DELAY_OPERATION:-} == "$operation" ||
-        ${FAKE_CODEX_DELAY_OPERATION:-} == "$operation:$n" ]]; then
-    : > "$state/delay.$operation.$n.ready"
-    sleep 2
+  if [[ ${FAKE_CODEX_FAIL_OPERATION:-} == "$operation" || ${FAKE_CODEX_FAIL_OPERATION:-} == "$operation:$n" ]]; then
+    printf 'fake codex: forced %s failure\n' "$operation" >&2; exit 42
   fi
-  if [[ ${FAKE_CODEX_FAIL_OPERATION:-} == "$operation:$n" ]]; then exit 42; fi
 }
 
-[[ ${1:-} == plugin ]] || { printf 'fake codex: unsupported command\n' >&2; exit 2; }
+[[ ${1:-} == plugin ]] || exit 2
 case ${2:-} in
   list)
     count_operation list
-    fail_if_requested list
     if [[ -n ${FAKE_CODEX_LIST_JSON:-} ]]; then printf '%s\n' "$FAKE_CODEX_LIST_JSON"; exit 0; fi
-    # 格式須與先前的 json.dumps 輸出逐字元一致（鍵間 ", "、鍵值間 ": "）；
-    # 呼叫端 codex-mode-lib.sh 以 json.loads 解析，格式不符會讓測試立刻變紅。
-    # 限制：不做 JSON 轉義。測試語料的 plugin id 皆為 name@marketplace 形式，
-    # 不含引號、反斜線或控制字元；若日後引入這類字元，這裡會產生無效 JSON，
-    # 使呼叫端解析失敗而讓測試變紅——屬可偵測的失敗，不會造成假性通過。
-    entries=""
-    while IFS= read -r line || [[ -n $line ]]; do
-      [[ -z $line ]] && continue
-      # 只切第一個 @，與原本 split("@", 1) 的語意一致
-      [[ -n $entries ]] && entries+=", "
-      entries+="{\"pluginId\": \"$line\", \"name\": \"${line%%@*}\""
-      entries+=", \"marketplaceName\": \"${line#*@}\""
-      entries+=", \"installed\": true, \"enabled\": true}"
+    entries=''
+    while IFS= read -r plugin || [[ -n $plugin ]]; do
+      [[ -z $plugin ]] && continue
+      [[ -n $entries ]] && entries+=', '
+      entries+="{\"pluginId\": \"$plugin\", \"name\": \"${plugin%%@*}\", \"marketplaceName\": \"${plugin#*@}\", \"installed\": true, \"enabled\": true}"
     done < "$installed"
     printf '{"installed": [%s]}\n' "$entries"
     ;;
-  add)
-    plugin=${3:?missing plugin}; count_operation add; fail_if_requested add "$plugin"
-    grep -Fxq "$plugin" "$installed" || printf '%s\n' "$plugin" >> "$installed"
-    generation_file="$state/generation.${plugin//@/_}"
-    generation=0; [[ -f $generation_file ]] && read -r generation < "$generation_file"
-    printf '%s\n' "$((generation + 1))" > "$generation_file"
-    if [[ ${FAKE_CODEX_DELAY_AFTER_OPERATION:-} == add ]]; then sleep 2; fi
-    ;;
-  remove)
-    plugin=${3:?missing plugin}; count_operation remove; fail_if_requested remove "$plugin"
-    tmp="$state/installed.tmp"
-    grep -Fxv "$plugin" "$installed" > "$tmp" || true
-    mv "$tmp" "$installed"
+  add|remove)
+    plugin=${3:?missing plugin id}
+    [[ $plugin == *@* ]] || { printf 'fake codex: plugin id must be name@marketplace\n' >&2; exit 2; }
+    count_operation "$2"
+    if [[ $2 == add ]]; then
+      grep -Fxq "$plugin" "$installed" || printf '%s\n' "$plugin" >> "$installed"
+    else
+      grep -Fxv "$plugin" "$installed" > "$installed.tmp" || true
+      mv "$installed.tmp" "$installed"
+    fi
     ;;
   marketplace)
-    [[ ${3:-} == upgrade ]] || { printf 'fake codex: unsupported marketplace operation\n' >&2; exit 2; }
+    [[ ${3:-} == upgrade ]] || exit 2
     count_operation upgrade
-    fail_if_requested upgrade "${4:-}"
     printf '%s\n' "${4:-}" > "$state/upgrade.args"
     ;;
-  *) printf 'fake codex: unsupported plugin operation\n' >&2; exit 2 ;;
+  *) exit 2 ;;
 esac
