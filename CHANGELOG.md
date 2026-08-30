@@ -8,6 +8,19 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Codex 新增單一 `ai-guardrail-loader` marketplace plugin、SHA-256 驗證的 runtime
+  manifest/archive、內容定址 cache、project/local/user selector 與離線 dispatch。
+- Codex loader plugin 自帶 manager、selector、verifier bootstrap，可部署到
+  `$CODEX_HOME` 而不依賴 checkout；新增 A/B project、archive 安全性、payload integrity、
+  rollback、selector registry、prune 與 global wrapper 測試。
+
+### Changed
+
+- Codex mode 切換不再安裝或移除四個 legacy mode plugin；global integrated-harness
+  installer 改為 loader + user fallback 相容 wrapper。
+
 ## [0.4.0] - 2026-08-21
 
 ### Fixed

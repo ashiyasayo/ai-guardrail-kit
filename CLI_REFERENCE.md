@@ -55,29 +55,52 @@ Code session。
 
 ## Codex
 
+Codex 只由 installer 管理全域 `ai-guardrail-loader@ai-guardrail-kit`；mode plugin
+不再由 selector add/remove。remote marketplace plugin 自帶 manager、loader、selector
+與 verifier，可部署到 `$CODEX_HOME/guardrail/{loader,bin}`，不依賴 checkout。
+
 ```bash
 codex plugin marketplace add "$(pwd)"
-./scripts/select-codex-mode sensitive-data-guard --scope project .
-./scripts/verify-codex-mode sensitive-data-guard --scope project .
+codex plugin add ai-guardrail-loader@ai-guardrail-kit
+./scripts/install-codex-guardrail-loader --repo .
+./scripts/select-codex-mode harness --scope project --ref vX.Y.Z .
+./scripts/verify-codex-mode harness --scope project .
 ```
 
-Codex 三種 scope 的設定層如下：`project` 是專案共享的
-`.codex/config.toml` managed block；`local` 是目前專案的
-`.codex/hooks.json`；`user` 是 `$CODEX_HOME/hooks.json`（預設
-`~/.codex/hooks.json`）。範例：
+Codex 三種 scope 的 selector 如下：`project` 是
+`.codex/guardrail/runtime.json`；`local` 是
+`.codex/guardrail/runtime.local.json`；`user` 是
+`$CODEX_HOME/guardrail/default-runtime.json`。precedence 為
+`local > project > user > disabled`。
 
 ```bash
-./scripts/select-codex-mode harness --scope local .
-./scripts/verify-codex-mode harness --scope local .
-./scripts/select-codex-mode integrated-harness --scope user .
-./scripts/verify-codex-mode integrated-harness --scope user .
+./scripts/select-codex-mode harness --scope local --ref vX.Y.Z .
+./scripts/select-codex-mode integrated-harness --scope user --ref vX.Y.Z .
+./scripts/select-codex-mode --update harness --scope project --ref vX.Y.Z .
+./scripts/verify-codex-mode harness --scope project --offline .
+./scripts/select-codex-mode --remove --scope project .
 ```
 
-移除目前受管模式：
+`--source github` 只使用核准 HTTPS origin；`local`／`test` 只在明確 development
+環境變數下可用。`--offline` 僅使用 runtime index 與完整 cache，不連網。`--update`
+才重新取得 manifest；普通重跑保留既有 identity。
+
+全域相容 wrapper：
 
 ```bash
-./scripts/select-codex-mode --remove --scope project /path/to/project
-./scripts/verify-codex-mode --no-managed-mode --scope project /path/to/project
+./scripts/install-codex-global-integrated-harness /path/to/checkout
+./scripts/verify-codex-global-integrated-harness /path/to/checkout
+./scripts/install-codex-global-integrated-harness --remove /path/to/checkout
+```
+
+wrapper 只管理 loader 與 user fallback；不移除 project/local selector、unrelated
+plugin、hooks 或個人 orchestration policy。
+
+清理未引用 runtime（預設只預覽；`--apply` 才實際刪除）：
+
+```bash
+$CODEX_HOME/guardrail/bin/prune-codex-runtime-cache --dry-run --max-age 30
+$CODEX_HOME/guardrail/bin/prune-codex-runtime-cache --apply --max-age 30
 ```
 
 ## 釘版本與發版
