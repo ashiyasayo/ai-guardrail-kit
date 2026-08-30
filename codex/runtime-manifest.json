@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "release": {
+    "source": "https://github.com/ashiyasayo/ai-guardrail-kit",
+    "ref": "main",
+    "commit": "6f503ad27293c2e8d7fb087db18c1ea9479fa680",
+    "runtime_version": "main+6f503ad2"
+  },
+  "modes": {
+    "decomposition-gate": {
+      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/main/codex/runtime-archives/codex-runtime-decomposition-gate.tar.gz",
+      "archive_sha256": "ad4ed9e46deefee1aaf99f95df87d7fc00989aa15af79ec5fbce35f21a3fef31",
+      "archive_size": 2362,
+      "entrypoints": {
+        "pretool.decomposition": "hooks/decomposition_gate.py"
+      }
+    },
+    "sensitive-data-guard": {
+      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/main/codex/runtime-archives/codex-runtime-sensitive-data-guard.tar.gz",
+      "archive_sha256": "36e4c15c74453fe4302d63b5422df36822c1cfa951d62efaa691795f391e421d",
+      "archive_size": 6926,
+      "entrypoints": {
+        "pretool.security": "hooks/block_secrets.py",
+        "pretool.pii": "hooks/pii_guard.py",
+        "prompt.pii": "hooks/pii_guard.py"
+      }
+    },
+    "harness": {
+      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/main/codex/runtime-archives/codex-runtime-harness.tar.gz",
+      "archive_sha256": "2773a5e1b8932ae13b681bc24c43956e40f18438d0a60a47db6e5226ce8ca7cd",
+      "archive_size": 7693,
+      "entrypoints": {
+        "pretool.plan": "hooks/plan_gate.py",
+        "pretool.security": "hooks/security_guard.py",
+        "pretool.pii": "hooks/pii_guard.py",
+        "prompt.pii": "hooks/pii_guard.py"
+      }
+    },
+    "integrated-harness": {
+      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/main/codex/runtime-archives/codex-runtime-integrated-harness.tar.gz",
+      "archive_sha256": "c4717182c860828f408b8e76dcecb66ce445dc12038d0942a4425a57e5447522",
+      "archive_size": 9826,
+      "entrypoints": {
+        "pretool.plan": "hooks/plan_gate.py",
+        "pretool.security": "hooks/security_guard.py",
+        "pretool.pii": "hooks/pii_guard.py",
+        "prompt.pii": "hooks/pii_guard.py",
+        "session.start": "hooks/session_start.py"
+      }
+    }
+  }
+}

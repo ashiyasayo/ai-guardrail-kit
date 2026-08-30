@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+repo=$(cd "$(dirname "$0")/.." && pwd -P)
+mode=write
+case ${1:-} in '') ;; --check) mode=check ;; *) printf 'usage: sync-codex-loader-copies [--check]\n' >&2; exit 2 ;; esac
+source="$repo/scripts/codex-runtime-manager.py"
+target="$repo/codex/plugins/ai-guardrail-loader/hooks/manager.py"
+[[ -f $source && -f $target ]] || { printf 'loader manager copy is missing\n' >&2; exit 1; }
+if ! cmp -s "$source" "$target"; then
+  if [[ $mode == check ]]; then printf 'loader manager copy is out of sync\n' >&2; exit 1; fi
+  cp -p "$source" "$target"
+fi
+for pair in \
+  "$repo/scripts/select-codex-mode|$repo/codex/plugins/ai-guardrail-loader/hooks/select-codex-mode" \
+  "$repo/scripts/verify-codex-mode|$repo/codex/plugins/ai-guardrail-loader/hooks/verify-codex-mode" \
+  "$repo/scripts/install-codex-guardrail-loader|$repo/codex/plugins/ai-guardrail-loader/hooks/install-codex-guardrail-loader" \
+  "$repo/scripts/prune-codex-runtime-cache|$repo/codex/plugins/ai-guardrail-loader/hooks/prune-codex-runtime-cache"; do
+  source_copy=${pair%%|*}
+  target_copy=${pair#*|}
+  [[ -f $source_copy && -f $target_copy ]] || { printf 'loader copy is missing\n' >&2; exit 1; }
+  if ! cmp -s "$source_copy" "$target_copy"; then
+    if [[ $mode == check ]]; then printf 'loader copy is out of sync\n' >&2; exit 1; fi
+    cp -p "$source_copy" "$target_copy"
+  fi
+done

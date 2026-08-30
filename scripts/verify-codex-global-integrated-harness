@@ -2,66 +2,15 @@
 set -euo pipefail
 script_dir=$(cd "$(dirname "$0")" && pwd -P)
 repo=$(cd "$script_dir/.." && pwd -P)
-# shellcheck source=codex-mode-lib.sh
-source "$script_dir/codex-mode-lib.sh"
-
 no_installed=0
 if [[ ${1:-} == --no-installed ]]; then no_installed=1; shift; fi
-[[ $# -le 1 ]] || { agk_die 'usage: verify-codex-global-integrated-harness [--no-installed] [repo-dir]'; exit 2; }
+[[ $# -le 1 ]] || { printf 'usage: verify-codex-global-integrated-harness [--no-installed] [repo-dir]\n' >&2; exit 2; }
 [[ $# -eq 0 ]] || repo=$(cd "$1" && pwd -P)
-codex_home=$(agk_codex_home)
-hooks="$codex_home/hooks.json"
-installed=$(agk_installed_modes) || { agk_die 'could not inspect installed plugins'; exit 1; }
-count=$(printf '%s\n' "$installed" | awk 'NF { n++ } END { print n+0 }')
 if (( no_installed )); then
-  [[ $count -eq 0 ]] || { agk_die "expected no installed managed plugin, found $count"; exit 1; }
-  if [[ -e $hooks ]]; then
-    python3 - "$hooks" <<'PY' || { agk_die 'managed global hooks remain'; exit 1; }
-import json, pathlib, sys
-hooks = json.loads(pathlib.Path(sys.argv[1]).read_text()).get("hooks", {})
-for groups in hooks.values():
-    if not isinstance(groups, list): continue
-    for group in groups:
-        for hook in group.get("hooks", []):
-            if isinstance(hook, dict) and str(hook.get("command", "")).startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 "):
-                raise SystemExit(1)
-PY
-  fi
-  printf 'Verified no global Codex integrated-harness hooks.\n'; exit 0
+  "$script_dir/verify-codex-mode" --no-managed-mode --scope user "$repo"
+  printf 'Verified no global Codex integrated-harness selector.\n'
+else
+  "$script_dir/verify-codex-mode" integrated-harness --scope user "$repo"
+  [[ -f ${CODEX_HOME:-$HOME/.codex}/guardrail/loader/current.json ]] || { printf 'E_RUNTIME_MISSING: loader is not installed\n' >&2; exit 1; }
+  printf 'Verified global Codex integrated-harness fallback and loader.\n'
 fi
-[[ $count -eq 1 && $installed == integrated-harness ]] || { agk_die 'expected only integrated-harness to be installed'; exit 1; }
-agk_validate_personal_policy || exit 1
-[[ -f $hooks && ! -L $hooks ]] || { agk_die "global hooks are missing: $hooks"; exit 1; }
-python3 - "$hooks" "$repo/codex/plugins/integrated-harness/hooks" <<'PY' || { agk_die 'global integrated-harness hooks do not match'; exit 1; }
-import json, pathlib, shlex, subprocess, sys
-path, root = map(pathlib.Path, sys.argv[1:])
-# 與安裝腳本相同的直譯器解析邏輯，確保驗證與安裝結果一致
-def interpreter_is_usable(name):
-    try:
-        return subprocess.run([name, "-V"], capture_output=True).returncode == 0
-    except OSError:
-        return False
-interpreter = "python3" if interpreter_is_usable("python3") else "python"
-data = json.loads(path.read_text())
-hooks = data.get("hooks")
-if not isinstance(hooks, dict): raise SystemExit(1)
-commands = []
-for event in ("PreToolUse", "UserPromptSubmit", "SessionStart"):
-    for group in hooks.get(event, []):
-        if not isinstance(group, dict): raise SystemExit(1)
-        for hook in group.get("hooks", []):
-            if isinstance(hook, dict): commands.append((event, group.get("matcher"), hook.get("command")))
-expected = [
-    ("PreToolUse", "exec_command|apply_patch", root / "plan_gate.py"),
-    ("PreToolUse", "exec_command|apply_patch", root / "security_guard.py"),
-    ("PreToolUse", "apply_patch", root / "pii_guard.py"),
-    ("UserPromptSubmit", None, root / "pii_guard.py"),
-    ("SessionStart", "startup|resume|clear|compact", root / "session_start.py"),
-]
-for event, matcher, target in expected:
-    wanted = "AI_GUARDRAIL_GLOBAL_DEFAULT=1 " + interpreter + " -- " + shlex.quote(str(target))
-    if commands.count((event, matcher, wanted)) != 1 or not target.is_file(): raise SystemExit(1)
-if sum(1 for _, _, command in commands if isinstance(command, str) and command.startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 ")) != 5:
-    raise SystemExit(1)
-PY
-printf 'Verified global Codex integrated-harness hooks.\n'
