@@ -15,7 +15,9 @@
 1. **消費單位就是整個 repo 的一個 ref。** Codex 以
    `codex plugin marketplace add ... --ref <ref> --sparse` 註冊、Claude marketplace
    走預設分支、Copilot 直接複製 `copilot/plugins/` 下的檔案。三種安裝機制都**無法**
-   只取用某個 plugin 的某個版本，因此獨立的 per-plugin 版本線在消費端不可解析。
+   只取用某個 plugin 的某個版本，因此獨立的 per-plugin 版本線在消費端不可解析。Codex
+   runtime manifest 的 `ref`、`commit`、archive SHA-256 是該 repo tag 的內容 identity，
+   不是新的 per-plugin 版號。
 2. **這些 plugin 不是可自由組合的套件，而是同一產品的互斥變體。** 它們共用
    `shared/codex/`、`shared/claude/` 單一來源，並由逐位元組同步測試守護。
    「harness 搭配哪一版 shared」這種問題只有「同一個 commit 快照」答得出來。

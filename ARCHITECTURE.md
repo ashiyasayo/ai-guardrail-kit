@@ -9,8 +9,9 @@
 | `harness` | 無 | 有 | 有 | 有 | 無 |
 | `integrated-harness` | 有 | 有 | 有 | 有 | 精簡治理政策 |
 
-四種模式是互斥的產品邊界，不是可任意疊加的 feature flags。Claude 與
-Codex selector 會移除其他受管模式，再安裝並驗證目標模式。Copilot 為 copy-in、
+四種模式是互斥的產品邊界，不是可任意疊加的 feature flags。Claude selector 會管理
+其平台的模式安裝；Codex selector 只釘住每專案 runtime，不 add/remove mode plugin。
+Copilot 為 copy-in、
 無 selector，互斥性由安裝者負責：兩個 Copilot 模式都註冊 `PreToolUse` 且都含
 `hook_protocol.py`，同時複製進 `.github/hooks/` 會衝突。
 
@@ -23,11 +24,29 @@ Claude selector／verifier 支援 `project`、`local`、`user` 三種 scope；�
 原生 CLI 從遠端 marketplace 安裝 user scope，則不經本專案的 package
 validation、互斥及 rollback 邊界。
 
-Codex CLI 的 plugin 安裝狀態是使用者層級，但 hooks 可分別落在三個設定層：
-`project` 使用 `<project>/.codex/config.toml` managed block，`local` 使用
-`<project>/.codex/hooks.json`，`user` 使用 `$CODEX_HOME/hooks.json`（預設
-`~/.codex/hooks.json`）。selector 會依 scope 驗證並更新對應層；Codex 的
-`integrated-harness` global installer 是另一條相容流程，不應與 user selector 混用。
+Codex CLI 的 plugin 安裝狀態是使用者層級，但本專案只安裝
+`ai-guardrail-loader@ai-guardrail-kit`。selector 檔分別是
+`<project>/.codex/guardrail/runtime.json`、`runtime.local.json` 與
+`$CODEX_HOME/guardrail/default-runtime.json`，precedence 為
+local > project > user。loader 從 event cwd 找 root，離線解析完整 cache identity，
+再以固定 Python argv 執行 verified entrypoint；global integrated-harness installer
+只是 user fallback 相容 wrapper。
+
+## Codex runtime manager data flow
+
+`codex-runtime-manager` 將 `resolve`、`prepare`、`commit`、`verify` 與 `dispatch` 收在
+單一深 module。HTTPS manifest source 嚴格限制 origin、redirect hop、timeout 與下載大小；
+archive 先驗 SHA-256，再拒絕 traversal、drive/UNC、symlink、hardlink、device、FIFO、
+duplicate normalized path 與解壓炸彈。cache metadata 同時保存 selector identity 與
+每個 payload file digest，hook 每次重新驗證 metadata、完整 payload、entrypoint regular
+file 及 containment。
+
+全域 hooks 只指向 `$CODEX_HOME/guardrail/loader/loader.py`，以 slot 保留
+decomposition／plan／security／PII／SessionStart 的順序與獨立決策；子程序固定
+`[python, "--", verified_entrypoint]`、`shell=False`，不傳下載憑證且不在 hook 熱路徑連網。
+selector commit 同步維護 `$CODEX_HOME/guardrail/selector-index.json`，讓低頻 prune
+能在刪除前重建引用集合；prune 預設 dry-run，只有明確 `--apply` 才刪除已重新驗證、
+超過 grace period 且未被 selector 引用的 digest cache。
 
 ## 多版本一致性架構
 
@@ -43,8 +62,9 @@ Codex CLI 的 plugin 安裝狀態是使用者層級，但 hooks 可分別落在�
 | Claude | `integrated-harness` | copy-in、marketplace | `shared/claude/`、`integrated-harness/`、`claude/plugins/integrated-harness/` | 協定同步、copy-in parity、orchestration 與 hook 行為測試 |
 | Claude | 四種模式 | marketplace／selector（project、local、user） | `shared/claude/`、`claude/plugins/`、`scripts/claude-mode-lib.sh` | shared 同步、marketplace、三 scope mode switch 及 guardrail 測試 |
 | Claude | 四種模式 | native user fallback | Claude 原生 `plugin install --scope user`；不經 repository selector | marketplace 文件與 CLI 操作契約測試 |
-| Codex | 四種模式 | marketplace／selector（project、local、user） | `shared/codex/`、`codex/plugins/`、`scripts/codex-mode-lib.sh` | shared 同步、marketplace、三 scope mode switch 及 guardrail 測試 |
-| Codex | `integrated-harness` | global install | `codex/plugins/integrated-harness/`、global installer | global install 交易與 rollback 測試 |
+| Codex | 四種模式 | runtime archive／selector（project、local、user） | `shared/codex/`、`codex/plugins/`、`scripts/codex-runtime-manager.py` | manifest/archive/cache、A/B scope、offline、rollback 測試 |
+| Codex | loader | marketplace／global install | `codex/plugins/ai-guardrail-loader/`、`$CODEX_HOME/guardrail/` | loader bootstrap、hook slot、plugin-id 與 rollback 測試 |
+| Codex | `integrated-harness` | global compatibility wrapper | `scripts/install-codex-global-integrated-harness`、user selector | policy 不覆寫、legacy marker 遷移測試 |
 | Copilot | `decomposition-gate` | copy-in | `shared/copilot/`、`copilot/plugins/decomposition-gate/` | shared 同步檢查、Copilot smoke test；Preview 平台限制另見相關文件 |
 | Copilot | `sensitive-data-guard` | copy-in | `shared/copilot/`、`copilot/plugins/sensitive-data-guard/` | shared 同步檢查、三平台 PII 行為一致性測試、Copilot smoke test |
 
