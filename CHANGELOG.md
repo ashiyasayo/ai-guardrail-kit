@@ -21,6 +21,11 @@ All notable changes to this project are documented in this file.
 - Codex mode 切換不再安裝或移除四個 legacy mode plugin；global integrated-harness
   installer 改為 loader + user fallback 相容 wrapper。
 
+### Documentation
+
+- 澄清 Codex 管理 wrapper 的 Python 探測順序，並補充以 `AI_GUARDRAIL_PYTHON` 指定
+  Windows `py` launcher 或自訂 Python 路徑的方式。
+
 ## [0.4.0] - 2026-08-21
 
 ### Fixed

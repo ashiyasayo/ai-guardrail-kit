@@ -85,6 +85,13 @@ Codex 三種 scope 的 selector 如下：`project` 是
 環境變數下可用。`--offline` 僅使用 runtime index 與完整 cache，不連網。`--update`
 才重新取得 manifest；普通重跑保留既有 identity。
 
+Codex 的 shell wrapper 預設依序使用 `python3`、`python`。若 Windows 只有 `py`
+launcher 或 Python 不在 PATH，執行命令前設定 `AI_GUARDRAIL_PYTHON`，例如：
+
+```bash
+AI_GUARDRAIL_PYTHON=py ./scripts/select-codex-mode harness --scope project .
+```
+
 全域相容 wrapper：
 
 ```bash

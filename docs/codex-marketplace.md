@@ -31,6 +31,10 @@ plugin add/remove。
 ./scripts/install-codex-guardrail-loader --repo .
 ```
 
+上述 shell entrypoint 預設依序探測 `python3`、`python`。若環境只有 Windows `py`
+launcher 或 Python 不在 PATH，請在執行 bootstrap、selector、verifier 或 prune 前設定
+`AI_GUARDRAIL_PYTHON`；這只影響管理命令，不會讓 hook 熱路徑連網。
+
 ## Selecting a runtime
 
 四個 mode：`decomposition-gate`、`sensitive-data-guard`、`harness`、
