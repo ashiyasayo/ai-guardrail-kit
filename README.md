@@ -19,11 +19,12 @@ hooks）」。三個目錄**功能與用途各自獨立、不可同時安裝**�
 
 - [Claude Code](https://docs.claude.com/en/docs/claude-code) CLI
 - Python 3.9+（四種模式統一版本需求）——**唯一**執行期依賴，僅需直譯器本身，
-  hooks 只用標準函式庫，不需 `pip install` 任何套件。系統只要有
-  `python3`、`python`、`py`（Windows）任一種可執行別名即可，`settings.json`
-  會依序探測並使用第一個可用的；若三者皆不存在，hook 會直接失敗（fail
-  closed，不會誤放行）——這種情況請自行安裝 Python 3.9+ 並確認已加入 PATH，
-  安裝完成後開新的終端機／Claude Code session 再試一次。
+  hooks 只用標準函式庫，不需 `pip install` 任何套件。Claude Code 的設定會依序探測
+  `python3`、`python`、`py`；Codex 的 selector、loader installer、verifier 與 prune
+  wrapper 預設依序探測 `python3`、`python`。若 Codex 環境只有 Windows `py` launcher
+  或自訂 Python 路徑，請設定 `AI_GUARDRAIL_PYTHON`；若管理入口找不到可用的 Python，
+  命令會以錯誤結束；已安裝 loader 在 runtime 不可用時則會直接失敗（fail closed，
+  不會誤放行）。
 - git（`integrated-harness` 的核准機制以 SHA-256 綁定拆解文件內容）
 
 ## 快速開始
@@ -429,7 +430,7 @@ rm your-project/CLAUDE.md your-project/ORCHESTRATOR.md 2>/dev/null
 | 保留其他既有 hooks | selector 管理自己的 plugin 狀態 | loader/global wrapper 只管理自身 marker，保留其他 hooks |
 | 政策範本安裝 | IH 由使用者建立專案或個人政策 | selector 選 IH 時，個人政策不存在才建立；不覆寫既有檔 |
 | 生效時機 | 選擇、更新或移除後開新 Claude Code session | 選擇、更新或移除後開新 Codex thread |
-| Python | 3.9+；依序探測 `python3`／`python`／`py` | 3.9+；selector 探測並寫入 hook 命令 |
+| Python | 3.9+；依序探測 `python3`／`python`／`py` | 3.9+；selector／installer 預設探測 `python3`／`python`，可用 `AI_GUARDRAIL_PYTHON` 覆寫 |
 | 額外 Python 套件 | 無，現有 hooks 僅用標準函式庫 | 無，現有 hooks 僅用標準函式庫 |
 | 共用程式來源 | PII 三件組以 `shared/claude/` 為唯一審核來源，同步腳本產生 plugin 與 copy-in 副本；`block_secrets`／`block_dangerous` 為分歧分支，由 parity 行為測試守護 | `shared/codex/` 為唯一審核來源，透過同步腳本產生 plugin 副本 |
 | 統一回歸入口 | `tests/run_all.sh` | `tests/run_all.sh` |
