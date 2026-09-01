@@ -8,4 +8,4 @@ description: 說明獨立敏感資料防線的秘密阻擋、個資阻擋與去�
 此模式只提供秘密與個資防護，不提供拆解、人工核准、危險命令阻擋或編排。
 提示文字命中疑似個資時阻擋；受支援的寫入內容命中個資時先去識別化。
 
-Activate it from the repository with `scripts/select-codex-mode sensitive-data-guard <project-dir>`, verify it with `scripts/verify-codex-mode sensitive-data-guard <project-dir>`, then start a new thread after switching.
+Activate it with `$CODEX_HOME/guardrail/bin/select-codex-mode sensitive-data-guard <project-dir>`, verify it with `$CODEX_HOME/guardrail/bin/verify-codex-mode sensitive-data-guard <project-dir>`, then start a new thread after switching. The `./scripts/...` equivalents are only for a local checkout.

@@ -27,4 +27,4 @@ pull requests, or outbound communication unless the approved plan already lists
 the exact action. Report unrun validation and remaining risk. Plugin hooks are not
 a sandbox, and installation alone does not activate them.
 
-Activate it from the repository with `scripts/select-codex-mode integrated-harness <project-dir>`, verify it with `scripts/verify-codex-mode integrated-harness <project-dir>`, then start a new thread after switching.
+Activate it with `$CODEX_HOME/guardrail/bin/select-codex-mode integrated-harness <project-dir>`, verify it with `$CODEX_HOME/guardrail/bin/verify-codex-mode integrated-harness <project-dir>`, then start a new thread after switching. The `./scripts/...` equivalents are only for a local checkout.

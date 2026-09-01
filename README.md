@@ -58,9 +58,8 @@ codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git 
 
 `--ref main` 取得最新主幹；若要固定在某個發布版本，改指 tag（例如 `--ref v0.1.0`），
 版本語意見 [`VERSIONING.md`](VERSIONING.md)。
-`--sparse .agents --sparse codex/plugins` 下載 marketplace manifest 與 plugin 套件。註冊後請依照
-[`docs/codex-marketplace.md`](docs/codex-marketplace.md) 使用 selector 選擇並啟用其中一種模式；也可先安裝
-唯一的 loader plugin，例如：
+`--sparse .agents --sparse codex/plugins` 下載 marketplace manifest 與 plugin 套件。註冊後安裝唯一的
+loader plugin（它提供一次性的遠端 bootstrap 入口）：
 
 ```bash
 codex plugin add ai-guardrail-loader@ai-guardrail-kit
@@ -79,20 +78,30 @@ codex plugin add ai-guardrail-loader@ai-guardrail-kit
 
 因此，Codex 可由 remote marketplace plugin 完成 bootstrap；checkout 只提供管理 CLI
 與本機開發來源。marketplace 只提供 loader 來源；metadata 本身不負責 mode 選擇，
-selector 也不安裝／移除 mode plugin。直接使用
-`codex plugin add/remove` 可能造成已安裝 plugin 與 hooks 設定不同步，請使用 selector
-進行安裝、切換、更新及移除。
+selector 也不安裝／移除 mode plugin。不要用 `codex plugin add/remove` 管理四個 mode
+plugin，以免已安裝 plugin 與 hooks 設定不同步；唯一 loader 仍依上面的 bootstrap 流程管理，
+mode 則使用 selector 進行切換、更新及移除。
 
-註冊 marketplace 通常只需執行一次；之後切換模式不必重新 clone 或重新註冊 marketplace。
-若不使用 checkout，可從遠端 plugin 目錄執行 bootstrap；安裝後改用
-`$CODEX_HOME/guardrail/bin/` 中的 selector/verifier：
+註冊 marketplace 與安裝 loader 通常只需執行一次；之後切換模式不必重新 clone 或重新註冊
+marketplace。若不使用 checkout，先從 `codex plugin list --json` 找到已安裝的
+`<plugin-directory>`，執行一次 bootstrap，之後所有切換都使用全域入口：
 
 ```text
 <plugin-directory>/hooks/install-codex-guardrail-loader --plugin-root <plugin-directory>
-$CODEX_HOME/guardrail/bin/select-codex-mode
 ```
 
-若使用 checkout，從 clone 根目錄執行：
+實際的模式切換指令如下；最後的 `<project-dir>` 是要套用設定的目標專案，不是
+`ai-guardrail-kit` checkout：
+
+```bash
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/select-codex-mode" harness --scope project --ref vX.Y.Z /path/to/target-project
+"$guardrail_bin/verify-codex-mode" harness --scope project /path/to/target-project
+"$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX.Y.Z /path/to/target-project
+"$guardrail_bin/verify-codex-mode" integrated-harness --scope user /path/to/target-project
+```
+
+若是維護者要使用 checkout 內的本機 development source，才從 clone 根目錄執行等效入口：
 
 ```bash
 cd /path/to/ai-guardrail-kit
@@ -100,8 +109,8 @@ cd /path/to/ai-guardrail-kit
 ./scripts/verify-codex-mode harness --scope user .
 ```
 
-命令最後的 `.` 代表要設定的目標專案。如果要設定另一個專案，仍須在 clone 根目錄執行，
-並將 `.` 改成目標專案路徑：
+命令最後的 `.` 代表目前 checkout；若要設定另一個專案，將 `.` 改成目標專案路徑。
+這是本機開發／測試流程，不是遠端安裝後的必要步驟：
 
 ```bash
 ./scripts/select-codex-mode harness --scope user /path/to/target-project
@@ -109,7 +118,9 @@ cd /path/to/ai-guardrail-kit
 ```
 
 Windows PowerShell 不會直接執行這些沒有副檔名的 shell script；請在 Git Bash 或 WSL 中
-執行 `./scripts/...`，或在 PowerShell 且已安裝 `bash` 時執行。
+執行全域 `$CODEX_HOME/guardrail/bin/...` 入口，或在 PowerShell 且已安裝 `bash` 時以
+`bash` 呼叫該入口。若 Windows 只有 `py` launcher，請先設定
+`AI_GUARDRAIL_PYTHON=py`。
 
 Selector 支援三種 scope：`project` 寫入可提交的
 `<project>/.codex/guardrail/runtime.json`，`local` 寫入本機覆寫的
@@ -118,17 +129,12 @@ Selector 支援三種 scope：`project` 寫入可提交的
 `~/.codex/guardrail/default-runtime.json`）。有效模式 precedence 為
 `local > project > user > disabled`：
 
-```powershell
-Set-Location C:\path\to\ai-guardrail-kit
-bash ./scripts/select-codex-mode harness --scope user .
-bash ./scripts/verify-codex-mode harness --scope user .
-```
-
 ```bash
-./scripts/select-codex-mode harness --scope project .
-./scripts/select-codex-mode harness --scope local .
-./scripts/select-codex-mode harness --scope user .
-./scripts/verify-codex-mode harness --scope user .
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/select-codex-mode" harness --scope project .
+"$guardrail_bin/select-codex-mode" harness --scope local .
+"$guardrail_bin/select-codex-mode" harness --scope user .
+"$guardrail_bin/verify-codex-mode" harness --scope user .
 ```
 
 Codex 的 plugin 安裝狀態只保留全域 loader；scope selector 可讓同一使用者的不同專案
@@ -140,8 +146,8 @@ Codex 的 plugin 安裝狀態只保留全域 loader；scope selector 可讓同�
 [`codex/plugins/integrated-harness/README.md`](codex/plugins/integrated-harness/README.md)。
 
 若要將 `integrated-harness` 設為所有 Codex 專案的全域預設，也可使用上面的 `user`
-scope selector。另有僅針對 `integrated-harness` 的相容性 global installer；註冊
-marketplace 後於本儲存庫執行一次：
+scope selector。另有僅針對 `integrated-harness` 的 checkout-only 相容性 global installer；
+註冊 marketplace 後於本儲存庫執行一次：
 
 ```bash
 ./scripts/install-codex-global-integrated-harness
@@ -287,10 +293,9 @@ claude plugin marketplace remove ai-guardrail-kit
 Codex 只安裝一個全域 `ai-guardrail-loader`；模式與版本由每個專案 selector 決定：
 
 ```bash
-codex plugin add ai-guardrail-loader@ai-guardrail-kit
-./scripts/install-codex-guardrail-loader --repo .
-./scripts/select-codex-mode harness --scope project --ref vX.Y.Z /path/to/project
-./scripts/verify-codex-mode harness --scope project /path/to/project
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/select-codex-mode" harness --scope project --ref vX.Y.Z /path/to/project
+"$guardrail_bin/verify-codex-mode" harness --scope project /path/to/project
 ```
 
 `project`、`local`、`user` selector 分別寫入
@@ -304,7 +309,8 @@ runtime archive 會先驗證 SHA-256，再安裝到 content-addressed cache，Co
 若需移除專案模式：
 
 ```bash
-./scripts/select-codex-mode --remove --scope project /path/to/project
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/select-codex-mode" --remove --scope project /path/to/project
 codex plugin marketplace remove ai-guardrail-kit
 ```
 

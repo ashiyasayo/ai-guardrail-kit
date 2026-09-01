@@ -10,4 +10,4 @@ and credential denials remain independent of approval and cannot be overridden b
 it. If host approvals are disabled, the plugin cannot manufacture an equivalent.
 Plugin hooks are not a sandbox, and installation alone does not activate them.
 
-Activate it from the repository with `scripts/select-codex-mode harness <project-dir>`, verify it with `scripts/verify-codex-mode harness <project-dir>`, then start a new thread after switching.
+Activate it with `$CODEX_HOME/guardrail/bin/select-codex-mode harness <project-dir>`, verify it with `$CODEX_HOME/guardrail/bin/verify-codex-mode harness <project-dir>`, then start a new thread after switching. The `./scripts/...` equivalents are only for a local checkout.

@@ -23,9 +23,11 @@ If neither file can be read, the plugin fails closed to `strict` mode with an
 empty Bash allowlist. Use a project policy for repositories that need a
 different policy from your personal default.
 
-Selecting `integrated-harness` with `scripts/select-codex-mode` installs this
-bundled default at the personal path when no personal policy exists. Existing
-personal policies are never overwritten or removed by the selector.
+Selecting `integrated-harness` with
+`$CODEX_HOME/guardrail/bin/select-codex-mode` installs this bundled default at
+the personal path when no personal policy exists. Existing personal policies
+are never overwritten or removed by the selector. The `./scripts/...` equivalent
+is only for a local checkout.
 
 ## Approval Modes
 

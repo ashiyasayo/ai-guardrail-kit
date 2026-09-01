@@ -60,12 +60,20 @@ Codex 只由 installer 管理全域 `ai-guardrail-loader@ai-guardrail-kit`；mod
 與 verifier，可部署到 `$CODEX_HOME/guardrail/{loader,bin}`，不依賴 checkout。
 
 ```bash
-codex plugin marketplace add "$(pwd)"
+codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref main --sparse .agents --sparse codex/plugins
 codex plugin add ai-guardrail-loader@ai-guardrail-kit
-./scripts/install-codex-guardrail-loader --repo .
-./scripts/select-codex-mode harness --scope project --ref vX.Y.Z .
-./scripts/verify-codex-mode harness --scope project .
+# <plugin-directory> 由 codex plugin list --json 查得；只需 bootstrap 一次
+<plugin-directory>/hooks/install-codex-guardrail-loader --plugin-root <plugin-directory>
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/select-codex-mode" harness --scope project --ref vX.Y.Z /path/to/project
+"$guardrail_bin/verify-codex-mode" harness --scope project /path/to/project
 ```
+
+上面的 `$CODEX_HOME/guardrail/bin/select-codex-mode` 才是遠端安裝後的實際模式切換入口；
+`/path/to/project` 是目標專案，不需要 checkout `ai-guardrail-kit`。若使用本機 checkout
+作為 development source，才改用 `./scripts/select-codex-mode` 與 `./scripts/verify-codex-mode`。
+實際語法是 `select-codex-mode [--update] <mode> [--scope ...] [--ref ...] [project-dir]`；
+移除時使用 `select-codex-mode --remove [--scope ...] [project-dir]`。
 
 Codex 三種 scope 的 selector 如下：`project` 是
 `.codex/guardrail/runtime.json`；`local` 是
@@ -74,11 +82,11 @@ Codex 三種 scope 的 selector 如下：`project` 是
 `local > project > user > disabled`。
 
 ```bash
-./scripts/select-codex-mode harness --scope local --ref vX.Y.Z .
-./scripts/select-codex-mode integrated-harness --scope user --ref vX.Y.Z .
-./scripts/select-codex-mode --update harness --scope project --ref vX.Y.Z .
-./scripts/verify-codex-mode harness --scope project --offline .
-./scripts/select-codex-mode --remove --scope project .
+"$guardrail_bin/select-codex-mode" harness --scope local --ref vX.Y.Z /path/to/project
+"$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX.Y.Z /path/to/project
+"$guardrail_bin/select-codex-mode" --update harness --scope project --ref vX.Y.Z /path/to/project
+"$guardrail_bin/verify-codex-mode" harness --scope project --offline /path/to/project
+"$guardrail_bin/select-codex-mode" --remove --scope project /path/to/project
 ```
 
 `--source github` 只使用核准 HTTPS origin；`local`／`test` 只在明確 development
@@ -89,7 +97,7 @@ Codex 的 shell wrapper 預設依序使用 `python3`、`python`。若 Windows �
 launcher 或 Python 不在 PATH，執行命令前設定 `AI_GUARDRAIL_PYTHON`，例如：
 
 ```bash
-AI_GUARDRAIL_PYTHON=py ./scripts/select-codex-mode harness --scope project .
+AI_GUARDRAIL_PYTHON=py "$guardrail_bin/select-codex-mode" harness --scope project /path/to/project
 ```
 
 全域相容 wrapper：
