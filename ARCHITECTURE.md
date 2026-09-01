@@ -29,8 +29,10 @@ Codex CLI 的 plugin 安裝狀態是使用者層級，但本專案只安裝
 `<project>/.codex/guardrail/runtime.json`、`runtime.local.json` 與
 `$CODEX_HOME/guardrail/default-runtime.json`，precedence 為
 local > project > user。loader 從 event cwd 找 root，離線解析完整 cache identity，
-再以固定 Python argv 執行 verified entrypoint；global integrated-harness installer
-只是 user fallback 相容 wrapper。
+再以固定 Python argv 執行 verified entrypoint。遠端 loader bootstrap 完成後，模式切換
+實際使用 `$CODEX_HOME/guardrail/bin/select-codex-mode` 與
+`$CODEX_HOME/guardrail/bin/verify-codex-mode`；`./scripts/...` 僅是 checkout 的等效
+development 入口。global integrated-harness installer 只是 user fallback 相容 wrapper。
 
 ## Codex runtime manager data flow
 

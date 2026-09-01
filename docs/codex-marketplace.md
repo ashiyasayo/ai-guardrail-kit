@@ -6,7 +6,13 @@ plugin scope，因此 selector 只寫本專案的 selector 檔。
 
 ## Remote/no-checkout bootstrap
 
-在已註冊本 marketplace 的 Codex 使用者環境，安裝唯一 loader：
+若尚未註冊 marketplace，先執行：
+
+```bash
+codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref main --sparse .agents --sparse codex/plugins
+```
+
+接著在已註冊本 marketplace 的 Codex 使用者環境，安裝唯一 loader：
 
 ```bash
 codex plugin add ai-guardrail-loader@ai-guardrail-kit
@@ -49,11 +55,19 @@ launcher 或 Python 不在 PATH，請在執行 bootstrap、selector、verifier �
 precedence 固定為 `local > project > user > disabled`。
 
 ```bash
-./scripts/select-codex-mode harness --scope project --ref vX.Y.Z /path/to/project
-./scripts/select-codex-mode integrated-harness --scope local --ref vX.Y.Z /path/to/project
-./scripts/verify-codex-mode harness --scope project /path/to/project
-./scripts/select-codex-mode --remove --scope local /path/to/project
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/select-codex-mode" harness --scope project --ref vX.Y.Z /path/to/project
+"$guardrail_bin/select-codex-mode" integrated-harness --scope local --ref vX.Y.Z /path/to/project
+"$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX.Y.Z /path/to/project
+"$guardrail_bin/verify-codex-mode" harness --scope project /path/to/project
+"$guardrail_bin/select-codex-mode" --remove --scope local /path/to/project
 ```
+
+以上是遠端 marketplace bootstrap 完成後的實際切換指令；`/path/to/project` 是目標專案，
+不需要把 `ai-guardrail-kit` clone 下來。若使用 checkout 作為本機 development source，
+才使用 `./scripts/select-codex-mode`、`./scripts/verify-codex-mode` 等等效入口。
+實際語法是 `select-codex-mode [--update] <mode> [--scope ...] [--ref ...] [project-dir]`；
+移除時使用 `select-codex-mode --remove [--scope ...] [project-dir]`。
 
 `--update` 才會重新解析 manifest；普通重跑保留既有 identity。正式來源只接受
 `github` alias 與核准 HTTPS origin。`local`／`test` 必須明確設定

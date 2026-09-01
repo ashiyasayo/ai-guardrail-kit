@@ -25,6 +25,9 @@ All notable changes to this project are documented in this file.
 
 - 澄清 Codex 管理 wrapper 的 Python 探測順序，並補充以 `AI_GUARDRAIL_PYTHON` 指定
   Windows `py` launcher 或自訂 Python 路徑的方式。
+- 修正 Codex 遠端 marketplace bootstrap 後的實際模式切換指令，改以
+  `$CODEX_HOME/guardrail/bin/select-codex-mode` 為主，並明確標示 `./scripts/...` 僅供
+  checkout 開發／測試使用。
 
 ## [0.4.0] - 2026-08-21
 
