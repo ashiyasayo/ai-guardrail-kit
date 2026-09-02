@@ -7,7 +7,7 @@
 
 ## 功能與用途分析
 
-`integrated-harness` 是 `decomposition-gate` 與 `harness` 的整合版，也是三個目錄中唯一同時
+`integrated-harness` 是 `decomposition-gate` 與 `harness` 的整合版，也是三個 Claude copy-in 目錄中唯一同時
 具備「治理政策、推理協定、計畫品質檢查、人類授權及安全 hooks」的完整方案。
 
 | 層次 | 解決的問題 | 實作來源 |
@@ -24,7 +24,7 @@
 協作、高風險資料、正式系統與需要稽核軌跡的專案；若只需要簡單的先拆解後修改，
 `decomposition-gate` 會更輕量。
 
-## 三個目錄的定位
+## 三個 Claude copy-in 目錄的定位
 
 | 目錄 | 拆解檢查 | 人類核准 | 安全 Hook | 治理政策 | 建議用途 |
 | --- | --- | --- | --- | --- | --- |
@@ -60,7 +60,7 @@
    由人類在自己的終端執行 `python3 .claude/hooks/approve_plan.py`（Windows 環境無 `python3` 時改用 `python`）。
 4. `strict` 核准紀錄只在 60 分鐘內有效，且 SHA-256 必須符合目前拆解文件；
    檔案工具在 `strict`／`standard` 下不得修改允許範圍外路徑。
-5. 憑證與危險命令 hooks 獨立於計畫與人工核准關卡，三種模式都不豁免。
+5. 憑證與危險命令 hooks 獨立於計畫與人工核准關卡，三種核准模式都不豁免。
 
 ## 分級模式
 
@@ -76,7 +76,7 @@
 選用 `light` 等同放棄檔案範圍管制，只保留「有拆解才能動」這一層流程紀律，故僅適用於
 低風險且不需授權控制的工作。需要檔案邊界請改用 `standard`，需要人類核准請用 `strict`。
 
-三種模式下憑證與危險命令 hook 都獨立生效。核准模式只由人類設定，模型不得修改政策檔或
+三種核准模式下憑證與危險命令 hook 都獨立生效。核准模式只由人類設定，模型不得修改政策檔或
 建議降級；欄位缺少或無法辨識時一律視為 `strict`。具體 hook 覆蓋邊界見「安全設計」。
 `strict` 模式拒絕一般 Bash；只有唯讀命令與人類 policy allowlist 的測試／建置入口
 可進入計畫／核准流程。Allowlist 入口仍可能執行專案程式，permissions 與 sandbox
