@@ -58,13 +58,16 @@ precedence 固定為 `local > project > user > disabled`。
 guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
 "$guardrail_bin/select-codex-mode" harness --scope project --ref vX.Y.Z /path/to/project
 "$guardrail_bin/select-codex-mode" integrated-harness --scope local --ref vX.Y.Z /path/to/project
-"$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX.Y.Z /path/to/project
+"$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX.Y.Z
 "$guardrail_bin/verify-codex-mode" harness --scope project /path/to/project
+"$guardrail_bin/verify-codex-mode" integrated-harness --scope user
 "$guardrail_bin/select-codex-mode" --remove --scope local /path/to/project
 ```
 
-以上是遠端 marketplace bootstrap 完成後的實際切換指令；`/path/to/project` 是目標專案，
-不需要把 `ai-guardrail-kit` clone 下來。若使用 checkout 作為本機 development source，
+以上是遠端 marketplace bootstrap 完成後的實際切換指令；`/path/to/project` 是
+`project`／`local` scope 的目標專案，不需要把 `ai-guardrail-kit` clone 下來。`user` scope
+是全域個人 fallback，可省略 `project-dir`，省略時預設使用目前目錄。若使用 checkout 作為
+本機 development source，
 才使用 `./scripts/select-codex-mode`、`./scripts/verify-codex-mode` 等等效入口。
 實際語法是 `select-codex-mode [--update] <mode> [--scope ...] [--ref ...] [project-dir]`；
 移除時使用 `select-codex-mode --remove [--scope ...] [project-dir]`。

@@ -28,6 +28,8 @@ All notable changes to this project are documented in this file.
 - 修正 Codex 遠端 marketplace bootstrap 後的實際模式切換指令，改以
   `$CODEX_HOME/guardrail/bin/select-codex-mode` 為主，並明確標示 `./scripts/...` 僅供
   checkout 開發／測試使用。
+- 澄清 Codex `user` scope 是全域個人 fallback，`project-dir` 為可選參數；省略時可從目前
+  目錄直接切換與驗證全域模式。
 
 ## [0.4.0] - 2026-08-21
 

@@ -70,8 +70,10 @@ guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
 ```
 
 上面的 `$CODEX_HOME/guardrail/bin/select-codex-mode` 才是遠端安裝後的實際模式切換入口；
-`/path/to/project` 是目標專案，不需要 checkout `ai-guardrail-kit`。若使用本機 checkout
-作為 development source，才改用 `./scripts/select-codex-mode` 與 `./scripts/verify-codex-mode`。
+`/path/to/project` 是 `project`／`local` scope 的目標專案，不需要 checkout
+`ai-guardrail-kit`。`user` scope 是全域個人 fallback，可省略專案路徑，省略時預設使用目前
+目錄作為命令脈絡。若使用本機 checkout 作為 development source，才改用
+`./scripts/select-codex-mode` 與 `./scripts/verify-codex-mode`。
 實際語法是 `select-codex-mode [--update] <mode> [--scope ...] [--ref ...] [project-dir]`；
 移除時使用 `select-codex-mode --remove [--scope ...] [project-dir]`。
 
@@ -83,9 +85,10 @@ Codex 三種 scope 的 selector 如下：`project` 是
 
 ```bash
 "$guardrail_bin/select-codex-mode" harness --scope local --ref vX.Y.Z /path/to/project
-"$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX.Y.Z /path/to/project
+"$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX.Y.Z
 "$guardrail_bin/select-codex-mode" --update harness --scope project --ref vX.Y.Z /path/to/project
 "$guardrail_bin/verify-codex-mode" harness --scope project --offline /path/to/project
+"$guardrail_bin/verify-codex-mode" integrated-harness --scope user
 "$guardrail_bin/select-codex-mode" --remove --scope project /path/to/project
 ```
 
