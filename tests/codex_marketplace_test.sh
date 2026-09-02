@@ -36,5 +36,13 @@ for needle in ('ai-guardrail-loader@ai-guardrail-kit','runtime.local.json','--of
     assert needle in guide, needle
 readme=(root/'README.md').read_text()
 assert 'hook 熱路徑' in readme and 'ai-guardrail-loader' in readme
+cli_reference=(root/'CLI_REFERENCE.md').read_text()
+for label, document in (('README', readme), ('CLI_REFERENCE', cli_reference), ('marketplace guide', guide)):
+    assert re.search(r'\$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX\.Y\.Z\n', document), label
+    assert not re.search(r'\$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX\.Y\.Z\s+/path/to/', document), label
+for plugin in names[1:]:
+    base = root/f'codex/plugins/{plugin}'
+    skill = next((base/'skills').glob('*/SKILL.md')).read_text()
+    assert 'For `user` scope, omit `[project-dir]`' in skill, plugin
 print('PASS: Codex marketplace, loader and runtime manifest structure')
 PY

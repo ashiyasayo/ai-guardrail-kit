@@ -11,3 +11,8 @@ After bootstrap, modes are selected with
 `$CODEX_HOME/guardrail/bin/verify-codex-mode`; mode switching never adds or
 removes a legacy mode plugin. The hook process is offline and executes only a
 verified content-addressed runtime cache entry.
+
+The selector syntax accepts an optional `[project-dir]`. Provide it for
+`project` or `local` scope; for `user` scope, omit it to use the current
+directory as command context while writing the global user fallback. Start a
+new thread after switching modes.
