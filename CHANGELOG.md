@@ -23,6 +23,8 @@ All notable changes to this project are documented in this file.
 
 ### Documentation
 
+- 統一 README 對四種產品模式的說明；明確區分四種互斥模式、三個 Claude copy-in
+  目錄及 integrated-harness 的三種核准模式，避免將不同層級的數量混為一談。
 - 澄清 Codex 管理 wrapper 的 Python 探測順序，並補充以 `AI_GUARDRAIL_PYTHON` 指定
   Windows `py` launcher 或自訂 Python 路徑的方式。
 - 修正 Codex 遠端 marketplace bootstrap 後的實際模式切換指令，改以
