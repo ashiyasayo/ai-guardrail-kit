@@ -14,7 +14,7 @@ for plugin in data['plugins']:
     assert base.name==name and (base/'.codex-plugin/plugin.json').is_file()
     assert plugin['category']=='Security'
     policy=plugin['policy']['installation']
-    assert policy == ('AVAILABLE' if name=='ai-guardrail-loader' else 'DEPRECATED')
+    assert policy == ('AVAILABLE' if name=='ai-guardrail-loader' else 'NOT_AVAILABLE')
     manifest=json.loads((base/'.codex-plugin/plugin.json').read_text())
     assert manifest['name']==name
     skills=list((base/'skills').glob('*/SKILL.md'))
