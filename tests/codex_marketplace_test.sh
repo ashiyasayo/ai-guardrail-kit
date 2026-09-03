@@ -1,88 +1,48 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Windows（Git Bash）環境通常只有 python 而沒有可用的 python3，實際探測後回退
-if ! python3 -V >/dev/null 2>&1 && python -V >/dev/null 2>&1; then
-  python3() { python "$@"; }
-fi
-# Windows 預設編碼為 cp950，強制 Python 使用 UTF-8 避免中文讀寫失敗
 export PYTHONUTF8=${PYTHONUTF8:-1}
 cd "$(dirname "$0")/.."
 python3 - <<'PY'
-import json, pathlib, re, sys
-
-SEMVER_PATTERN = re.compile(r'^\d+\.\d+\.\d+$')
-
-def check(condition, message):
- if not condition:
-  print(f'FAIL: {message}', file=sys.stderr)
-  raise SystemExit(1)
-
+import json, pathlib, re
 root=pathlib.Path('.')
 data=json.loads((root/'.agents/plugins/marketplace.json').read_text())
-names=['decomposition-gate','sensitive-data-guard','harness','integrated-harness']
-check(data.get('name')=='ai-guardrail-kit', 'marketplace name must be ai-guardrail-kit')
-check([p.get('name') for p in data.get('plugins', [])]==names, f'plugin order must be {names}')
-for p,name in zip(data['plugins'],names):
- check(p.get('source')=={'source':'local','path':f'./codex/plugins/{name}'}, f'{name}: invalid local source')
- check(p.get('policy')=={'installation':'AVAILABLE','authentication':'ON_INSTALL'}, f'{name}: invalid policy')
- check(p.get('category')=='Security', f'{name}: category must be Security')
- base=root/p['source']['path'].removeprefix('./')
- manifest=json.loads((base/'.codex-plugin/plugin.json').read_text())
- check(base.name==manifest.get('name')==name, f'{name}: directory and manifest names must match')
- # 版號本身由各 plugin.json 維護、隨每次功能變更調整；此測試只驗證格式，
- # 不寫死特定版號，避免每次版號升級都要同步改測試。
- check(SEMVER_PATTERN.match(manifest.get('version', '')), f"{name}: version must be semver, got {manifest.get('version')!r}")
- skills=list(base.glob('skills/*/SKILL.md'))
- check(len(skills)==1, f'{name}: expected exactly one skill, found {len(skills)}')
- text=skills[0].read_text()
- lines=text.splitlines()
- check(lines and lines[0].strip()=='---', f'{name}: SKILL.md must begin with YAML frontmatter')
- try:
-  closing=next(i for i,line in enumerate(lines[1:], 1) if line.strip()=='---')
- except StopIteration:
-  check(False, f'{name}: SKILL.md frontmatter is missing closing ---')
- frontmatter=lines[1:closing]
- frontmatter_names=[line.split(':',1)[1].strip() for line in frontmatter if line.startswith('name:')]
- check(frontmatter_names==[name], f'{name}: frontmatter name must be {name}, found {frontmatter_names}')
-
+names=['ai-guardrail-loader','decomposition-gate','sensitive-data-guard','harness','integrated-harness']
+assert data['name']=='ai-guardrail-kit'
+assert [p['name'] for p in data['plugins']]==names
+for plugin in data['plugins']:
+    name=plugin['name']; base=root/plugin['source']['path'][2:]
+    assert base.name==name and (base/'.codex-plugin/plugin.json').is_file()
+    assert plugin['category']=='Security'
+    policy=plugin['policy']['installation']
+    assert policy == ('AVAILABLE' if name=='ai-guardrail-loader' else 'DEPRECATED')
+    manifest=json.loads((base/'.codex-plugin/plugin.json').read_text())
+    assert manifest['name']==name
+    skills=list((base/'skills').glob('*/SKILL.md'))
+    assert len(skills)==1
+    assert ('new thread' in skills[0].read_text()) if name != 'ai-guardrail-loader' else True
+loader=root/'codex/plugins/ai-guardrail-loader/hooks'
+for name in ('loader.py','manager.py','select-codex-mode','verify-codex-mode','install-codex-guardrail-loader','prune-codex-runtime-cache'):
+    assert (loader/name).is_file(), name
+manifest=json.loads((root/'codex/runtime-manifest.json').read_text())
+assert manifest['schema_version']==1 and set(manifest['modes'])==set(names[1:])
+for item in manifest['modes'].values():
+    assert re.fullmatch(r'[0-9a-f]{64}', item['archive_sha256'])
+    assert item['archive_size'] > 0
+    archive=root/'codex/runtime-archives'/pathlib.PurePosixPath(item['archive_url']).name
+    assert archive.is_file() and archive.stat().st_size == item['archive_size']
+    assert __import__('hashlib').sha256(archive.read_bytes()).hexdigest() == item['archive_sha256']
+guide=(root/'docs/codex-marketplace.md').read_text()
+for needle in ('ai-guardrail-loader@ai-guardrail-kit','runtime.local.json','--offline','E_ARCHIVE_UNSAFE','shell=False','no-checkout','selector-index.json','--apply'):
+    assert needle in guide, needle
 readme=(root/'README.md').read_text()
-guide_path=root/'docs/codex-marketplace.md'
-check(guide_path.exists(), 'docs/codex-marketplace.md must exist')
-guide=guide_path.read_text()
-check('docs/codex-marketplace.md' in readme, 'README must link to the Codex marketplace guide')
-required = {
- 'codex plugin marketplace add "$(pwd)"': 'marketplace add command',
- './scripts/select-codex-mode decomposition-gate --scope project .': 'project selector command',
- './scripts/select-codex-mode harness --scope local .': 'local selector command',
- './scripts/select-codex-mode integrated-harness --scope user .': 'user selector command',
- './scripts/install-codex-global-integrated-harness': 'global installer command',
- './scripts/verify-codex-global-integrated-harness': 'global verifier command',
- '~/.codex/hooks.json': 'global hook configuration path',
- './scripts/verify-codex-mode decomposition-gate --scope project .': 'verifier command',
- './scripts/select-codex-mode --remove --scope project /path/to/project': 'safe remove command',
- './scripts/verify-codex-mode --no-managed-mode --scope project /path/to/project': 'removed-state verifier command',
- '.codex/config.toml': 'managed config path',
- '.codex/hooks.json': 'project-local hook configuration path',
- '# ai-guardrail-kit:begin': 'managed block delimiter',
- 'Python 3.9': 'Python minimum',
- 'new thread': 'new-thread activation instruction',
- 'native Codex `ask`': 'native approval semantics',
- 'codex plugin add/remove': 'direct CLI desynchronization boundary',
- 'refresh': 'local update workflow',
- 'codex plugin marketplace upgrade ai-guardrail-kit': 'remote marketplace snapshot upgrade',
- './scripts/select-codex-mode --update': 'selector remote update command',
- 'update applied but verification failed': 'post-commit refresh failure',
- 'irreversible update commit point': 'refresh commit point',
- 'TOCTOU': 'selector race limitation',
-}
-for needle, label in required.items():
- check(needle in guide, f'Codex guide must document {label}')
-check('/Users/' not in guide, 'Codex guide must not contain a developer-machine path')
-check('removes and re-adds' not in guide, 'Codex guide retains obsolete refresh workaround')
-check('refreshes cached plugin content with transactional rollback' not in guide, 'Codex guide falsely promises refresh rollback')
-for name in names:
- skill=(root/f'codex/plugins/{name}/skills/{name}/SKILL.md').read_text()
- check('new thread' in skill, f'{name}: skill must require a new thread')
- check(f'scripts/select-codex-mode {name}' in skill, f'{name}: skill must name its selector command')
-print('PASS: Codex marketplace and plugin skeletons')
+assert 'hook 熱路徑' in readme and 'ai-guardrail-loader' in readme
+cli_reference=(root/'CLI_REFERENCE.md').read_text()
+for label, document in (('README', readme), ('CLI_REFERENCE', cli_reference), ('marketplace guide', guide)):
+    assert re.search(r'\$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX\.Y\.Z\n', document), label
+    assert not re.search(r'\$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX\.Y\.Z\s+/path/to/', document), label
+for plugin in names[1:]:
+    base = root/f'codex/plugins/{plugin}'
+    skill = next((base/'skills').glob('*/SKILL.md')).read_text()
+    assert 'For `user` scope, omit `[project-dir]`' in skill, plugin
+print('PASS: Codex marketplace, loader and runtime manifest structure')
 PY

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+script_dir=$(cd "$(dirname "$0")" && pwd -P)
+manager="$script_dir/codex-runtime-manager.py"
+repo=''
+plugin_root=''
+python_bin=${AI_GUARDRAIL_PYTHON:-python3}
+if ! "$python_bin" -c 'import sys; raise SystemExit(sys.version_info < (3, 9))' >/dev/null 2>&1; then python_bin=python; fi
+export PYTHONUTF8=${PYTHONUTF8:-1}
+update=0
+remove=0
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --update) update=1; shift;;
+    --remove) remove=1; shift;;
+    --migrate) shift;;
+    --ref) [[ $# -ge 2 ]] || exit 2; shift 2;;
+    --repo) [[ $# -ge 2 ]] || exit 2; repo=$2; shift 2;;
+    --plugin-root) [[ $# -ge 2 ]] || exit 2; plugin_root=$2; shift 2;;
+    *) printf 'usage: install-codex-guardrail-loader [--update|--remove|--migrate]\n' >&2; exit 2;;
+  esac
+done
+if [[ -z $plugin_root && -z $repo && -f $script_dir/manager.py ]]; then
+  plugin_root=$(cd "$script_dir/.." && pwd -P)
+fi
+if [[ -n $plugin_root && -f $plugin_root/hooks/manager.py ]]; then
+  manager="$plugin_root/hooks/manager.py"
+elif [[ ! -f $manager && -n ${CODEX_HOME:-} && -f ${CODEX_HOME}/guardrail/bin/codex-runtime-manager.py ]]; then
+  manager="${CODEX_HOME}/guardrail/bin/codex-runtime-manager.py"
+fi
+[[ -f $manager ]] || { printf 'loader: manager is unavailable\n' >&2; exit 1; }
+args=(install-loader)
+if [[ -n $plugin_root ]]; then args+=(--plugin-root "$plugin_root"); else args+=(--repo "${repo:-$script_dir/..}"); fi
+(( update )) && args+=(--update)
+(( remove )) && args+=(--remove)
+exec "$python_bin" "$manager" "${args[@]}"

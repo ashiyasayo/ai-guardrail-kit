@@ -10,7 +10,7 @@ SessionStart 會載入協定，依任務風險調整分析、進度播報、suba
 
 ## 功能與用途分析
 
-`decomposition-gate` 是三個目錄中最單純的「任務拆解品質閘門」。它不負責多模型派工、
+`decomposition-gate` 是三個 Claude copy-in 目錄中最單純的「任務拆解品質閘門」。它不負責多模型派工、
 人工核准或憑證安全，而是確保 Claude 在修改專案前，先留下格式可驗證的拆解文件。
 
 | 面向 | 說明 |

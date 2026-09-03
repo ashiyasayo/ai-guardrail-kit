@@ -1,221 +1,145 @@
 # Codex guardrail marketplace
 
-The Codex marketplace manifest is at `.agents/plugins/marketplace.json`, with
-four complete plugins under `codex/plugins/` named `decomposition-gate`,
-`sensitive-data-guard`, `harness`, and `integrated-harness`. Select exactly one
-managed mode and choose where its hooks are enabled with `project`, `local`, or
-`user` scope.
-These plugins implement the same product
-intent as the top-level Claude packages, but Codex hook, approval, installation,
-and policy semantics are platform-specific and are not claimed to be identical.
+Codex 使用一個全域 `ai-guardrail-loader` plugin；四個 mode 是每個專案的
+runtime identity，不是全域 plugin 安裝狀態。Codex 沒有本專案可依賴的 per-project
+plugin scope，因此 selector 只寫本專案的 selector 檔。
 
-## Requirements and first installation
+## Remote/no-checkout bootstrap
 
-Use Codex and Python 3.9 or newer. Register the GitHub marketplace, then select
-a mode for a project from a local checkout of this repository:
+若尚未註冊 marketplace，先執行：
 
 ```bash
 codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref main --sparse .agents --sparse codex/plugins
 ```
 
-`--ref main` tracks the trunk. To pin a released snapshot, point `--ref` at a
-release tag instead (for example `--ref v0.1.0`). Codex plugins carry no version
-field of their own; the repository tag is the only release coordinate. See
-[`../VERSIONING.md`](../VERSIONING.md).
-
-For local development, register the local marketplace instead:
+接著在已註冊本 marketplace 的 Codex 使用者環境，安裝唯一 loader：
 
 ```bash
-codex plugin marketplace add "$(pwd)"
+codex plugin add ai-guardrail-loader@ai-guardrail-kit
 ```
 
-Then select and verify a mode:
+`ai-guardrail-loader` plugin 自帶 `hooks/manager.py`、loader、selector 與 verifier
+bootstrap。依 Codex `plugin list --json` 顯示的已安裝 plugin directory，執行：
 
 ```bash
-./scripts/select-codex-mode decomposition-gate --scope project .
-./scripts/verify-codex-mode decomposition-gate --scope project .
+<plugin-directory>/hooks/install-codex-guardrail-loader --plugin-root <plugin-directory>
 ```
 
-Codex does not expose Claude's named plugin-install scopes; this repository maps
-the three selector scopes to the native hook layers as follows:
+它會把 loader、manager 與 selector/verifier 入口部署到
+`$CODEX_HOME/guardrail/{loader,bin}/`；已選專案只執行 cache 內的 verified payload，
+不依賴 checkout 絕對路徑。loader installer 是唯一可以管理
+`ai-guardrail-loader@ai-guardrail-kit` 的本專案流程；selector 不呼叫任何 mode
+plugin add/remove。
 
-| Scope | Managed layer | Intended reach |
-| --- | --- | --- |
-| `project` | `<project>/.codex/config.toml` managed block | project-shared configuration |
-| `local` | `<project>/.codex/hooks.json` managed commands | current project local configuration |
-| `user` | `$CODEX_HOME/hooks.json` (default `~/.codex/hooks.json`) | every project for the user |
-
-Examples for the other two layers:
+有 checkout 時可使用等效入口：
 
 ```bash
-./scripts/select-codex-mode harness --scope local .
-./scripts/verify-codex-mode harness --scope local .
-./scripts/select-codex-mode integrated-harness --scope user .
-./scripts/verify-codex-mode integrated-harness --scope user .
+./scripts/install-codex-guardrail-loader --repo .
 ```
 
-Substitute any of the four mode names in the repository commands. Use an
-explicit project directory instead of `.` when configuring another project.
-Selection installs the target, removes the other managed plugins, writes the
-selector-owned hooks in the selected layer, and verifies that the installed
-plugin and active hooks agree. Marketplace metadata itself does not provide
-mutual exclusion, and plugin installation alone does not activate hooks. Since
-Codex plugin installation is user-global, do not keep different selector-managed
-modes in different scope layers at the same time.
+上述 shell entrypoint 預設依序探測 `python3`、`python`。若環境只有 Windows `py`
+launcher 或 Python 不在 PATH，請在執行 bootstrap、selector、verifier 或 prune 前設定
+`AI_GUARDRAIL_PYTHON`；這只影響管理命令，不會讓 hook 熱路徑連網。
 
-After every selection or reinstall, start a new thread. Existing threads do not
-reliably reload newly installed skills and hooks.
+## Selecting a runtime
 
-## Global integrated-harness default
+四個 mode：`decomposition-gate`、`sensitive-data-guard`、`harness`、
+`integrated-harness`。selector 位置如下：
 
-To make `integrated-harness` the default guardrail for every Codex project, run
-this once after registering the marketplace from a local checkout:
+| Scope | Selector |
+| --- | --- |
+| project | `<project>/.codex/guardrail/runtime.json` |
+| local | `<project>/.codex/guardrail/runtime.local.json` |
+| user | `$CODEX_HOME/guardrail/default-runtime.json` |
+
+precedence 固定為 `local > project > user > disabled`。
 
 ```bash
-./scripts/install-codex-global-integrated-harness
-./scripts/verify-codex-global-integrated-harness
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/select-codex-mode" harness --scope project --ref vX.Y.Z /path/to/project
+"$guardrail_bin/select-codex-mode" integrated-harness --scope local --ref vX.Y.Z /path/to/project
+"$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX.Y.Z
+"$guardrail_bin/verify-codex-mode" harness --scope project /path/to/project
+"$guardrail_bin/verify-codex-mode" integrated-harness --scope user
+"$guardrail_bin/select-codex-mode" --remove --scope local /path/to/project
 ```
 
-The installer installs only `integrated-harness`, copies the bundled personal
-policy only when absent, and adds three tagged `PreToolUse` commands to
-`~/.codex/hooks.json`. Unrelated global hooks are retained. A first installation
-keeps a private pre-install backup so `--remove` can restore the original hooks
-file byte-for-byte:
+以上是遠端 marketplace bootstrap 完成後的實際切換指令；`/path/to/project` 是
+`project`／`local` scope 的目標專案，不需要把 `ai-guardrail-kit` clone 下來。`user` scope
+是全域個人 fallback，可省略 `project-dir`，省略時預設使用目前目錄。若使用 checkout 作為
+本機 development source，
+才使用 `./scripts/select-codex-mode`、`./scripts/verify-codex-mode` 等等效入口。
+實際語法是 `select-codex-mode [--update] <mode> [--scope ...] [--ref ...] [project-dir]`；
+移除時使用 `select-codex-mode --remove [--scope ...] [project-dir]`。
 
-The three `PreToolUse` commands keep distinct decision semantics: the plan gate
-requests native approval, `security_guard.py` runs dangerous-command and secret
-checks in one Python process, and the PII hook can return a redacted
-`updatedInput`. Prompt PII blocking and the session reminder remain separate
-event hooks.
+`--update` 才會重新解析 manifest；普通重跑保留既有 identity。正式來源只接受
+`github` alias 與核准 HTTPS origin。`local`／`test` 必須明確設定
+`AI_GUARDRAIL_ALLOW_DEVELOPMENT_SOURCE=1`、manifest path 與 archive directory。
+`--offline` 僅使用 `$CODEX_HOME/guardrail/runtime-index.json` 中唯一匹配的 identity，
+不呼叫 network adapter。
+
+manifest 會固定 `ref`、40-hex `commit`、runtime version、archive size、SHA-256 及
+entrypoints。archive 先驗 hash，再檢查 UTF-8 相對 POSIX regular files、拒絕
+symlink、hardlink、device、FIFO、duplicate normalized path、path traversal 與解壓大小
+上限，最後才 atomic publish 到 `runtime-cache/sha256/<digest>/`。
+
+## Loader hooks and safety
+
+loader 從 Codex event 的 `cwd` 找最近含 selector 的 project root，依 precedence
+解析 runtime。它不連網、不更新 cache、不執行 URL 或 selector 提供的 command。
+每次執行前重新確認 cache metadata、payload 全檔 digest、entrypoint regular file
+與 containment，子程序固定使用 `[python, "--", verified_entrypoint]`、`shell=False`，
+原始 event bytes 送入 stdin。
+
+註冊的 event slots 保留既有順序與語意：
+
+- `PreToolUse exec_command|apply_patch`：decomposition、plan、security
+- `PreToolUse apply_patch`：獨立 PII updatedInput
+- `UserPromptSubmit`：PII prompt deny
+- `SessionStart startup|resume|clear|compact`：integrated-harness reminder
+
+安全事件 runtime 缺失或驗證失敗時 fail closed；SessionStart 輸出明確診斷。環境會
+移除 token、password、secret、auth、cookie、proxy 等敏感變數，且不記錄 event、prompt
+或 tool input。
+
+## Global integrated-harness compatibility wrapper
 
 ```bash
-./scripts/install-codex-global-integrated-harness --remove
-./scripts/verify-codex-global-integrated-harness --no-installed
+./scripts/install-codex-global-integrated-harness /path/to/checkout
+./scripts/verify-codex-global-integrated-harness /path/to/checkout
+./scripts/install-codex-global-integrated-harness --remove /path/to/checkout
 ```
 
-Global mode keeps the dangerous-command and secret checks active in every
-project. Its plan gate is intentionally inactive only until a project creates
-`.codex/guardrail/plan/decomposition.md`; once that file exists, the normal
-integrated-harness policy, scope, and native approval checks apply. Project
-selection remains strict and still requires the plan file from the start.
-## Choosing a mode
+此 wrapper 只確保 loader、`integrated-harness` user fallback 與既有個人政策建立來源；
+不安裝或移除 integrated-harness mode plugin。`--remove` 不刪除個人
+`orchestration-policy.md`，也不影響 project/local selector 或 unrelated hooks/plugins。
 
-- `decomposition-gate` requires `.codex/guardrail/plan/decomposition.md` before
-  writes. It is workflow discipline, not human authorization or a sandbox.
-- `sensitive-data-guard` blocks plaintext secrets and prompt PII, and redacts
-  supported PII from patch content. It does not add decomposition,
-  dangerous-command checks, human approval, or orchestration.
-- `harness` returns native Codex `ask` for guarded writes after deterministic
-  safety checks. It does not generate or enforce agent orchestration.
-- `integrated-harness` adds decomposition, a slim governance policy, scope, and audit context. Strict
-  mode asks after all deterministic checks pass. Light mode may allow a provably
-  scoped `apply_patch`, but mutating `exec_command` still asks. Ordinary model
-  routing and agent delegation remain platform-native.
+## Migration and rollback
 
-For `integrated-harness`, the project policy at
-`.codex/guardrail/orchestration-policy.md` always wins. Only when it is absent
-does the hook read the personal policy at
-`~/.codex/guardrail/orchestration-policy.md`. If neither file is available, or
-the project file cannot be read, the hook fails closed to `strict` with an empty
-allowlist. A permissive personal policy therefore affects every project without
-its own policy file; create a project policy for high-risk repositories.
-Selecting `integrated-harness` creates the personal policy from the bundled
-default when it is absent. The selector never overwrites or removes an existing
-personal policy, including when the managed mode is later removed.
+selector 會辨識舊 TOML marker、local/user hook marker 與 legacy global marker。只有
+完整且一致的舊 hook 集合才會遷移；混合、缺漏或無法判定 mode 回報
+`E_LEGACY_AMBIGUOUS` 並保持 bytes 不變。selector、runtime index 與 loader pointer
+使用同目錄 temporary file、flush/fsync（平台可行時）及 `os.replace`；manifest、download、
+archive、cache publish 或 post-verify 失敗會保留舊 selector 可用。非受管 hooks、plugins
+與個人 policy 永遠保留。
 
-Native `ask` delegates the approval prompt to Codex; no approval file, nonce, or
-repository command substitutes for a human response. If approvals are disabled
-by the Codex host or execution policy, these plugins cannot turn them back on or
-provide equivalent authorization. Destructive-command and plaintext-credential
-denials are deterministic and independent of approval eligibility: approval does
-not override them, in strict or light mode.
+## Runtime cache cleanup
 
-## Managed state and verification
-
-For `project`, the selector exclusively owns the text from
-`# ai-guardrail-kit:begin` through `# ai-guardrail-kit:end` in
-`.codex/config.toml`. For `local` and `user`, it owns only commands carrying
-the corresponding scope marker in `hooks.json`; unrelated hooks are preserved.
-The selector rejects malformed delimiters, malformed hook JSON, symlinks, and
-non-regular targets. Run the verifier after any suspected state change:
+selector 會在 `$CODEX_HOME/guardrail/selector-index.json` 登記受管 selector 路徑，供
+低頻清理流程建立引用集合。清理預設為 dry-run；只有明確 `--apply` 才會刪除超過
+保留天數、未被任何已登記 selector 引用且重新驗證完整的 digest cache：
 
 ```bash
-./scripts/verify-codex-mode integrated-harness --scope project /path/to/project
-./scripts/verify-codex-mode integrated-harness --scope local /path/to/project
-./scripts/verify-codex-mode integrated-harness --scope user /path/to/project
+$CODEX_HOME/guardrail/bin/prune-codex-runtime-cache --dry-run --max-age 30
+$CODEX_HOME/guardrail/bin/prune-codex-runtime-cache --apply --max-age 30
 ```
 
-Direct `codex plugin add/remove` can desynchronize installed plugin state from
-the project hook block. Use the selector for installation, switching, refreshing,
-and safe removal:
+selector registry 損壞、cache 正在被 lock、候選內容不完整或是 symlink 時，清理會
+停止或跳過該項，不會遞迴刪除來源不明的路徑。hook 熱路徑不執行 prune。
 
-```bash
-./scripts/select-codex-mode --remove --scope project /path/to/project
-./scripts/verify-codex-mode --no-managed-mode --scope project /path/to/project
-```
+## Troubleshooting and tests
 
-Use the same `--scope` value for local or user removal. Removal transactionally
-removes all managed plugins and only the selector-owned block or marked hook
-commands for that scope. Unrelated plugins, hooks, and config bytes are
-preserved. Repeating it is safe.
-
-## Remote update workflow
-
-For a marketplace registered from GitHub, refresh this marketplace's Git
-snapshot and reinstall the selected mode in one selector command:
-
-```bash
-./scripts/select-codex-mode --update <mode> --scope project <project>
-./scripts/verify-codex-mode <mode> --scope project <project>
-```
-
-`--update` first runs `codex plugin marketplace upgrade ai-guardrail-kit`
-(scoped to this marketplace only). If the upgrade fails, the selector aborts
-before touching installed plugins or project config. On success it continues
-into the normal selection flow: a same-mode invocation follows the refresh
-semantics below (including the irreversible commit point), and a different
-mode performs a regular switch installed from the refreshed snapshot.
-`--update` cannot be combined with `--remove`. Start a new thread after a
-successful update.
-
-## Local update workflow
-
-Codex caches installed local plugin content. During repository development,
-refresh the selected plugin through the selector:
-
-```bash
-./scripts/select-codex-mode <mode> --scope project .
-./scripts/verify-codex-mode <mode> --scope project .
-```
-
-Replace `project` with `local` or `user` when refreshing another hook layer.
-
-For a same-mode refresh, the selector first requires the installed plugin,
-selected scope layer, repository hook paths, and executables to be exact. A
-mismatch is rejected without mutation; run a normal switch to another mode and
-back to repair it. The final `codex plugin add <mode>@ai-guardrail-kit` is the
-irreversible update commit point. If it fails, the old cached generation remains.
-If it succeeds but the post-check fails, the selector reports
-`update applied but verification failed` and does not claim rollback. Start a
-new thread afterward.
-
-## Failure, rollback, and security boundaries
-
-Mode switches and removals snapshot managed plugin state and project config. A
-post-mutation error reports either `rollback succeeded` or `rollback also
-failed`; neither message means the requested operation succeeded. Same-mode
-refresh follows the distinct irreversible commit-point behavior described above.
-
-Atomic rename protects each config replacement, but validation and snapshotting
-cannot be atomic across an externally mutable project path. A TOCTOU window
-remains if another process changes the config between those operations. Rollback
-is best-effort and also depends on the Codex plugin CLI and filesystem remaining
-available. Avoid concurrent config/plugin changes and keep version-control or
-another external backup for recovery.
-
-Hooks are defense layers, not a security sandbox. Regex command/secret detection
-cannot prove the absence of obfuscation, indirect effects, or every credential
-format. Light-mode scope checks only bypass a prompt for deterministic
-`apply_patch` paths; arbitrary shell effects are not treated as scoped. Combine
-these controls with Codex permissions, isolation, secret management, static
-analysis, and human review.
+穩定錯誤碼包括 `E_NETWORK`、`E_SOURCE_DENIED`、`E_MANIFEST_INVALID`、
+`E_DIGEST_MISMATCH`、`E_ARCHIVE_UNSAFE`、`E_CACHE_CORRUPT`、`E_RUNTIME_MISSING`、
+`E_HOOK_FAILED` 與 `E_ROLLBACK_FAILED`。完整測試需 Python 3.9+、Bash、fake Codex；
+測試使用 in-memory／temporary filesystem／fake process，不依賴真實網路。

@@ -8,6 +8,38 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-03
+
+### Fixed
+
+- Codex global `integrated-harness` installer 改以偵測到的 Python 直譯器執行 runtime
+  manager，修正 Linux checkout／CI 中 manager 檔案沒有 executable bit 時的安裝失敗。
+
+### Added
+
+- Codex 新增單一 `ai-guardrail-loader` marketplace plugin、SHA-256 驗證的 runtime
+  manifest/archive、內容定址 cache、project/local/user selector 與離線 dispatch。
+- Codex loader plugin 自帶 manager、selector、verifier bootstrap，可部署到
+  `$CODEX_HOME` 而不依賴 checkout；新增 A/B project、archive 安全性、payload integrity、
+  rollback、selector registry、prune 與 global wrapper 測試。
+
+### Changed
+
+- Codex mode 切換不再安裝或移除四個 legacy mode plugin；global integrated-harness
+  installer 改為 loader + user fallback 相容 wrapper。
+
+### Documentation
+
+- 統一 README 對四種產品模式的說明；明確區分四種互斥模式、三個 Claude copy-in
+  目錄及 integrated-harness 的三種核准模式，避免將不同層級的數量混為一談。
+- 澄清 Codex 管理 wrapper 的 Python 探測順序，並補充以 `AI_GUARDRAIL_PYTHON` 指定
+  Windows `py` launcher 或自訂 Python 路徑的方式。
+- 修正 Codex 遠端 marketplace bootstrap 後的實際模式切換指令，改以
+  `$CODEX_HOME/guardrail/bin/select-codex-mode` 為主，並明確標示 `./scripts/...` 僅供
+  checkout 開發／測試使用。
+- 澄清 Codex `user` scope 是全域個人 fallback，`project-dir` 為可選參數；省略時可從目前
+  目錄直接切換與驗證全域模式。
+
 ## [0.4.0] - 2026-08-21
 
 ### Fixed
@@ -313,7 +345,8 @@ VS Code Agent hooks，且 macOS／Linux 路徑尚未實機驗證。以下彙整�
   once a plan exists, normal integrated-harness scope, policy, and approval
   checks apply.
 
-[Unreleased]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.2.0...v0.2.1

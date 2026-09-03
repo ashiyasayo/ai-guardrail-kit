@@ -55,29 +55,70 @@ Code session。
 
 ## Codex
 
+Codex 只由 installer 管理全域 `ai-guardrail-loader@ai-guardrail-kit`；mode plugin
+不再由 selector add/remove。remote marketplace plugin 自帶 manager、loader、selector
+與 verifier，可部署到 `$CODEX_HOME/guardrail/{loader,bin}`，不依賴 checkout。
+
 ```bash
-codex plugin marketplace add "$(pwd)"
-./scripts/select-codex-mode sensitive-data-guard --scope project .
-./scripts/verify-codex-mode sensitive-data-guard --scope project .
+codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref main --sparse .agents --sparse codex/plugins
+codex plugin add ai-guardrail-loader@ai-guardrail-kit
+# <plugin-directory> 由 codex plugin list --json 查得；只需 bootstrap 一次
+<plugin-directory>/hooks/install-codex-guardrail-loader --plugin-root <plugin-directory>
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/select-codex-mode" harness --scope project --ref vX.Y.Z /path/to/project
+"$guardrail_bin/verify-codex-mode" harness --scope project /path/to/project
 ```
 
-Codex 三種 scope 的設定層如下：`project` 是專案共享的
-`.codex/config.toml` managed block；`local` 是目前專案的
-`.codex/hooks.json`；`user` 是 `$CODEX_HOME/hooks.json`（預設
-`~/.codex/hooks.json`）。範例：
+上面的 `$CODEX_HOME/guardrail/bin/select-codex-mode` 才是遠端安裝後的實際模式切換入口；
+`/path/to/project` 是 `project`／`local` scope 的目標專案，不需要 checkout
+`ai-guardrail-kit`。`user` scope 是全域個人 fallback，可省略專案路徑，省略時預設使用目前
+目錄作為命令脈絡。若使用本機 checkout 作為 development source，才改用
+`./scripts/select-codex-mode` 與 `./scripts/verify-codex-mode`。
+實際語法是 `select-codex-mode [--update] <mode> [--scope ...] [--ref ...] [project-dir]`；
+移除時使用 `select-codex-mode --remove [--scope ...] [project-dir]`。
+
+Codex 三種 scope 的 selector 如下：`project` 是
+`.codex/guardrail/runtime.json`；`local` 是
+`.codex/guardrail/runtime.local.json`；`user` 是
+`$CODEX_HOME/guardrail/default-runtime.json`。precedence 為
+`local > project > user > disabled`。
 
 ```bash
-./scripts/select-codex-mode harness --scope local .
-./scripts/verify-codex-mode harness --scope local .
-./scripts/select-codex-mode integrated-harness --scope user .
-./scripts/verify-codex-mode integrated-harness --scope user .
+"$guardrail_bin/select-codex-mode" harness --scope local --ref vX.Y.Z /path/to/project
+"$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX.Y.Z
+"$guardrail_bin/select-codex-mode" --update harness --scope project --ref vX.Y.Z /path/to/project
+"$guardrail_bin/verify-codex-mode" harness --scope project --offline /path/to/project
+"$guardrail_bin/verify-codex-mode" integrated-harness --scope user
+"$guardrail_bin/select-codex-mode" --remove --scope project /path/to/project
 ```
 
-移除目前受管模式：
+`--source github` 只使用核准 HTTPS origin；`local`／`test` 只在明確 development
+環境變數下可用。`--offline` 僅使用 runtime index 與完整 cache，不連網。`--update`
+才重新取得 manifest；普通重跑保留既有 identity。
+
+Codex 的 shell wrapper 預設依序使用 `python3`、`python`。若 Windows 只有 `py`
+launcher 或 Python 不在 PATH，執行命令前設定 `AI_GUARDRAIL_PYTHON`，例如：
 
 ```bash
-./scripts/select-codex-mode --remove --scope project /path/to/project
-./scripts/verify-codex-mode --no-managed-mode --scope project /path/to/project
+AI_GUARDRAIL_PYTHON=py "$guardrail_bin/select-codex-mode" harness --scope project /path/to/project
+```
+
+全域相容 wrapper：
+
+```bash
+./scripts/install-codex-global-integrated-harness /path/to/checkout
+./scripts/verify-codex-global-integrated-harness /path/to/checkout
+./scripts/install-codex-global-integrated-harness --remove /path/to/checkout
+```
+
+wrapper 只管理 loader 與 user fallback；不移除 project/local selector、unrelated
+plugin、hooks 或個人 orchestration policy。
+
+清理未引用 runtime（預設只預覽；`--apply` 才實際刪除）：
+
+```bash
+$CODEX_HOME/guardrail/bin/prune-codex-runtime-cache --dry-run --max-age 30
+$CODEX_HOME/guardrail/bin/prune-codex-runtime-cache --apply --max-age 30
 ```
 
 ## 釘版本與發版

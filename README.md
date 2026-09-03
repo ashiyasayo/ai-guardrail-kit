@@ -4,8 +4,9 @@
 **互斥、擇一啟用**；兩個平台的生命週期與核准語意不同，不應視為完全相同。
 Claude Code 方案把 AI 協作開發從
 單純的 prompt 約定，提升為「軟性決策規則 ＋ 硬性工具關卡（PreToolUse
-hooks）」。三個目錄**功能與用途各自獨立、不可同時安裝**，其中
-`integrated-harness` 是整合另外兩者能力的完整版，而非疊加安裝。
+hooks）」。`decomposition-gate`、`harness` 與 `integrated-harness` 三個根目錄
+功能與用途各自獨立、不可同時安裝，其中 `integrated-harness` 是整合另外兩者能力的
+完整版，而非疊加安裝；`sensitive-data-guard` 則以獨立 plugin 提供第四種資料保護模式。
 
 > **實驗性：GitHub Copilot (VS Code)**（Preview）——第三平台目前提供兩種模式：
 > [`decomposition-gate`](copilot/plugins/decomposition-gate/) 與
@@ -19,11 +20,12 @@ hooks）」。三個目錄**功能與用途各自獨立、不可同時安裝**�
 
 - [Claude Code](https://docs.claude.com/en/docs/claude-code) CLI
 - Python 3.9+（四種模式統一版本需求）——**唯一**執行期依賴，僅需直譯器本身，
-  hooks 只用標準函式庫，不需 `pip install` 任何套件。系統只要有
-  `python3`、`python`、`py`（Windows）任一種可執行別名即可，`settings.json`
-  會依序探測並使用第一個可用的；若三者皆不存在，hook 會直接失敗（fail
-  closed，不會誤放行）——這種情況請自行安裝 Python 3.9+ 並確認已加入 PATH，
-  安裝完成後開新的終端機／Claude Code session 再試一次。
+  hooks 只用標準函式庫，不需 `pip install` 任何套件。Claude Code 的設定會依序探測
+  `python3`、`python`、`py`；Codex 的 selector、loader installer、verifier 與 prune
+  wrapper 預設依序探測 `python3`、`python`。若 Codex 環境只有 Windows `py` launcher
+  或自訂 Python 路徑，請設定 `AI_GUARDRAIL_PYTHON`；若管理入口找不到可用的 Python，
+  命令會以錯誤結束；已安裝 loader 在 runtime 不可用時則會直接失敗（fail closed，
+  不會誤放行）。
 - git（`integrated-harness` 的核准機制以 SHA-256 綁定拆解文件內容）
 
 ## 快速開始
@@ -44,8 +46,8 @@ Code session，接著可以繼續對話。命令會在目前工作目錄執行�
 
 ### Codex
 
-Codex 使用 repository marketplace manifest、[`codex/`](codex/) 內的 plugin 與 scope 對應的
-hook 設定；完整的安裝、切換、更新、驗證及限制請見
+Codex 使用單一全域 `ai-guardrail-loader` 與每專案 content-addressed runtime；完整的
+安裝、切換、更新、驗證及限制請見
 [`docs/codex-marketplace.md`](docs/codex-marketplace.md)。Codex 四種模式皆需
 Python 3.9+，不可沿用下列 Claude copy-in 安裝步驟。
 
@@ -57,12 +59,11 @@ codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git 
 
 `--ref main` 取得最新主幹；若要固定在某個發布版本，改指 tag（例如 `--ref v0.1.0`），
 版本語意見 [`VERSIONING.md`](VERSIONING.md)。
-`--sparse .agents --sparse codex/plugins` 下載 marketplace manifest 與 plugin 套件。註冊後請依照
-[`docs/codex-marketplace.md`](docs/codex-marketplace.md) 使用 selector 選擇並啟用其中一種模式；也可先安裝
-單一 plugin，例如：
+`--sparse .agents --sparse codex/plugins` 下載 marketplace manifest 與 plugin 套件。註冊後安裝唯一的
+loader plugin（它提供一次性的遠端 bootstrap 入口）：
 
 ```bash
-codex plugin add decomposition-gate@ai-guardrail-kit
+codex plugin add ai-guardrail-loader@ai-guardrail-kit
 ```
 
 #### Codex marketplace、git clone 與 selector 的關係
@@ -71,64 +72,70 @@ codex plugin add decomposition-gate@ai-guardrail-kit
 
 | 步驟 | 作用 | 是否切換模式 |
 | --- | --- | --- |
-| `git clone` | 取得本專案的 selector、verifier、global installer 與本機 checkout | 否；只取得管理工具與本機檔案 |
-| `codex plugin marketplace add` | 註冊 marketplace manifest 與 plugin 套件來源，讓 Codex 能找到 `mode@ai-guardrail-kit` | 否；只註冊來源 |
-| `select-codex-mode` | 安裝選定 plugin、移除其他受管模式、寫入指定 scope 的 hooks，並執行驗證與 rollback | 是 |
-| `verify-codex-mode` | 檢查已安裝 plugin、scope hooks 與選定模式是否一致 | 否；只檢查 |
+| `git clone` | 取得本專案的管理 CLI 與可選本機開發來源 | 否；不是已選 runtime 的執行期依賴 |
+| `codex plugin marketplace add` | 註冊 marketplace manifest 與 loader 來源 | 否；只註冊來源 |
+| `select-codex-mode` | 驗證並釘住指定 scope 的 runtime cache selector | 是 |
+| `verify-codex-mode` | 檢查 selector、cache identity 與 payload 完整性 | 否；只檢查 |
 
-因此，Codex 的支援流程需要先取得一份本機 `git clone`，再註冊 marketplace，最後由
-selector 管理模式切換。marketplace 只提供插件來源；marketplace metadata 本身不負責
-互斥，也不會替 `project`、`local` 或 `user` scope 寫入 hooks。直接使用
-`codex plugin add/remove` 可能造成已安裝 plugin 與 hooks 設定不同步，請使用 selector
-進行安裝、切換、更新及移除。
+因此，Codex 可由 remote marketplace plugin 完成 bootstrap；checkout 只提供管理 CLI
+與本機開發來源。marketplace 只提供 loader 來源；metadata 本身不負責 mode 選擇，
+selector 也不安裝／移除 mode plugin。不要用 `codex plugin add/remove` 管理四個 mode
+plugin，以免已安裝 plugin 與 hooks 設定不同步；唯一 loader 仍依上面的 bootstrap 流程管理，
+mode 則使用 selector 進行切換、更新及移除。
 
-註冊 marketplace 通常只需執行一次；之後切換模式不必重新 clone 或重新註冊 marketplace，
-但仍要從該 clone 的根目錄執行 selector。以下相對路徑命令的執行位置是必要條件：
+註冊 marketplace 與安裝 loader 通常只需執行一次；之後切換模式不必重新 clone 或重新註冊
+marketplace。若不使用 checkout，先從 `codex plugin list --json` 找到已安裝的
+`<plugin-directory>`，執行一次 bootstrap，之後所有切換都使用全域入口：
 
 ```text
-ai-guardrail-kit/             # git clone 的根目錄
-└─ scripts/select-codex-mode
+<plugin-directory>/hooks/install-codex-guardrail-loader --plugin-root <plugin-directory>
 ```
 
-先切換到 clone 根目錄，再執行：
+實際的模式切換指令如下；`project`／`local` scope 的 `<project-dir>` 是要套用設定的目標
+專案，不是 `ai-guardrail-kit` checkout。`user` scope 是所有專案共用的 fallback，
+可省略 `<project-dir>`；省略時使用目前目錄作為命令脈絡：
+
+```bash
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/select-codex-mode" harness --scope project --ref vX.Y.Z /path/to/target-project
+"$guardrail_bin/verify-codex-mode" harness --scope project /path/to/target-project
+"$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX.Y.Z
+"$guardrail_bin/verify-codex-mode" integrated-harness --scope user
+```
+
+若是維護者要使用 checkout 內的本機 development source，才從 clone 根目錄執行等效入口：
 
 ```bash
 cd /path/to/ai-guardrail-kit
-./scripts/select-codex-mode harness --scope user .
-./scripts/verify-codex-mode harness --scope user .
+./scripts/select-codex-mode harness --scope user
+./scripts/verify-codex-mode harness --scope user
 ```
 
-命令最後的 `.` 代表要設定的目標專案。如果要設定另一個專案，仍須在 clone 根目錄執行，
-並將 `.` 改成目標專案路徑：
-
-```bash
-./scripts/select-codex-mode harness --scope user /path/to/target-project
-./scripts/verify-codex-mode harness --scope user /path/to/target-project
-```
+`user` scope 省略路徑時預設使用目前 checkout 作為命令脈絡；若使用 `project`／`local`
+scope，才在命令最後指定目標專案路徑。這是本機開發／測試流程，不是遠端安裝後的必要步驟。
 
 Windows PowerShell 不會直接執行這些沒有副檔名的 shell script；請在 Git Bash 或 WSL 中
-執行 `./scripts/...`，或在 PowerShell 且已安裝 `bash` 時執行：
+執行全域 `$CODEX_HOME/guardrail/bin/...` 入口，或在 PowerShell 且已安裝 `bash` 時以
+`bash` 呼叫該入口。若 Windows 只有 `py` launcher，請先設定
+`AI_GUARDRAIL_PYTHON=py`。
 
-```powershell
-Set-Location C:\path\to\ai-guardrail-kit
-bash ./scripts/select-codex-mode harness --scope user .
-bash ./scripts/verify-codex-mode harness --scope user .
-```
-
-Selector 支援三種 scope：`project` 將受管 block 寫入
-`<project>/.codex/config.toml`，`local` 將受管 hooks 寫入
-`<project>/.codex/hooks.json`，`user` 則寫入
-`$CODEX_HOME/hooks.json`（未設定時為 `~/.codex/hooks.json`）：
+Selector 支援三種 scope：`project` 寫入可提交的
+`<project>/.codex/guardrail/runtime.json`，`local` 寫入本機覆寫的
+`<project>/.codex/guardrail/runtime.local.json`，`user` 寫入
+`$CODEX_HOME/guardrail/default-runtime.json`（未設定時為
+`~/.codex/guardrail/default-runtime.json`）。有效模式 precedence 為
+`local > project > user > disabled`：
 
 ```bash
-./scripts/select-codex-mode harness --scope project .
-./scripts/select-codex-mode harness --scope local .
-./scripts/select-codex-mode harness --scope user .
-./scripts/verify-codex-mode harness --scope user .
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/select-codex-mode" harness --scope project .
+"$guardrail_bin/select-codex-mode" harness --scope local .
+"$guardrail_bin/select-codex-mode" harness --scope user
+"$guardrail_bin/verify-codex-mode" harness --scope user
 ```
 
-Codex 的 plugin 安裝狀態仍由 CLI 全域管理；scope 決定 hooks 啟用的設定層。
-同一個使用者請選定一個受管模式，不要同時保留不同 scope 的受管 hooks。
+Codex 的 plugin 安裝狀態只保留全域 loader；scope selector 可讓同一使用者的不同專案
+同時使用不同 mode 與 runtime。hook 接線固定指向 loader，不含 checkout 絕對路徑。
 
 使用 selector 選擇 `integrated-harness` 時，若個人政策檔不存在，會建立
 `~/.codex/guardrail/orchestration-policy.md`；既有個人政策不會被覆寫或在移除
@@ -136,17 +143,17 @@ Codex 的 plugin 安裝狀態仍由 CLI 全域管理；scope 決定 hooks 啟用
 [`codex/plugins/integrated-harness/README.md`](codex/plugins/integrated-harness/README.md)。
 
 若要將 `integrated-harness` 設為所有 Codex 專案的全域預設，也可使用上面的 `user`
-scope selector。另有僅針對 `integrated-harness` 的相容性 global installer；註冊
-marketplace 後於本儲存庫執行一次：
+scope selector。另有僅針對 `integrated-harness` 的 checkout-only 相容性 global installer；
+註冊 marketplace 後於本儲存庫執行一次：
 
 ```bash
 ./scripts/install-codex-global-integrated-harness
 ./scripts/verify-codex-global-integrated-harness
 ```
 
-此操作只管理 `~/.codex/hooks.json` 中帶有 ai-guardrail-kit global 標記的 hooks，
-保留既有的其他全域 hooks。它與 `select-codex-mode --scope user` 是兩條不同的
-管理流程，請勿混用。解除安裝與驗證：
+此操作只管理 loader 與 user fallback，保留既有的其他全域 hooks；不移除 project/local
+selector、其他 plugin 或個人政策。它等同於「安裝 loader，再選 user scope 的
+integrated-harness」，不是另一套 mode plugin 管理流程。解除 user fallback 與驗證：
 
 ```bash
 ./scripts/install-codex-global-integrated-harness --remove
@@ -280,11 +287,38 @@ claude plugin marketplace remove ai-guardrail-kit
 
 ### Codex
 
-若曾用 selector 啟用某一模式，先移除該模式再移除 marketplace：
+Codex 只安裝一個全域 `ai-guardrail-loader`；模式與版本由 `project`／`local` selector
+或 `user` fallback 決定：
 
 ```bash
-codex plugin remove integrated-harness@ai-guardrail-kit
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/select-codex-mode" harness --scope project --ref vX.Y.Z /path/to/project
+"$guardrail_bin/verify-codex-mode" harness --scope project /path/to/project
+```
+
+`project`、`local`、`user` selector 分別寫入
+`.codex/guardrail/runtime.json`、`.codex/guardrail/runtime.local.json` 與
+`$CODEX_HOME/guardrail/default-runtime.json`；precedence 為 local > project > user。
+`user` selector 的 `<project-dir>` 可省略，預設使用目前目錄；`project`／`local` selector
+才需要指定要套用設定的專案。
+runtime archive 會先驗證 SHA-256，再安裝到 content-addressed cache，Codex hook 熱路徑
+只使用已驗證 cache，不連網。無 checkout 時使用 marketplace plugin 自帶的
+`hooks/install-codex-guardrail-loader --plugin-root <plugin-directory>`，它會部署
+全域 manager、selector、verifier 與 loader。
+
+若需移除專案模式：
+
+```bash
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/select-codex-mode" --remove --scope project /path/to/project
 codex plugin marketplace remove ai-guardrail-kit
+```
+
+清理未引用的 runtime cache 時，先預覽再明確套用：
+
+```bash
+$CODEX_HOME/guardrail/bin/prune-codex-runtime-cache --dry-run --max-age 30
+$CODEX_HOME/guardrail/bin/prune-codex-runtime-cache --apply --max-age 30
 ```
 
 若曾執行過全域預設安裝（`install-codex-global-integrated-harness`），
@@ -295,7 +329,8 @@ codex plugin marketplace remove ai-guardrail-kit
 ./scripts/verify-codex-global-integrated-harness --no-installed
 ```
 
-此指令只移除帶有 ai-guardrail-kit 標記的 hooks，不影響其他既有全域 hooks；
+此指令只移除 user fallback，不卸載仍被 project/local selector 使用的 loader；
+也不影響其他既有全域 hooks；
 既有個人政策檔 `~/.codex/guardrail/orchestration-policy.md` 不會被自動刪除，
 需自行決定是否保留或手動刪除。完整行為見
 [`docs/codex-marketplace.md`](docs/codex-marketplace.md)。
@@ -348,7 +383,8 @@ rm your-project/CLAUDE.md your-project/ORCHESTRATOR.md 2>/dev/null
 含個資：個資可能經由更早輪次的對話、檔案讀取或工具回傳結果進入模型的處理過程，而非
 僅來自當次提示，因此當次 `UserPromptSubmit` 檢查不到，需靠寫入端的第二層防線補上。
 
-下方大表接續比較原有三種治理模式；SDG 的完整能力已獨立列於上表。
+下方大表只比較 `decomposition-gate`、`harness` 與 `integrated-harness`；
+SDG 的完整能力已獨立列於上表。
 
 ### 各模式執行期能力
 
@@ -395,13 +431,13 @@ rm your-project/CLAUDE.md your-project/ORCHESTRATOR.md 2>/dev/null
 | 可選模式 | `decomposition-gate`、`sensitive-data-guard`、`harness`、`integrated-harness` | 同 Claude |
 | 模式互斥 selector | `scripts/select-claude-mode` | `scripts/select-codex-mode` |
 | 安裝狀態驗證 | `scripts/verify-claude-mode` | `scripts/verify-codex-mode` |
-| 支援 scope | selector 管理 `project`／`local`／`user`；原生 CLI 也可直接 user 安裝 | selector 管理 `project`（`.codex/config.toml`）、`local`（專案 `.codex/hooks.json`）、`user`（`~/.codex/hooks.json`）；另有 IH 全域預設安裝器 |
-| copy-in 發佈 | 有，根目錄三個模式的 `.claude/` 可直接複製 | 無；不可沿用 Claude copy-in |
-| 全域預設 | 原生 CLI 以 `user` scope 安裝；無專用 repository global installer | IH 可用 `install-codex-global-integrated-harness` 安裝到 `~/.codex/hooks.json` |
-| 保留其他既有 hooks | selector 管理自己的 plugin 狀態 | 全域安裝器只管理帶 kit 標記的 hooks，保留其他 hooks |
+| 支援 scope | selector 管理 `project`／`local`／`user`；原生 CLI 也可直接 user 安裝 | runtime selector 管理 `project`／`local`／`user`；路徑分別為 `.codex/guardrail/runtime.json`、`runtime.local.json`、`$CODEX_HOME/guardrail/default-runtime.json` |
+| copy-in 發佈 | 有；`decomposition-gate`、`harness`、`integrated-harness` 的根目錄 `.claude/` 可直接複製 | 無；不可沿用 Claude copy-in |
+| 全域預設 | 原生 CLI 以 `user` scope 安裝；無專用 repository global installer | 全域只安裝 loader；IH wrapper 設定 user fallback，不安裝 mode plugin |
+| 保留其他既有 hooks | selector 管理自己的 plugin 狀態 | loader/global wrapper 只管理自身 marker，保留其他 hooks |
 | 政策範本安裝 | IH 由使用者建立專案或個人政策 | selector 選 IH 時，個人政策不存在才建立；不覆寫既有檔 |
 | 生效時機 | 選擇、更新或移除後開新 Claude Code session | 選擇、更新或移除後開新 Codex thread |
-| Python | 3.9+；依序探測 `python3`／`python`／`py` | 3.9+；selector 探測並寫入 hook 命令 |
+| Python | 3.9+；依序探測 `python3`／`python`／`py` | 3.9+；selector／installer 預設探測 `python3`／`python`，可用 `AI_GUARDRAIL_PYTHON` 覆寫 |
 | 額外 Python 套件 | 無，現有 hooks 僅用標準函式庫 | 無，現有 hooks 僅用標準函式庫 |
 | 共用程式來源 | PII 三件組以 `shared/claude/` 為唯一審核來源，同步腳本產生 plugin 與 copy-in 副本；`block_secrets`／`block_dangerous` 為分歧分支，由 parity 行為測試守護 | `shared/codex/` 為唯一審核來源，透過同步腳本產生 plugin 副本 |
 | 統一回歸入口 | `tests/run_all.sh` | `tests/run_all.sh` |
@@ -434,9 +470,9 @@ rm your-project/CLAUDE.md your-project/ORCHESTRATOR.md 2>/dev/null
 | `harness` | 不要求採用本專案的拆解／編排方法；可直接補上人工核准、危險命令、秘密與個資防線；容易接到既有 SDLC、規格或外部編排流程 | 本身不驗證拆解品質與修改範圍；Claude 與 Codex 的人工核准生命週期不同；安全規則仍有 regex／token 判定盲點 | 團隊已有自己的計畫、工單、編排或審批流程，只缺確定性施作授權與安全底線時 | **有條件必要**：避免強迫成熟團隊改用本專案的拆解格式與編排規範 |
 | `integrated-harness` | 一次提供拆解、範圍、政策模式、人工核准、安全防線、個資保護、SessionStart 提醒及精簡治理政策；治理邊界最完整 | 設定與學習成本最高；strict 模式摩擦最大；政策錯誤可能導致 fail closed；兩平台的 `standard`／`light` 行為不同，維護與測試矩陣最大 | 新專案、多人協作、高風險資料、正式系統，或需要明確授權與稽核邊界時 | **必要**：作為完整治理方案，避免使用者自行拼裝 DG 與 H 後產生 hook 順序、政策或核准語意衝突 |
 
-### 拆成三個的整體優缺點
+### 拆成四種模式的整體優缺點
 
-| 面向 | 拆成三個的優點 | 拆成三個的缺點 |
+| 面向 | 拆成四種模式的優點 | 拆成四種模式的缺點 |
 | --- | --- | --- |
 | 最小權限與最小摩擦 | 每個專案只啟用真正需要的關卡 | 使用者安裝前必須先理解並選擇模式 |
 | 邊界清楚 | 流程紀律、資料保護、授權安全、完整治理四種需求不混在同一組開關 | 功能說明、安裝流程與版本需要分別維護 |
@@ -444,14 +480,14 @@ rm your-project/CLAUDE.md your-project/ORCHESTRATOR.md 2>/dev/null
 | 風險隔離 | 簡單模式不會因複雜政策解析錯誤而被影響 | Claude／Codex × 四模式形成較大的回歸測試矩陣 |
 | 完整方案 | IH 提供經過設計的整合順序，不需使用者自行疊加 | IH 與獨立模式之間可能發生功能漂移，需 parity／sync 測試守護 |
 
-### 是否技術上一定要三個 Plugin
+### 是否技術上一定要拆成四個模式
 
-**不是。** 技術上可以改成單一 plugin，再用設定切換 `decomposition`、`security`、
-`integrated` profile；但這會把互斥選擇從安裝階段移到執行期分支，增加錯誤設定、
+**不是。** 技術上可以改成單一 plugin，再用設定切換 `decomposition`、`sensitive-data`、
+`security`、`integrated` profile；但這會把互斥選擇從安裝階段移到執行期分支，增加錯誤設定、
 未知組合、政策解析與測試複雜度。尤其安全 hook 若被個別開關誤關閉，失敗模式會比
 「明確選錯 plugin」更不容易察覺。
 
-目前保留三個的必要性主要是**產品與治理邊界**，不是程式執行上的硬性限制：
+目前保留四個的必要性主要是**產品與治理邊界**，不是程式執行上的硬性限制：
 
 1. `decomposition-gate` 服務只需要流程紀律的低摩擦使用者。
 2. `sensitive-data-guard` 服務只需要秘密與個資防線、但不想改變流程的團隊。
@@ -460,7 +496,7 @@ rm your-project/CLAUDE.md your-project/ORCHESTRATOR.md 2>/dev/null
 
 若未來觀察到獨立 DG 或 H 幾乎沒有實際使用者，或多副本同步成本持續造成安全漂移，
 才適合評估合併為單一 plugin；合併前應先具備設定 schema、非法組合拒絕、升級遷移、
-fail-closed 預設與六種現有行為的相容測試。
+fail-closed 預設與四種模式的跨平台相容測試。
 
 ## 各目錄說明
 
@@ -522,12 +558,12 @@ subagent；驗證深度依風險調整，避免沒有新證據的重複檢查。
 4. 需要完整方案（拆解品質 ＋ 人類授權 ＋ 安全底線 ＋ 編排規則）→
    `integrated-harness`
 
-Claude copy-in 安裝方式見各根目錄模式的 `README.md`；三者彼此沒有執行時相依。
+Claude 的三個 copy-in 方案安裝方式見各根目錄的 `README.md`；彼此沒有執行時相依。
 Codex 請使用 marketplace plugin 與 selector，不可沿用 copy-in 步驟。
 
 ## 維護注意事項
 
-- 三個目錄的閘門 hook **不得互相覆蓋**：`decomposition-gate` 的
+- 三個 Claude copy-in 目錄的閘門 hook **不得互相覆蓋**：`decomposition-gate` 的
   `decomposition_gate.py` 檢查「拆解是否完成」；`harness` 的 `plan_gate.py`
   檢查「人類是否核准」；`integrated-harness` 的 `plan_gate.py` 兩者皆查。
 - `harness` 與 `integrated-harness` 的 `block_secrets.py`、
@@ -560,6 +596,9 @@ Codex 請使用 marketplace plugin 與 selector，不可沿用 copy-in 步驟。
   `scripts/sync-codex-hook-copies` 更新可攜式 plugin 副本，再以
   `scripts/sync-codex-hook-copies --check` 與 `bash tests/run_all.sh`（預設 smoke）確認
   沒有漂移；若同時涉及模式切換，再以 `AGK_TEST_PROFILE=full` 執行完整回歸。
+- Codex loader 的 manager、selector、verifier、installer 與 prune 入口由
+  `scripts/sync-codex-loader-copies` 同步到 `codex/plugins/ai-guardrail-loader/hooks/`；
+  修改後執行該腳本的 `--check` 與 `tests/codex_loader_sync_test.sh`。
 - Codex `harness` 與 `integrated-harness` 以 `security_guard.py` 在單一 Python
   程序內依序執行危險命令與秘密寫入檢查；計畫閘門與個資改寫因決策語意不同，
   仍維持獨立 hook。

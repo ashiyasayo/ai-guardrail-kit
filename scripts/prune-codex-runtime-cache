@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir=$(cd "$(dirname "$0")" && pwd -P)
+manager="$script_dir/codex-runtime-manager.py"
+if [[ ! -f $manager && -n ${CODEX_HOME:-} && -f ${CODEX_HOME}/guardrail/bin/codex-runtime-manager.py ]]; then
+  manager="${CODEX_HOME}/guardrail/bin/codex-runtime-manager.py"
+fi
+if [[ ! -f $manager ]]; then
+  printf 'codex prune: runtime manager is unavailable; install the loader first\n' >&2
+  exit 1
+fi
+python_bin=${AI_GUARDRAIL_PYTHON:-python3}
+if ! "$python_bin" -c 'import sys; raise SystemExit(sys.version_info < (3, 9))' >/dev/null 2>&1; then python_bin=python; fi
+export PYTHONUTF8=${PYTHONUTF8:-1}
+
+exec "$python_bin" "$manager" prune "$@"

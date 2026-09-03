@@ -1,98 +1,46 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Windows（Git Bash）環境通常只有 python 而沒有可用的 python3，實際探測後回退
-if ! python3 -V >/dev/null 2>&1 && python -V >/dev/null 2>&1; then
-  python3() { python "$@"; }
-fi
-# Windows 預設編碼為 cp950，強制 Python 使用 UTF-8 避免中文讀寫失敗
 export PYTHONUTF8=${PYTHONUTF8:-1}
-
-repo=$(cd "$(dirname "$0")/.." && pwd -P)
+root=$(cd "$(dirname "$0")/.." && pwd -P)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-mkdir -p "$tmp/bin" "$tmp/state"
-ln -s "$repo/tests/helpers/fake-codex" "$tmp/bin/codex"
-export PATH="$tmp/bin:$PATH"
-export AI_GUARDRAIL_TEST_STATE="$tmp/state"
-export HOME="$tmp/home"
+mkdir -p "$tmp/bin" "$tmp/home" "$tmp/project/.codex"
+cp "$root/tests/helpers/fake-codex" "$tmp/bin/codex"; chmod +x "$tmp/bin/codex"
+export PATH="$tmp/bin:$PATH" HOME="$tmp/home" CODEX_HOME="$tmp/home/.codex" AI_GUARDRAIL_TEST_STATE="$tmp/state"
+export AI_GUARDRAIL_ALLOW_DEVELOPMENT_SOURCE=1 AI_GUARDRAIL_MANIFEST_PATH="$root/codex/runtime-manifest.json" AI_GUARDRAIL_ARCHIVE_DIR="$root/codex/runtime-archives"
+printf 'unrelated@elsewhere\n' > "$tmp/state-seed"
+mkdir -p "$AI_GUARDRAIL_TEST_STATE"; cp "$tmp/state-seed" "$AI_GUARDRAIL_TEST_STATE/installed"
 
-fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
-hooks="$HOME/.codex/hooks.json"
-policy="$HOME/.codex/guardrail/orchestration-policy.md"
-seed_hooks() {
-  mkdir -p "$(dirname "$hooks")"
-  cat > "$hooks" <<'JSON'
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "exec_command",
-        "hooks": [
-          {"type": "command", "command": "python3 -- /opt/unrelated.py"}
-        ]
-      }
-    ],
-    "PermissionRequest": [
-      {
-        "matcher": ".*",
-        "hooks": [
-          {"type": "command", "command": "python3 -- /opt/approval.py"}
-        ]
-      }
-    ]
-  }
-}
-JSON
-}
+# 直接從 marketplace plugin 自帶的 hook bootstrap，模擬沒有 repository checkout 的流程。
+"$root/codex/plugins/ai-guardrail-loader/hooks/install-codex-guardrail-loader" --plugin-root "$root/codex/plugins/ai-guardrail-loader" >/dev/null
+"$root/scripts/install-codex-global-integrated-harness" "$root" >/dev/null
+"$root/scripts/verify-codex-global-integrated-harness" "$root" >/dev/null
+grep -Fxq 'unrelated@elsewhere' "$AI_GUARDRAIL_TEST_STATE/installed"
+grep -Fxq 'ai-guardrail-loader@ai-guardrail-kit' "$AI_GUARDRAIL_TEST_STATE/installed"
+! grep -Eq '^(decomposition-gate|sensitive-data-guard|harness|integrated-harness)@' "$AI_GUARDRAIL_TEST_STATE/installed"
+grep -Fq 'loader.py' "$CODEX_HOME/hooks.json"
+grep -Fq 'AI_GUARDRAIL_LOADER_SLOT=pretool.security' "$CODEX_HOME/hooks.json"
+grep -Fq 'AI_GUARDRAIL_LOADER_SLOT=session.start' "$CODEX_HOME/hooks.json"
+[[ -x "$CODEX_HOME/guardrail/bin/prune-codex-runtime-cache" ]]
 
-assert_global_hooks() {
-  python3 - "$hooks" <<'PY' || fail 'global hook structure is invalid'
-import json, pathlib, sys
-data = json.loads(pathlib.Path(sys.argv[1]).read_text())
-groups = data["hooks"]["PreToolUse"]
-commands = [hook["command"] for group in groups for hook in group["hooks"]]
-assert "python3 -- /opt/unrelated.py" in commands
-for name in ("plan_gate.py", "security_guard.py", "pii_guard.py"):
-    matches = [command for command in commands if name in command]
-    assert len(matches) == 1, (name, matches)
-    assert matches[0].startswith(("AI_GUARDRAIL_GLOBAL_DEFAULT=1 python3 -- ", "AI_GUARDRAIL_GLOBAL_DEFAULT=1 python -- ")), matches[0]
-prompt = data["hooks"]["UserPromptSubmit"][0]["hooks"][0]["command"]
-session = data["hooks"]["SessionStart"][0]["hooks"][0]["command"]
-assert "pii_guard.py" in prompt and prompt.startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 ")
-assert "session_start.py" in session and session.startswith("AI_GUARDRAIL_GLOBAL_DEFAULT=1 ")
-assert data["hooks"]["PermissionRequest"][0]["hooks"][0]["command"] == "python3 -- /opt/approval.py"
-PY
-}
-
-seed_hooks
-before=$(sha256sum "$hooks")
-"$repo/scripts/install-codex-global-integrated-harness" "$repo" >/dev/null
-"$repo/scripts/verify-codex-global-integrated-harness" "$repo" >/dev/null || fail 'first install did not verify'
-assert_global_hooks
-cmp -s "$repo/codex/plugins/integrated-harness/orchestration-policy.md" "$policy" || fail 'personal policy not installed'
-
-installed=$(sha256sum "$hooks")
-"$repo/scripts/install-codex-global-integrated-harness" "$repo" >/dev/null
-[[ $installed == "$(sha256sum "$hooks")" ]] || fail 'repeated install changed global hooks'
-
-"$repo/scripts/install-codex-global-integrated-harness" --remove "$repo" >/dev/null
-"$repo/scripts/verify-codex-global-integrated-harness" --no-installed "$repo" >/dev/null || fail 'removal did not verify'
-[[ $before == "$(sha256sum "$hooks")" ]] || fail 'removal did not restore unrelated global hooks'
-"$repo/scripts/install-codex-global-integrated-harness" --remove "$repo" >/dev/null
-[[ $before == "$(sha256sum "$hooks")" ]] || fail 'repeated removal changed global hooks'
-
-unset HOME
-export HOME="$tmp/rollback-home"
-hooks="$HOME/.codex/hooks.json"
-policy="$HOME/.codex/guardrail/orchestration-policy.md"
-seed_hooks
-rollback_before=$(sha256sum "$hooks")
-export AI_GUARDRAIL_TEST_FAIL_GLOBAL_VERIFY=1
-if "$repo/scripts/install-codex-global-integrated-harness" "$repo" >/dev/null 2>&1; then
-  fail 'verification failure did not fail install'
+"$root/scripts/select-codex-mode" harness --scope project --source local --ref main "$tmp/project" >/dev/null
+project_before=$(sha256sum "$tmp/project/.codex/guardrail/runtime.json" | cut -d' ' -f1)
+"$root/scripts/install-codex-global-integrated-harness" --remove "$root" >/dev/null
+"$root/scripts/verify-codex-global-integrated-harness" --no-installed "$root" >/dev/null
+[[ $project_before == "$(sha256sum "$tmp/project/.codex/guardrail/runtime.json" | cut -d' ' -f1)" ]]
+"$root/scripts/select-codex-mode" harness --scope user --source local --ref main "$root" >/dev/null
+if "$root/scripts/install-codex-global-integrated-harness" --remove "$root" >/dev/null 2>&1; then
+  printf 'FAIL: global wrapper removed an unowned user selector\n' >&2
+  exit 1
 fi
-unset AI_GUARDRAIL_TEST_FAIL_GLOBAL_VERIFY
-[[ $rollback_before == "$(sha256sum "$hooks")" ]] || fail 'verification failure did not roll back hooks'
-[[ ! -e $policy ]] || fail 'verification failure did not roll back created policy'
-
-printf 'PASS: global Codex integrated-harness installation\n'
+"$root/scripts/verify-codex-mode" harness --scope user "$root" >/dev/null
+"$root/scripts/select-codex-mode" --remove --scope user "$root" >/dev/null
+if "$root/codex/plugins/ai-guardrail-loader/hooks/install-codex-guardrail-loader" --plugin-root "$root/codex/plugins/ai-guardrail-loader" --remove >/dev/null 2>&1; then
+  printf 'FAIL: loader removal ignored project selector\n' >&2
+  exit 1
+fi
+grep -Fxq 'ai-guardrail-loader@ai-guardrail-kit' "$AI_GUARDRAIL_TEST_STATE/installed"
+"$root/scripts/select-codex-mode" --remove --scope project "$tmp/project" >/dev/null
+"$root/codex/plugins/ai-guardrail-loader/hooks/install-codex-guardrail-loader" --plugin-root "$root/codex/plugins/ai-guardrail-loader" --remove >/dev/null
+! grep -Fxq 'ai-guardrail-loader@ai-guardrail-kit' "$AI_GUARDRAIL_TEST_STATE/installed"
+printf 'PASS: global wrapper manages loader/user fallback only\n'
