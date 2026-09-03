@@ -8,6 +8,11 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Codex marketplace 將四個由 loader 管理的 legacy mode 標示為 `NOT_AVAILABLE`，
+  取代目前 schema 不接受的 `DEPRECATED`，使遠端 marketplace 註冊可解析 manifest。
+
 ## [0.5.0] - 2026-09-03
 
 ### Fixed
