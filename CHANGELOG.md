@@ -10,6 +10,11 @@ All notable changes to this project are documented in this file.
 
 ## [0.5.0] - 2026-09-03
 
+### Fixed
+
+- Codex global `integrated-harness` installer 改以偵測到的 Python 直譯器執行 runtime
+  manager，修正 Linux checkout／CI 中 manager 檔案沒有 executable bit 時的安裝失敗。
+
 ### Added
 
 - Codex 新增單一 `ai-guardrail-loader` marketplace plugin、SHA-256 驗證的 runtime
