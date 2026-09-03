@@ -8,6 +8,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-03
+
 ### Added
 
 - Codex 新增單一 `ai-guardrail-loader` marketplace plugin、SHA-256 驗證的 runtime
@@ -338,7 +340,8 @@ VS Code Agent hooks，且 macOS／Linux 路徑尚未實機驗證。以下彙整�
   once a plan exists, normal integrated-harness scope, policy, and approval
   checks apply.
 
-[Unreleased]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.2.0...v0.2.1
