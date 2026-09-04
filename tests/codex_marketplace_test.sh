@@ -17,6 +17,9 @@ for plugin in data['plugins']:
     assert policy == ('AVAILABLE' if name=='ai-guardrail-loader' else 'NOT_AVAILABLE')
     manifest=json.loads((base/'.codex-plugin/plugin.json').read_text())
     assert manifest['name']==name
+    if name == 'ai-guardrail-loader':
+        # loader 以 $CODEX_HOME/hooks.json 管理 hook；此欄位只能指向單一設定檔。
+        assert 'hooks' not in manifest
     skills=list((base/'skills').glob('*/SKILL.md'))
     assert len(skills)==1
     assert ('new thread' in skills[0].read_text()) if name != 'ai-guardrail-loader' else True

@@ -10,8 +10,19 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Codex Loader 在 Windows 改以 PowerShell 原生 `$env:...; & <python>` hook command 啟動，
+  避免將 POSIX 的環境變數前綴當作 PowerShell 命令而使所有 hook 在 Loader 前失敗。
 - Codex marketplace 將四個由 loader 管理的 legacy mode 標示為 `NOT_AVAILABLE`，
   取代目前 schema 不接受的 `DEPRECATED`，使遠端 marketplace 註冊可解析 manifest。
+- 移除 Codex loader manifest 中誤指向 hook 資料夾的 `hooks` 欄位，避免 Codex 將資料夾
+  當成 hook 設定檔讀取而在 Windows 回報存取被拒。
+
+### Documentation
+
+- 說明 remote controller 用戶端無法執行 `!` 命令或平台原生核准 UI 時，不能繞過 strict
+  授權；並記錄手機低風險開發的預先設定、patch-only、PR 與 CI 流程。
+- 補上 Windows PowerShell 以 plugin 內附 Python manager bootstrap loader、設定與驗證 Codex
+  全域 `user` fallback 的流程，以及 `/hooks` 審閱信任步驟，不再要求 Git Bash 或 WSL。
 
 ## [0.5.0] - 2026-09-03
 

@@ -69,6 +69,24 @@ guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
 "$guardrail_bin/verify-codex-mode" harness --scope project /path/to/project
 ```
 
+Windows PowerShell 可不經 Git Bash／WSL，直接使用 plugin 附帶的 Python manager 設定全域
+`user` fallback。`<plugin-directory>` 由 `codex plugin list --json` 查得：
+
+```powershell
+$pluginRoot = '<plugin-directory>'
+$codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE '.codex' }
+$manager = Join-Path $codexHome 'guardrail\bin\codex-runtime-manager.py'
+
+py -3 "$pluginRoot\hooks\manager.py" install-loader --plugin-root "$pluginRoot"
+py -3 $manager select integrated-harness --scope user --ref main
+py -3 $manager verify integrated-harness --scope user
+```
+
+`integrated-harness` 可替換為任一 mode；沒有 `py` launcher 時改用 Python 3.9+ 的 `python`。
+`user` 設定只作全域 fallback，`local > project > user > disabled`；切換後開啟新的 Codex thread。
+首次安裝或 plugin hook 更新後，在 Codex 輸入 `/hooks` 審閱並信任 loader hook，否則 Codex
+會略過未信任的 plugin hook。
+
 上面的 `$CODEX_HOME/guardrail/bin/select-codex-mode` 才是遠端安裝後的實際模式切換入口；
 `/path/to/project` 是 `project`／`local` scope 的目標專案，不需要 checkout
 `ai-guardrail-kit`。`user` scope 是全域個人 fallback，可省略專案路徑，省略時預設使用目前
