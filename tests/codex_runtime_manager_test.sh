@@ -28,6 +28,18 @@ for kind in ('symlink','hardlink'):
 
 archive=bundle(); digest=hashlib.sha256(archive).hexdigest()
 identity={'schema_version':1,'mode':'harness','source':'test','ref':'test','commit':'1'*40,'runtime_version':'test+1','archive_url':'https://github.com/ashiyasayo/ai-guardrail-kit/releases/download/test/x.tar.gz','archive_sha256':digest,'archive_size':len(archive),'entrypoints':{'pretool.plan':'hooks/dispatch.py','pretool.security':'hooks/dispatch.py','pretool.pii':'hooks/dispatch.py','prompt.pii':'hooks/dispatch.py'}}
+
+loader=Path('C:/guardrail/loader/loader.py')
+assert m._loader_hook_command('C:/Program Files/Python/python.exe', loader, 'session.start', True) == (
+    "$env:AI_GUARDRAIL_LOADER_SLOT = 'session.start'; $env:AI_GUARDRAIL_LOADER = '1'; "
+    "& 'C:/Program Files/Python/python.exe' -- 'C:/guardrail/loader/loader.py'")
+assert m._is_loader_command(
+    "$env:AI_GUARDRAIL_LOADER_SLOT = 'session.start'; $env:AI_GUARDRAIL_LOADER = '1'; "
+    "& 'C:/Program Files/Python/python.exe' -- 'C:/guardrail/loader/loader.py'")
+assert m._loader_hook_command('/usr/bin/python3', Path('/guardrail/loader/loader.py'), 'session.start', False) == (
+    'AI_GUARDRAIL_LOADER_SLOT=session.start AI_GUARDRAIL_LOADER=1 '
+    '/usr/bin/python3 -- /guardrail/loader/loader.py')
+
 with tempfile.TemporaryDirectory() as td:
     store=m.RuntimeStore(Path(td)/'.codex'); store.install(identity, archive)
     payload=store.cache_path(digest)/'payload'; (payload/'hooks/dispatch.py').write_bytes(b'tampered')

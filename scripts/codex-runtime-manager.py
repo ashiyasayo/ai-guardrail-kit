@@ -578,6 +578,10 @@ class RuntimeStore:
 
 LOADER_MARKER = "AI_GUARDRAIL_LOADER=1 "
 LOADER_COMMAND_RE = re.compile(r"^AI_GUARDRAIL_LOADER_SLOT=[a-z.]+ " + re.escape(LOADER_MARKER))
+LOADER_WINDOWS_COMMAND_RE = re.compile(
+    r"^\$env:AI_GUARDRAIL_LOADER_SLOT = '[a-z.]+'; "
+    r"\$env:AI_GUARDRAIL_LOADER = '1'; "
+)
 LOADER_VERSION = "1.0.0"
 LEGACY_MARKERS = (
     "AI_GUARDRAIL_GLOBAL_DEFAULT=1 ",
@@ -618,7 +622,10 @@ def _read_regular_bytes(path: Path) -> bytes:
 
 
 def _is_loader_command(command: Any) -> bool:
-    return isinstance(command, str) and (command.startswith(LOADER_MARKER) or LOADER_COMMAND_RE.match(command) is not None)
+    return (isinstance(command, str)
+            and (command.startswith(LOADER_MARKER)
+                 or LOADER_COMMAND_RE.match(command) is not None
+                 or LOADER_WINDOWS_COMMAND_RE.match(command) is not None))
 
 
 def _legacy_command_matches(command: str) -> List[Tuple[str, str]]:
@@ -773,6 +780,21 @@ def loader_is_installed(store: RuntimeStore) -> bool:
     return data.get("schema_version") == 1 and data.get("complete") is True and stable.is_file() and manager.is_file()
 
 
+def _powershell_quote(value: str) -> str:
+    """PowerShell 單引號字串只需將單引號重複，避免路徑被當成程式碼。"""
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _loader_hook_command(python: str, loader: Path, slot: str, windows: bool) -> str:
+    if windows:
+        # Codex Windows hook 由 PowerShell 執行；直接設定環境變數可保留 stdin 並避免 Bash 語法失效。
+        return ("$env:AI_GUARDRAIL_LOADER_SLOT = " + _powershell_quote(slot)
+                + "; $env:AI_GUARDRAIL_LOADER = '1'; & " + _powershell_quote(python)
+                + " -- " + _powershell_quote(str(loader)))
+    return ("AI_GUARDRAIL_LOADER_SLOT=" + slot + " " + LOADER_MARKER
+            + shlex.quote(python) + " -- " + shlex.quote(str(loader)))
+
+
 def _loader_hook_data(path: Path, python: str, action: str) -> Dict[str, Any]:
     if path.exists():
         data = _read_json(path)
@@ -800,7 +822,7 @@ def _loader_hook_data(path: Path, python: str, action: str) -> Dict[str, Any]:
                 kept.append(copy)
         hooks[event] = kept
     if action == "install":
-        command = lambda slot: LOADER_MARKER + shlex.quote(python) + " -- " + shlex.quote(str(path.parent / "guardrail" / "loader" / "loader.py"))
+        loader = path.parent / "guardrail" / "loader" / "loader.py"
         specs = [
             ("PreToolUse", "exec_command|apply_patch", "pretool.decomposition"),
             ("PreToolUse", "exec_command|apply_patch", "pretool.plan"),
@@ -810,11 +832,10 @@ def _loader_hook_data(path: Path, python: str, action: str) -> Dict[str, Any]:
             ("SessionStart", "startup|resume|clear|compact", "session.start"),
         ]
         for event, matcher, slot in specs:
-            rule = {"hooks": [{"type": "command", "command": command(slot)}]}
+            command = _loader_hook_command(python, loader, slot, os.name == "nt")
+            rule = {"hooks": [{"type": "command", "command": command}]}
             if matcher:
                 rule["matcher"] = matcher
-            # slot 透過環境前綴傳遞，保持 argv 穩定，也讓 PII 維持獨立 hook invocation。
-            rule["hooks"][0]["command"] = "AI_GUARDRAIL_LOADER_SLOT=" + slot + " " + rule["hooks"][0]["command"]
             hooks.setdefault(event, []).append(rule)
     return data
 
