@@ -44,6 +44,20 @@ hooks）」。`decomposition-gate`、`harness` 與 `integrated-harness` 三個�
 Code session，接著可以繼續對話。命令會在目前工作目錄執行，實際 shell 語法依作業系統
 與平台 CLI 的行為為準。
 
+### 遠端控制器與手機的核准限制
+
+若 Claude Code 或 Codex 的 remote controller 用戶端（例如手機）無法執行 `!` 命令或
+顯示平台原生的核准 UI，便**不能**完成需要本機終端機或逐次 `ask` 的授權流程。因此
+`harness` 與 `integrated-harness` 的 `strict` 模式不是可直接在該用戶端執行開發的路徑。
+不得以提示詞中的「允許」、讓模型建立核准旗標，或修改政策檔來繞過此限制。
+
+需要暫時從手機處理低風險修改時，請先在可信任桌機為**個別專案**設定好模式與政策，並
+使用無正式憑證的 branch：Claude 可使用 `integrated-harness` 的 `standard` 模式；Codex
+可使用 `light` 模式，但只限已建立計畫後的範圍內 `apply_patch`，`exec_command`、部署與
+外部副作用仍交由桌機或 CI 處理。所有修改應透過 PR，由 GitHub Actions 驗證後再用手機
+審查／合併。這是低權限作業流程，不是 strict 核准的替代品；未來若需手機核准 strict，
+必須實作可驗證身分、範圍與短期效期的外部簽章核准機制。
+
 ### Codex
 
 Codex 使用單一全域 `ai-guardrail-loader` 與每專案 content-addressed runtime；完整的
@@ -91,6 +105,26 @@ marketplace。若不使用 checkout，先從 `codex plugin list --json` 找到�
 <plugin-directory>/hooks/install-codex-guardrail-loader --plugin-root <plugin-directory>
 ```
 
+Windows PowerShell 不需要 Git Bash 或 WSL；可直接以 plugin 內附的 Python manager 完成
+一次 bootstrap，並設定所有專案共用的 `user` fallback。將 `<plugin-directory>` 替換成
+`codex plugin list --json` 顯示的安裝目錄：
+
+```powershell
+$pluginRoot = '<plugin-directory>'
+$codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE '.codex' }
+$manager = Join-Path $codexHome 'guardrail\bin\codex-runtime-manager.py'
+
+py -3 "$pluginRoot\hooks\manager.py" install-loader --plugin-root "$pluginRoot"
+py -3 $manager select integrated-harness --scope user --ref main
+py -3 $manager verify integrated-harness --scope user
+```
+
+`integrated-harness` 可替換為 `decomposition-gate`、`sensitive-data-guard` 或 `harness`。
+若沒有 `py` launcher，改用 Python 3.9+ 的 `python`。`user` 是 fallback，既有 `project` 或
+`local` selector 仍會依 `local > project > user > disabled` 的優先權覆寫它；設定後請開啟新的
+Codex thread。首次安裝或 plugin hook 更新後，請在 Codex 輸入 `/hooks`，審閱並信任
+`ai-guardrail-loader` 的 hook；未信任的 plugin hook 不會執行。
+
 實際的模式切換指令如下；`project`／`local` scope 的 `<project-dir>` 是要套用設定的目標
 專案，不是 `ai-guardrail-kit` checkout。`user` scope 是所有專案共用的 fallback，
 可省略 `<project-dir>`；省略時使用目前目錄作為命令脈絡：
@@ -114,9 +148,9 @@ cd /path/to/ai-guardrail-kit
 `user` scope 省略路徑時預設使用目前 checkout 作為命令脈絡；若使用 `project`／`local`
 scope，才在命令最後指定目標專案路徑。這是本機開發／測試流程，不是遠端安裝後的必要步驟。
 
-Windows PowerShell 不會直接執行這些沒有副檔名的 shell script；請在 Git Bash 或 WSL 中
-執行全域 `$CODEX_HOME/guardrail/bin/...` 入口，或在 PowerShell 且已安裝 `bash` 時以
-`bash` 呼叫該入口。若 Windows 只有 `py` launcher，請先設定
+Windows PowerShell 不會直接執行這些沒有副檔名的 shell script；可在 Git Bash／WSL 使用
+全域 `$CODEX_HOME/guardrail/bin/...` 入口，或採用上方直接呼叫 Python manager 的流程。
+若使用 shell wrapper 而 Windows 只有 `py` launcher，請先設定
 `AI_GUARDRAIL_PYTHON=py`。
 
 Selector 支援三種 scope：`project` 寫入可提交的
