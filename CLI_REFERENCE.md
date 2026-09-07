@@ -114,6 +114,11 @@ Codex 三種 scope 的 selector 如下：`project` 是
 環境變數下可用。`--offline` 僅使用 runtime index 與完整 cache，不連網。`--update`
 才重新取得 manifest；普通重跑保留既有 identity。
 
+`--source github`（預設來源）的全新安裝若未指定 `--ref`，不再靜默信任可變的
+`main` 分支：會直接失敗並提示改用 `--ref <commit-or-tag>`（例如上方範例的
+`vX.Y.Z`）。僅在明確需要追蹤主幹最新內容的開發／測試情境下，才設定
+`AI_GUARDRAIL_ALLOW_MUTABLE_REF=1` 選擇退回舊行為。
+
 Codex 的 shell wrapper 預設依序使用 `python3`、`python`。若 Windows 只有 `py`
 launcher 或 Python 不在 PATH，執行命令前設定 `AI_GUARDRAIL_PYTHON`，例如：
 

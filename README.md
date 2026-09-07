@@ -141,12 +141,16 @@ guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
 
 ```bash
 cd /path/to/ai-guardrail-kit
-./scripts/select-codex-mode harness --scope user
+./scripts/select-codex-mode harness --scope user --ref vX.Y.Z
 ./scripts/verify-codex-mode harness --scope user
 ```
 
 `user` scope 省略路徑時預設使用目前 checkout 作為命令脈絡；若使用 `project`／`local`
 scope，才在命令最後指定目標專案路徑。這是本機開發／測試流程，不是遠端安裝後的必要步驟。
+
+`--source github`（預設來源）的全新安裝若省略 `--ref`，不再靜默信任可變的 `main`
+分支：會直接失敗並提示改用 `--ref <commit-or-tag>`；僅在明確需要追蹤主幹最新內容
+的開發／測試情境下，才設定 `AI_GUARDRAIL_ALLOW_MUTABLE_REF=1` 選擇退回舊行為。
 
 Windows PowerShell 不會直接執行這些沒有副檔名的 shell script；可在 Git Bash／WSL 使用
 全域 `$CODEX_HOME/guardrail/bin/...` 入口，或採用上方直接呼叫 Python manager 的流程。
@@ -162,9 +166,9 @@ Selector 支援三種 scope：`project` 寫入可提交的
 
 ```bash
 guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
-"$guardrail_bin/select-codex-mode" harness --scope project .
-"$guardrail_bin/select-codex-mode" harness --scope local .
-"$guardrail_bin/select-codex-mode" harness --scope user
+"$guardrail_bin/select-codex-mode" harness --scope project --ref vX.Y.Z .
+"$guardrail_bin/select-codex-mode" harness --scope local --ref vX.Y.Z .
+"$guardrail_bin/select-codex-mode" harness --scope user --ref vX.Y.Z
 "$guardrail_bin/verify-codex-mode" harness --scope user
 ```
 

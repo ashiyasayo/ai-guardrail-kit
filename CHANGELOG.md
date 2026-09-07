@@ -8,6 +8,31 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Security
+
+- Claude（`harness`、`integrated-harness`）與 Codex（全部模式）的危險命令攔截，
+  修正 `git -C <path> reset --hard`／`push ... --force`、`sudo -- rm`／
+  `sudo -u <user> rm`，以及可執行任意內嵌程式碼的直譯器（`python3 -c`、
+  `pwsh -Command` 等）等等價繞過形式；新增可安全遞迴解析的 `bash -c`／`sh -c`
+  巢狀檢查（AGK-001）。Copilot 目前不提供危險命令防護，不受影響。
+- Claude（`harness`、`integrated-harness`、`sensitive-data-guard`）、Codex（全部
+  模式）與 Copilot（`sensitive-data-guard`）的憑證攔截，修正 placeholder 判斷
+  從「命中內容任一處含 EXAMPLE／PLACEHOLDER 等子字串即豁免」改為「擷取出的憑證
+  值本身須完整符合明確的佔位符格式」，避免真實憑證只要附帶這類子字串就繞過偵測
+  （AGK-002）。
+- Codex `ai-guardrail-loader` 的 runtime manifest 驗證新增：manifest 自報的
+  `commit` 必須與請求的不可變 commit ref 一致、每個模式的 archive URL 必須以
+  路徑區段方式綁定該 commit；`select-codex-mode` 對 github 來源的全新安裝預設
+  不再信任可變的 `main` 分支，未指定 `--ref <commit-or-tag>` 時會拒絕並提示，
+  可用 `AI_GUARDRAIL_ALLOW_MUTABLE_REF=1` 明確選擇退回舊行為（AGK-003）。已隨附
+  修正 `codex/runtime-manifest.json` 的 archive URL，改為指向其宣告的 commit
+  而非可變分支。
+- Codex `ai-guardrail-loader` 的 `resolve_runtime` 現在會要求 project／local
+  selector 已登錄於受保護（`CODEX_HOME` 之下、專案不可寫）的 selector registry
+  且 path/scope/digest 完全一致才會採用，避免未受信任專案提交指向已快取合法
+  runtime 的 selector 來降級使用者原本期待的防護模式（AGK-004）；`user` scope
+  與經由 `select-codex-mode` 本機指令登錄的既有流程不受影響。
+
 ### Fixed
 
 - Codex Loader 在 Windows 改以 PowerShell 原生 `$env:...; & <python>` hook command 啟動，
