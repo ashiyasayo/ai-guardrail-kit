@@ -8,6 +8,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-07
+
 ### Security
 
 - Claude（`harness`、`integrated-harness`）與 Codex（全部模式）的危險命令攔截，
