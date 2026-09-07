@@ -149,7 +149,17 @@ $CODEX_HOME/guardrail/bin/prune-codex-runtime-cache --apply --max-age 30
 已用 `marketplace add` 註冊過來源的環境，若要切到另一個 ref（例如新發布的
 tag），`marketplace add` 會直接報錯拒絕（`marketplace 'xxx' is already added
 from a different source; remove it before adding this source`）；`codex plugin`
-也沒有 `update` 子指令。已驗證可行的更新序列如下：
+也沒有 `update` 子指令。
+
+若已有本機 checkout（例如維護者自己的開發環境），可用下方封裝好的一行指令
+（等同下面手動序列的第 1、3、4、5 步；只是既有 `codex` CLI 呼叫的封裝，不引入
+新的信任邊界）：
+
+```bash
+./scripts/refresh-codex-guardrail-ref vX.Y.Z
+```
+
+沒有本機 checkout 時，或需要理解每一步實際做了什麼，才用下面完整的手動序列：
 
 ```bash
 # 1. 移除舊來源，改註冊到新 ref
