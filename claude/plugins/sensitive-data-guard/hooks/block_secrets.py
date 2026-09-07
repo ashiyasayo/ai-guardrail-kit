@@ -24,16 +24,21 @@ SECRET_PATTERNS = (
     ("GitHub Token", re.compile(r"gh[pousr]_[A-Za-z0-9]{36,}")),
     ("Slack Token", re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}")),
     ("JWT", re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}")),
-    ("Cloudflare API Token", re.compile(r"(?i)cloudflare[_-]?(api[_-]?)?token['\"]?\s*[:=]\s*['\"][A-Za-z0-9_-]{30,}['\"]")),
-    ("一般憑證指派", re.compile(r"(?i)\b(password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|connection[_-]?string)\b\s*[:=]\s*['\"][^'\"\s]{8,}['\"]")),
+    ("Cloudflare API Token", re.compile(r"(?i)cloudflare[_-]?(?:api[_-]?)?token['\"]?\s*[:=]\s*['\"]([A-Za-z0-9_-]{30,})['\"]")),
+    ("一般憑證指派", re.compile(r"(?i)\b(?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|connection[_-]?string)\b\s*[:=]\s*['\"]([^'\"\s]{8,})['\"]")),
     # 連線字串的 Password=／Pwd=（無空白，如 Server=db;Password=secret;）。
     # 刻意要求 = 前後無空白，避免誤中程式碼中的 `password = os.environ[...]`。
     ("MSSQL/MySQL 連線字串含密碼", re.compile(r"(?i)\b(?:Password|Pwd)=([^;'\"\s]{6,})(?=[;'\"\s]|$)")),
 )
 
-# 佔位符樣式：命中憑證但值屬佔位符時放行，降低誤判
+# 佔位符樣式：命中憑證但值屬佔位符時放行，降低誤判。
+# 呼叫端一律以 fullmatch 比對「擷取出的憑證值本身」，而非用 search 比對整段
+# 命中文字或原始值，避免真實憑證只要附帶 EXAMPLE／PLACEHOLDER 等子字串
+# 就整條規則被豁免（AGK-002）。${...} 允許一層巢狀（如 bash 的
+# ${VAR:-${OTHER_VAR}} 參照鏈），但整個值仍須是單一個平衡的 ${...} 運算式。
 PLACEHOLDER_PATTERN = re.compile(
-    r"(?i)(YOUR_|CHANGE_?ME|PLACEHOLDER|EXAMPLE|<[^>]+>|\$\{[^}]+\}|%\([^)]+\)s|\{\{[^}]+\}\}|REPLACE_ME|xxx+|\*{3,})"
+    r"(?i)(?:YOUR_[A-Z0-9_]*|CHANGE_?ME|PLACEHOLDER|EXAMPLE|REPLACE_ME"
+    r"|<[^<>]+>|\$\{(?:[^{}]|\{[^{}]*\})+\}|%\([^()]+\)s|\{\{[^{}]+\}\}|x{3,}|\*{3,})"
 )
 
 # 未加引號的憑證字面值（.env／YAML／設定檔最常見的硬寫方式，且上列規則多要求引號）：
@@ -54,7 +59,7 @@ REFERENCE_VALUE_PREFIXES = (
 
 def looks_like_secret_literal(value: str) -> bool:
     """判斷未加引號的指派值是否像硬寫的憑證字面值（而非變數／函式／佔位符參照）。"""
-    if PLACEHOLDER_PATTERN.search(value):
+    if PLACEHOLDER_PATTERN.fullmatch(value):
         return False
     if value.startswith("$"):                      # $VAR、${VAR}
         return False
@@ -88,8 +93,12 @@ def find_secret(content: str):
     for line in content.splitlines():
         for rule_name, pattern in SECRET_PATTERNS:
             hit = pattern.search(line)
-            # 佔位符判斷以命中片段為準，避免同一列的佔位符掩蓋真憑證
-            if hit and not PLACEHOLDER_PATTERN.search(hit.group(0)):
+            if not hit:
+                continue
+            # 佔位符判斷只看擷取出的憑證值本身（有擷取群組時），避免任意
+            # 子字串（如真實密碼後綴 "EXAMPLE"）就讓整條規則豁免。
+            value = hit.group(1) if hit.lastindex else hit.group(0)
+            if not PLACEHOLDER_PATTERN.fullmatch(value):
                 return rule_name, line.strip()
         # 未加引號的憑證字面值（涵蓋引號規則抓不到的 .env／YAML 寫法）
         for hit in UNQUOTED_ASSIGNMENT_PATTERN.finditer(line):

@@ -47,8 +47,14 @@ REFERENCE_VALUE_PREFIXES = (
 
 
 def looks_like_secret_literal(value: str) -> bool:
-    """判斷未加引號的指派值是否像硬寫憑證字面值（而非變數／函式／佔位符參照）。"""
-    if PLACEHOLDER.search(value) or value.startswith("$"):
+    """判斷未加引號的指派值是否像硬寫憑證字面值（而非變數／函式／佔位符參照）。
+
+    修正：先前以 PLACEHOLDER.search 比對整個值，只要值任意處含
+    EXAMPLE／PLACEHOLDER 等子字串就整條規則豁免，導致真實憑證附帶這類
+    後綴即可繞過（AGK-002）；改為 fullmatch，要求整個值本身就是明確的
+    佔位符格式。
+    """
+    if PLACEHOLDER.fullmatch(value) or value.startswith("$"):
         return False
     if any(ch in value for ch in "()[]"):
         return False

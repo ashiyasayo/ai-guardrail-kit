@@ -28,6 +28,92 @@ for kind in ('symlink','hardlink'):
 
 archive=bundle(); digest=hashlib.sha256(archive).hexdigest()
 identity={'schema_version':1,'mode':'harness','source':'test','ref':'test','commit':'1'*40,'runtime_version':'test+1','archive_url':'https://github.com/ashiyasayo/ai-guardrail-kit/releases/download/test/x.tar.gz','archive_sha256':digest,'archive_size':len(archive),'entrypoints':{'pretool.plan':'hooks/dispatch.py','pretool.security':'hooks/dispatch.py','pretool.pii':'hooks/dispatch.py','prompt.pii':'hooks/dispatch.py'}}
+
+# AGK-003: manifest 必須與其實際被要求的 commit 一致，archive URL 必須以路徑
+# 區段方式綁定到該 commit；兩者都只落在 approved host 上並不足夠。
+_commit_a = 'a' * 40
+_commit_b = 'b' * 40
+
+
+def _manifest_bytes(commit, archive_url):
+    payload = {
+        'schema_version': 1,
+        'release': {
+            'source': 'https://github.com/ashiyasayo/ai-guardrail-kit',
+            'ref': commit, 'commit': commit, 'runtime_version': 'test+' + commit[:8],
+        },
+        'modes': {
+            mode: {
+                'archive_url': archive_url,
+                'archive_sha256': digest, 'archive_size': len(archive),
+                'entrypoints': {
+                    'decomposition-gate': {'pretool.decomposition': 'hooks/dispatch.py'},
+                    'sensitive-data-guard': {'pretool.security': 'hooks/dispatch.py', 'pretool.pii': 'hooks/dispatch.py', 'prompt.pii': 'hooks/dispatch.py'},
+                    'harness': {'pretool.plan': 'hooks/dispatch.py', 'pretool.security': 'hooks/dispatch.py', 'pretool.pii': 'hooks/dispatch.py', 'prompt.pii': 'hooks/dispatch.py'},
+                    'integrated-harness': {'pretool.plan': 'hooks/dispatch.py', 'pretool.security': 'hooks/dispatch.py', 'pretool.pii': 'hooks/dispatch.py', 'prompt.pii': 'hooks/dispatch.py', 'session.start': 'hooks/dispatch.py'},
+                }[mode],
+            }
+            for mode in m.MODES
+        },
+    }
+    return json.dumps(payload).encode()
+
+
+_pinned_url = 'https://github.com/ashiyasayo/ai-guardrail-kit/releases/download/' + _commit_a + '/x.tar.gz'
+_mutable_url = 'https://github.com/ashiyasayo/ai-guardrail-kit/releases/download/main/x.tar.gz'
+
+m.validate_manifest(_manifest_bytes(_commit_a, _pinned_url), expected_ref=_commit_a)
+
+try:
+    m.validate_manifest(_manifest_bytes(_commit_b, _pinned_url), expected_ref=_commit_a)
+except m.ManagerError as e:
+    assert e.code == 'E_MANIFEST_INVALID'
+else:
+    raise AssertionError('manifest commit mismatched with the immutable fetch ref was accepted')
+
+try:
+    m.validate_manifest(_manifest_bytes(_commit_a, _mutable_url), expected_ref=_commit_a)
+except m.ManagerError as e:
+    assert e.code == 'E_MANIFEST_INVALID'
+else:
+    raise AssertionError('archive URL not pinned to the manifest commit was accepted')
+
+with tempfile.TemporaryDirectory() as td:
+    manifest_path = Path(td) / 'manifest.json'
+    manifest_path.write_bytes(_manifest_bytes(_commit_a, _pinned_url))
+    old_codex_home = os.environ.get('CODEX_HOME')
+    os.environ['CODEX_HOME'] = str(Path(td) / '.codex-home')
+    os.environ.pop('AI_GUARDRAIL_ALLOW_DEVELOPMENT_SOURCE', None)
+    os.environ.pop('AI_GUARDRAIL_MANIFEST_PATH', None)
+    os.environ.pop('AI_GUARDRAIL_ARCHIVE_DIR', None)
+    os.environ.pop('AI_GUARDRAIL_ALLOW_MUTABLE_REF', None)
+    try:
+        import argparse
+        args = argparse.Namespace(project=td, scope='project', mode='harness', ref=None,
+                                   source=None, update=False, offline=False, owner=None)
+        try:
+            m.prepare_selection(args)
+        except m.ManagerError as e:
+            assert e.code == 'E_USAGE'
+        else:
+            raise AssertionError('fresh github install without --ref silently trusted the mutable main branch')
+    finally:
+        if old_codex_home is None:
+            os.environ.pop('CODEX_HOME', None)
+        else:
+            os.environ['CODEX_HOME'] = old_codex_home
+
+loader=Path('C:/guardrail/loader/loader.py')
+assert m._loader_hook_command('C:/Program Files/Python/python.exe', loader, 'session.start', True) == (
+    "$env:AI_GUARDRAIL_LOADER_SLOT = 'session.start'; $env:AI_GUARDRAIL_LOADER = '1'; "
+    "& 'C:/Program Files/Python/python.exe' -- 'C:/guardrail/loader/loader.py'")
+assert m._is_loader_command(
+    "$env:AI_GUARDRAIL_LOADER_SLOT = 'session.start'; $env:AI_GUARDRAIL_LOADER = '1'; "
+    "& 'C:/Program Files/Python/python.exe' -- 'C:/guardrail/loader/loader.py'")
+assert m._loader_hook_command('/usr/bin/python3', Path('/guardrail/loader/loader.py'), 'session.start', False) == (
+    'AI_GUARDRAIL_LOADER_SLOT=session.start AI_GUARDRAIL_LOADER=1 '
+    '/usr/bin/python3 -- /guardrail/loader/loader.py')
+
 with tempfile.TemporaryDirectory() as td:
     store=m.RuntimeStore(Path(td)/'.codex'); store.install(identity, archive)
     payload=store.cache_path(digest)/'payload'; (payload/'hooks/dispatch.py').write_bytes(b'tampered')
@@ -73,5 +159,30 @@ with tempfile.TemporaryDirectory() as td:
     assert captured['environment']['AI_GUARDRAIL_MODE'] == 'harness'
     assert 'AI_GUARDRAIL_MANIFEST_PATH' not in captured['environment']
     assert 'SHOULD_NOT_LEAK_TOKEN' not in captured['environment']
+
+# AGK-004: 未登錄於受保護 registry 的 project/local selector，即使指向已快取
+# 且完整合法的 runtime，也不得被 resolve_runtime 採用（避免未受信任專案降級
+# 使用者原本期待的防護模式）。
+with tempfile.TemporaryDirectory() as td:
+    store = m.RuntimeStore(Path(td) / '.codex')
+    store.install(identity, archive)
+    project = Path(td) / 'project'
+    selector = project / '.codex/guardrail/runtime.json'
+    selector.parent.mkdir(parents=True)
+    event = {'cwd': str(project)}
+
+    # 未登錄：直接寫入 selector 檔案，不呼叫 register_selector（模擬攻擊者
+    # 提交版本控制的 project selector）。
+    m._atomic_write(selector, m._json_bytes(
+        {'schema_version': 1, 'scope': 'project', 'mode': 'harness', 'identity': identity}))
+    resolved_identity, resolved_payload, _ = m.resolve_runtime(event, store)
+    assert resolved_identity is None and resolved_payload is None, \
+        'unregistered project selector must not be trusted'
+
+    # 登錄後，同一份 selector 才應被信任並解析成功。
+    m.register_selector(store, selector, 'project', identity)
+    resolved_identity, resolved_payload, _ = m.resolve_runtime(event, store)
+    assert resolved_identity == identity and resolved_payload is not None, \
+        'registered project selector must resolve normally'
 print('PASS: Codex runtime manager archive and payload integrity')
 PY

@@ -23,6 +23,13 @@ grep -Fq 'AI_GUARDRAIL_LOADER_SLOT=pretool.security' "$CODEX_HOME/hooks.json"
 grep -Fq 'AI_GUARDRAIL_LOADER_SLOT=session.start' "$CODEX_HOME/hooks.json"
 [[ -x "$CODEX_HOME/guardrail/bin/prune-codex-runtime-cache" ]]
 
+# marketplace upgrade 必須保留已安裝的 Loader 與其他使用者 plugin。
+codex plugin marketplace upgrade ai-guardrail-kit
+[[ $(<"$AI_GUARDRAIL_TEST_STATE/upgrade.args") == ai-guardrail-kit ]]
+[[ $(<"$AI_GUARDRAIL_TEST_STATE/upgrade.count") == 1 ]]
+grep -Fxq 'unrelated@elsewhere' "$AI_GUARDRAIL_TEST_STATE/installed"
+grep -Fxq 'ai-guardrail-loader@ai-guardrail-kit' "$AI_GUARDRAIL_TEST_STATE/installed"
+
 "$root/scripts/select-codex-mode" harness --scope project --source local --ref main "$tmp/project" >/dev/null
 project_before=$(sha256sum "$tmp/project/.codex/guardrail/runtime.json" | cut -d' ' -f1)
 "$root/scripts/install-codex-global-integrated-harness" --remove "$root" >/dev/null

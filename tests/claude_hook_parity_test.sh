@@ -66,6 +66,12 @@ SECRET_CASES = [
      {"file_path": "cfg.py", "content": "password = os.environ['DB_PASSWORD']"}, False),
     ("一般程式碼不攔截", "Write",
      {"file_path": "a.py", "content": "def add(a, b):\n    return a + b\n"}, False),
+    ("真實密碼附帶 EXAMPLE 後綴仍須攔截", "Write",
+     {"file_path": "cfg.py",
+      "content": "pass" + "word = '" + "ActualSecret123" + "EXAMPLE" + "'"}, True),
+    ("真實金鑰附帶 PLACEHOLDER 後綴仍須攔截", "Write",
+     {"file_path": "cfg.py",
+      "content": "api" + "_key = '" + "live_Secret987" + "PLACEHOLDER" + "'"}, True),
 ]
 
 # --- 危險指令語料：(說明, command, 兩邊皆須攔截?) ---
@@ -81,6 +87,11 @@ DANGER_CASES = [
     ("一般刪除不攔截", "rm -r build", False),
     ("一般指令不攔截", "ls -la && git status", False),
     ("含 -rf 字樣檔名不攔截", "cat notes-rf.txt", False),
+    ("帶 -C 全域選項的硬重置", "git -C /tmp/repo reset --hard", True),
+    ("帶 -C 全域選項的強制推送主幹", "git -C /tmp/repo push origin main --force", True),
+    ("sudo 以 -- 結束選項的刪除", "sudo -- rm /tmp/important", True),
+    ("sudo 帶使用者旗標的刪除", "sudo -u root rm /tmp/important", True),
+    ("直譯器內嵌程式碼刪除", "python3 -c \"import shutil; shutil.rmtree('/tmp/important')\"", True),
 ]
 
 failures = []

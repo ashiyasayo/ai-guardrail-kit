@@ -192,6 +192,11 @@ def validate_manifest(raw: bytes, *, expected_ref: Optional[str] = None) -> Dict
         raise _error("E_MANIFEST_INVALID", "manifest commit is not a 40-hex value")
     if expected_ref and release["ref"] != expected_ref:
         raise _error("E_MANIFEST_INVALID", "manifest ref does not match requested ref")
+    # 若請求的 ref 本身就是不可變的 40-hex commit（GitHub 依 commit 提供的內容不會
+    # 隨後被改寫），manifest 自報的 commit 欄位必須與其一致；否則 manifest 的
+    # commit 欄位只是自報值，無法證明 manifest 確實來自該 commit（AGK-003）。
+    if expected_ref and COMMIT_RE.fullmatch(expected_ref) and release["commit"] != expected_ref:
+        raise _error("E_MANIFEST_INVALID", "manifest commit does not match the immutable ref it was fetched from")
     for mode, item in modes.items():
         if mode not in MODES or not isinstance(item, dict):
             raise _error("E_MANIFEST_INVALID", "manifest contains an unknown mode")
@@ -212,6 +217,13 @@ def validate_manifest(raw: bytes, *, expected_ref: Optional[str] = None) -> Dict
         if set(entries) != MODE_SLOTS[mode]:
             raise _error("E_MANIFEST_INVALID", "manifest entrypoints do not match mode events")
         _approved_url(url)
+        # archive URL 必須以路徑區段方式包含 manifest 自報的 commit，不得只落在
+        # approved host 上就被接受；否則 manifest 若指向可變 ref（如 main），
+        # archive 內容會在下載當下才被解析，與 manifest 宣稱的 commit 脫鉤
+        # （AGK-003 建議 3：repository owner/name、manifest commit 與 archive URL
+        # 的強制綁定）。
+        if f"/{release['commit']}/" not in url:
+            raise _error("E_MANIFEST_INVALID", "archive URL is not pinned to the manifest's commit")
     if set(modes) != set(MODES):
         raise _error("E_MANIFEST_INVALID", "manifest must describe all four modes")
     return data
@@ -578,6 +590,10 @@ class RuntimeStore:
 
 LOADER_MARKER = "AI_GUARDRAIL_LOADER=1 "
 LOADER_COMMAND_RE = re.compile(r"^AI_GUARDRAIL_LOADER_SLOT=[a-z.]+ " + re.escape(LOADER_MARKER))
+LOADER_WINDOWS_COMMAND_RE = re.compile(
+    r"^\$env:AI_GUARDRAIL_LOADER_SLOT = '[a-z.]+'; "
+    r"\$env:AI_GUARDRAIL_LOADER = '1'; "
+)
 LOADER_VERSION = "1.0.0"
 LEGACY_MARKERS = (
     "AI_GUARDRAIL_GLOBAL_DEFAULT=1 ",
@@ -618,7 +634,10 @@ def _read_regular_bytes(path: Path) -> bytes:
 
 
 def _is_loader_command(command: Any) -> bool:
-    return isinstance(command, str) and (command.startswith(LOADER_MARKER) or LOADER_COMMAND_RE.match(command) is not None)
+    return (isinstance(command, str)
+            and (command.startswith(LOADER_MARKER)
+                 or LOADER_COMMAND_RE.match(command) is not None
+                 or LOADER_WINDOWS_COMMAND_RE.match(command) is not None))
 
 
 def _legacy_command_matches(command: str) -> List[Tuple[str, str]]:
@@ -773,6 +792,21 @@ def loader_is_installed(store: RuntimeStore) -> bool:
     return data.get("schema_version") == 1 and data.get("complete") is True and stable.is_file() and manager.is_file()
 
 
+def _powershell_quote(value: str) -> str:
+    """PowerShell 單引號字串只需將單引號重複，避免路徑被當成程式碼。"""
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _loader_hook_command(python: str, loader: Path, slot: str, windows: bool) -> str:
+    if windows:
+        # Codex Windows hook 由 PowerShell 執行；直接設定環境變數可保留 stdin 並避免 Bash 語法失效。
+        return ("$env:AI_GUARDRAIL_LOADER_SLOT = " + _powershell_quote(slot)
+                + "; $env:AI_GUARDRAIL_LOADER = '1'; & " + _powershell_quote(python)
+                + " -- " + _powershell_quote(str(loader)))
+    return ("AI_GUARDRAIL_LOADER_SLOT=" + slot + " " + LOADER_MARKER
+            + shlex.quote(python) + " -- " + shlex.quote(str(loader)))
+
+
 def _loader_hook_data(path: Path, python: str, action: str) -> Dict[str, Any]:
     if path.exists():
         data = _read_json(path)
@@ -800,7 +834,7 @@ def _loader_hook_data(path: Path, python: str, action: str) -> Dict[str, Any]:
                 kept.append(copy)
         hooks[event] = kept
     if action == "install":
-        command = lambda slot: LOADER_MARKER + shlex.quote(python) + " -- " + shlex.quote(str(path.parent / "guardrail" / "loader" / "loader.py"))
+        loader = path.parent / "guardrail" / "loader" / "loader.py"
         specs = [
             ("PreToolUse", "exec_command|apply_patch", "pretool.decomposition"),
             ("PreToolUse", "exec_command|apply_patch", "pretool.plan"),
@@ -810,11 +844,10 @@ def _loader_hook_data(path: Path, python: str, action: str) -> Dict[str, Any]:
             ("SessionStart", "startup|resume|clear|compact", "session.start"),
         ]
         for event, matcher, slot in specs:
-            rule = {"hooks": [{"type": "command", "command": command(slot)}]}
+            command = _loader_hook_command(python, loader, slot, os.name == "nt")
+            rule = {"hooks": [{"type": "command", "command": command}]}
             if matcher:
                 rule["matcher"] = matcher
-            # slot 透過環境前綴傳遞，保持 argv 穩定，也讓 PII 維持獨立 hook invocation。
-            rule["hooks"][0]["command"] = "AI_GUARDRAIL_LOADER_SLOT=" + slot + " " + rule["hooks"][0]["command"]
             hooks.setdefault(event, []).append(rule)
     return data
 
@@ -1050,6 +1083,20 @@ def _write_selector_registry(store: RuntimeStore, selectors: Sequence[Mapping[st
     _atomic_write(store.selector_registry, _json_bytes({"schema_version": 1, "selectors": list(selectors)}))
 
 
+def _is_registered_selector(store: RuntimeStore, selector: Path, scope: str, archive_sha256: str) -> bool:
+    """selector 是否已登錄於受保護 registry，且 path/scope/digest 完全一致。
+
+    僅信任本機管理指令（見 register_selector／commit_selection）寫入的登錄項；
+    registry 位於 CODEX_HOME 之下、專案不可寫，因此攻擊者提交的 project／local
+    selector 檔案即使指向已快取的合法 runtime，也不會出現在這裡（AGK-004）。
+    """
+    key = str(selector.resolve(strict=False))
+    for item in _read_selector_registry(store):
+        if item["path"] == key and item["scope"] == scope and item["archive_sha256"] == archive_sha256:
+            return True
+    return False
+
+
 def register_selector(store: RuntimeStore, selector: Path, scope: str, identity: Mapping[str, Any]) -> None:
     identity = validate_identity(identity)
     if scope not in SCOPES:
@@ -1138,9 +1185,20 @@ def resolve_runtime(event: Mapping[str, Any], store: RuntimeStore) -> Tuple[Opti
     root = _find_root(cwd, store)
     for scope in ("local", "project", "user"):
         path = store.selector_path(scope, root)
-        if path.exists() or path.is_symlink():
-            identity, payload = _selector_identity(store, path, scope)
-            return identity, payload, root
+        if not (path.exists() or path.is_symlink()):
+            continue
+        if scope in ("local", "project"):
+            # project／local selector 檔案本身位於專案可寫的 .codex/guardrail/ 之下，
+            # 未受信任的專案可提交指向已快取合法 runtime 的 selector 來降級使用者
+            # 原本期待的防護模式；registry 位於 CODEX_HOME、專案不可寫，只有本機
+            # 管理指令能登錄，因此未登錄的 project／local selector 一律視為不存在
+            # （AGK-004；不影響 identity 本身仍會完整驗證，只是不被信任採用）。
+            data = _load_selector(store, path, scope)
+            digest = data["identity"]["archive_sha256"]
+            if not _is_registered_selector(store, path, scope, digest):
+                continue
+        identity, payload = _selector_identity(store, path, scope)
+        return identity, payload, root
     return None, None, root
 
 
@@ -1227,9 +1285,23 @@ def prepare_selection(args: argparse.Namespace) -> Dict[str, Any]:
     source_name = args.source or (
         "local" if existing_identity is not None and existing_identity["source"] in ("development", "local", "test") else "github"
     )
-    requested_ref = _validate_ref(args.ref or (
-        existing_identity["ref"] if existing_identity is not None and not args.update else "main"
-    ))
+    if args.ref:
+        requested_ref = _validate_ref(args.ref)
+    elif existing_identity is not None and not args.update:
+        requested_ref = _validate_ref(existing_identity["ref"])
+    else:
+        # 正式（github 來源、非離線）安裝預設不再信任可變的 main 分支：未明確指定
+        # --ref 時要求人工提供 immutable commit 或已發佈的 release tag，避免上游
+        # main 分支或發佈流程遭入侵時被靜默信任（AGK-003）。離線／development／
+        # test 來源不受影響，因為它們不會對可變 ref 發出新的網路請求。
+        if source_name == "github" and not args.offline and os.environ.get("AI_GUARDRAIL_ALLOW_MUTABLE_REF") != "1":
+            raise _error(
+                "E_USAGE",
+                "fresh install requires --ref <commit-or-tag>; refusing to default to the "
+                "mutable 'main' branch (set AI_GUARDRAIL_ALLOW_MUTABLE_REF=1 to explicitly "
+                "opt into it for development or testing)",
+            )
+        requested_ref = _validate_ref("main")
     if args.offline:
         index = _read_json(store.index)
         if index.get("schema_version") != 1 or not isinstance(index.get("entries"), list):

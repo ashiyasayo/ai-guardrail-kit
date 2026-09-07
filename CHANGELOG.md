@@ -8,10 +8,48 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-07
+
+### Security
+
+- Claude（`harness`、`integrated-harness`）與 Codex（全部模式）的危險命令攔截，
+  修正 `git -C <path> reset --hard`／`push ... --force`、`sudo -- rm`／
+  `sudo -u <user> rm`，以及可執行任意內嵌程式碼的直譯器（`python3 -c`、
+  `pwsh -Command` 等）等等價繞過形式；新增可安全遞迴解析的 `bash -c`／`sh -c`
+  巢狀檢查（AGK-001）。Copilot 目前不提供危險命令防護，不受影響。
+- Claude（`harness`、`integrated-harness`、`sensitive-data-guard`）、Codex（全部
+  模式）與 Copilot（`sensitive-data-guard`）的憑證攔截，修正 placeholder 判斷
+  從「命中內容任一處含 EXAMPLE／PLACEHOLDER 等子字串即豁免」改為「擷取出的憑證
+  值本身須完整符合明確的佔位符格式」，避免真實憑證只要附帶這類子字串就繞過偵測
+  （AGK-002）。
+- Codex `ai-guardrail-loader` 的 runtime manifest 驗證新增：manifest 自報的
+  `commit` 必須與請求的不可變 commit ref 一致、每個模式的 archive URL 必須以
+  路徑區段方式綁定該 commit；`select-codex-mode` 對 github 來源的全新安裝預設
+  不再信任可變的 `main` 分支，未指定 `--ref <commit-or-tag>` 時會拒絕並提示，
+  可用 `AI_GUARDRAIL_ALLOW_MUTABLE_REF=1` 明確選擇退回舊行為（AGK-003）。已隨附
+  修正 `codex/runtime-manifest.json` 的 archive URL，改為指向其宣告的 commit
+  而非可變分支。
+- Codex `ai-guardrail-loader` 的 `resolve_runtime` 現在會要求 project／local
+  selector 已登錄於受保護（`CODEX_HOME` 之下、專案不可寫）的 selector registry
+  且 path/scope/digest 完全一致才會採用，避免未受信任專案提交指向已快取合法
+  runtime 的 selector 來降級使用者原本期待的防護模式（AGK-004）；`user` scope
+  與經由 `select-codex-mode` 本機指令登錄的既有流程不受影響。
+
 ### Fixed
 
+- Codex Loader 在 Windows 改以 PowerShell 原生 `$env:...; & <python>` hook command 啟動，
+  避免將 POSIX 的環境變數前綴當作 PowerShell 命令而使所有 hook 在 Loader 前失敗。
 - Codex marketplace 將四個由 loader 管理的 legacy mode 標示為 `NOT_AVAILABLE`，
   取代目前 schema 不接受的 `DEPRECATED`，使遠端 marketplace 註冊可解析 manifest。
+- 移除 Codex loader manifest 中誤指向 hook 資料夾的 `hooks` 欄位，避免 Codex 將資料夾
+  當成 hook 設定檔讀取而在 Windows 回報存取被拒。
+
+### Documentation
+
+- 說明 remote controller 用戶端無法執行 `!` 命令或平台原生核准 UI 時，不能繞過 strict
+  授權；並記錄手機低風險開發的預先設定、patch-only、PR 與 CI 流程。
+- 補上 Windows PowerShell 以 plugin 內附 Python manager bootstrap loader、設定與驗證 Codex
+  全域 `user` fallback 的流程，以及 `/hooks` 審閱信任步驟，不再要求 Git Bash 或 WSL。
 
 ## [0.5.0] - 2026-09-03
 

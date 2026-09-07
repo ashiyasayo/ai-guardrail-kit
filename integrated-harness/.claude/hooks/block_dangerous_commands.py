@@ -13,6 +13,17 @@ RAW_RM_PATTERN = re.compile(
     r"\brm\s+(?:(?:-[A-Za-z]*r[A-Za-z]*f|-[A-Za-z]*f[A-Za-z]*r)\b|"
     r"(?=[^;&|]*--recursive)(?=[^;&|]*--force))"
 )
+# sudo 選項中會額外消耗下一個 token 的旗標（例如 `sudo -u root rm ...`）。
+SUDO_VALUE_FLAGS = {
+    "-u", "-g", "-h", "-p", "-C", "-D", "-R", "-T", "-U", "-r",
+    "--user", "--group", "--host", "--prompt", "--chdir",
+    "--close-from", "--role", "--type", "--other-user",
+}
+# 可執行任意內嵌程式碼、且此處無法可靠靜態解析其語意的直譯器；
+# 一旦帶有內嵌程式碼旗標一律保守攔截（無法解析時不視為安全，AGK-001）。
+OPAQUE_INTERPRETERS = {"python", "python3", "perl", "ruby", "node", "php", "pwsh", "powershell"}
+OPAQUE_INLINE_FLAGS = {"-c", "-e", "-Command", "-command", "-EncodedCommand", "-encodedcommand"}
+SHELL_INTERPRETERS = {"bash", "sh", "zsh", "ksh", "dash"}
 
 PATTERNS = (
     ("sudo 刪除", re.compile(r"\bsudo\s+rm\b")),
@@ -29,6 +40,10 @@ PATTERNS = (
     )),
     ("讀取系統帳密檔", re.compile(r"/etc/(shadow|passwd)\b")),
     ("下載即執行", re.compile(r"\b(curl|wget)\b[^|;&]*\|\s*(sudo\s+)?(bash|sh|python3?)\b")),
+    ("直譯器內嵌程式碼", re.compile(
+        r"\b(?:python3?|perl|ruby|node|php|pwsh|powershell)\b[^|;&]*"
+        r"\s(?:-c|-e|-Command|-command|-EncodedCommand|-encodedcommand)\s"
+    )),
 )
 
 
@@ -155,17 +170,50 @@ def push_targets_protected_branch(args: list[str]) -> bool:
     return False
 
 
+def strip_sudo_wrapper(tokens: list[str]) -> tuple[bool, list[str]]:
+    """消耗 sudo 的旗標與 '--' 選項終止符，回傳（是否曾為 sudo、剩餘 tokens）。
+
+    修正：先前只在 tokens[1] 恰好等於 'rm' 時辨識 sudo，'sudo -- rm'、
+    'sudo -u root rm' 等帶旗標或 '--' 的等價形式會被放行（AGK-001）。
+    """
+    if not tokens or command_name(tokens[0]) != "sudo":
+        return False, tokens
+    index = 1
+    while index < len(tokens) and tokens[index] != "--" and tokens[index].startswith("-"):
+        flag = tokens[index]
+        index += 1
+        if flag in SUDO_VALUE_FLAGS and index < len(tokens) and not tokens[index].startswith("-"):
+            index += 1
+    if index < len(tokens) and tokens[index] == "--":
+        index += 1
+    return True, tokens[index:]
+
+
+def opaque_interpreter_inline_code(name: str, args: list[str]) -> bool:
+    return name in OPAQUE_INTERPRETERS and any(arg in OPAQUE_INLINE_FLAGS for arg in args)
+
+
+def shell_inline_code(args: list[str]) -> Optional[str]:
+    for index, arg in enumerate(args):
+        if arg == "-c" and index + 1 < len(args):
+            return args[index + 1]
+    return None
+
+
 def dangerous_tokens(tokens: list[str]) -> Optional[str]:
     if not tokens:
         return None
-    name = command_name(tokens[0])
-    args = tokens[1:]
-    if name == "sudo" and len(tokens) > 1 and command_name(tokens[1]) == "rm":
+    had_sudo, stripped = strip_sudo_wrapper(tokens)
+    if not stripped:
+        return None
+    name = command_name(stripped[0])
+    args = stripped[1:]
+    if had_sudo and name == "rm":
         return "sudo 刪除"
     if name == "rm" and rm_is_recursive_force(args):
         return "遞迴強制刪除"
     if name == "git":
-        subcommand, args = git_subcommand(tokens)
+        subcommand, args = git_subcommand(stripped)
         if subcommand == "reset" and "--hard" in before_option_terminator(args):
             return "硬重置"
         if subcommand == "filter-branch" or (subcommand == "push" and "--mirror" in args):
@@ -192,6 +240,14 @@ def dangerous_tokens(tokens: list[str]) -> Optional[str]:
         sql_pattern = PATTERNS[1][1]
         if any(sql_pattern.search(arg) for arg in args):
             return "資料庫毀滅性操作"
+    if name in SHELL_INTERPRETERS:
+        inline = shell_inline_code(args)
+        if inline is not None:
+            nested = command_is_dangerous(inline)
+            if nested:
+                return nested
+    elif opaque_interpreter_inline_code(name, args):
+        return "直譯器內嵌程式碼無法靜態驗證安全性"
     return None
 
 
@@ -220,10 +276,7 @@ def emit_deny(reason: str) -> None:
     sys.exit(0)
 
 
-def matched_rule(data: dict) -> Optional[str]:
-    if data.get("tool_name") != "Bash":
-        return None
-    command = data.get("tool_input", {}).get("command", "")
+def command_is_dangerous(command: str) -> Optional[str]:
     parsed = tokenized_commands(command)
     if parsed is None:
         if raw_rm_is_recursive_force(command):
@@ -240,6 +293,13 @@ def matched_rule(data: dict) -> Optional[str]:
         if name:
             return name
     return dangerous_pipeline(segments, operators)
+
+
+def matched_rule(data: dict) -> Optional[str]:
+    if data.get("tool_name") != "Bash":
+        return None
+    command = data.get("tool_input", {}).get("command", "")
+    return command_is_dangerous(command)
 
 
 def check(data: dict) -> Optional[str]:

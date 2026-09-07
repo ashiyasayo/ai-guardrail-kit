@@ -41,6 +41,36 @@ plugin add/remove。
 launcher 或 Python 不在 PATH，請在執行 bootstrap、selector、verifier 或 prune 前設定
 `AI_GUARDRAIL_PYTHON`；這只影響管理命令，不會讓 hook 熱路徑連網。
 
+### Windows PowerShell：設定全域 fallback
+
+PowerShell 不會直接執行無副檔名的 Bash entrypoint。若不使用 Git Bash 或 WSL，可直接呼叫
+plugin 內附的 Python manager。以下 `<plugin-directory>` 應替換為 `codex plugin list --json`
+顯示的已安裝 plugin 目錄：
+
+```powershell
+$pluginRoot = '<plugin-directory>'
+$codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE '.codex' }
+$manager = Join-Path $codexHome 'guardrail\bin\codex-runtime-manager.py'
+
+# 只需執行一次：部署穩定 loader 與管理入口
+py -3 "$pluginRoot\hooks\manager.py" install-loader --plugin-root "$pluginRoot"
+
+# 為所有未設定 project/local selector 的專案建立全域 fallback
+py -3 $manager select integrated-harness --scope user --ref main
+py -3 $manager verify integrated-harness --scope user
+```
+
+若沒有 `py` launcher，改用 Python 3.9+ 的 `python`。`integrated-harness` 可替換成
+`decomposition-gate`、`sensitive-data-guard` 或 `harness`。選擇或變更模式後，請開啟新的
+Codex thread；`user` 只作 fallback，`local > project > user > disabled` 仍決定實際生效模式。
+首次安裝或 plugin hook 更新後，請在 Codex 輸入 `/hooks` 審閱並信任
+`ai-guardrail-loader` 的 hook；Codex 會略過未信任的 plugin hook。
+
+在 Windows，installer 會將 hook 寫成 PowerShell 的 `$env:...; & <python>` 形式；其行為與
+POSIX／Claude 的「先設定 Loader 環境變數，再啟動 Python」相同，但不混用 Bash 語法。若
+`$CODEX_HOME/hooks.json` 記錄的 Python 已移除或變更，先安裝可用的原生 Python 3.9+，再重跑
+上述 `install-loader` 指令以重新產生 hook；不要以 WSL 的 Python 路徑安裝 Windows Codex hook。
+
 ## Selecting a runtime
 
 四個 mode：`decomposition-gate`、`sensitive-data-guard`、`harness`、

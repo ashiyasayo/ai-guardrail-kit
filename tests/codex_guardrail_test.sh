@@ -128,6 +128,21 @@ else:
 assert security.dangerous_command(event("allow.json")["tool_input"]["command"]) is None
 assert security.dangerous_command(event("dangerous-command.json")["tool_input"]["command"]) == "硬重置"
 
+# AGK-001：等價命令形式不得繞過既有規則。
+assert security.dangerous_command("git -C /tmp/repo reset --hard") == "硬重置"
+assert security.dangerous_command("git -C /tmp/repo push origin main --force") == "強制推送主幹"
+assert security.dangerous_command("sudo -- rm /tmp/important") == "sudo 刪除"
+assert security.dangerous_command("sudo -u root rm /tmp/important") == "sudo 刪除"
+assert security.dangerous_command(
+    "python3 -c \"import shutil; shutil.rmtree('/tmp/important')\""
+) == "直譯器內嵌程式碼無法靜態驗證安全性"
+assert security.dangerous_command("bash -c 'rm -rf /tmp/important'") == "遞迴強制刪除"
+
+# AGK-002：真實憑證只要附帶 EXAMPLE／PLACEHOLDER 等子字串就不應豁免。
+# 值刻意以片段組成，避免此測試檔本身觸發 repo 自身的憑證攔截 hook。
+_real_secret_with_example = "pass" + "word=" + "ActualSecret123" + "EXAMPLE"
+assert security.secret_kind(_real_secret_with_example) is not None
+
 secret_input = event("secret-write.json")["tool_input"]
 content = security.pending_content(secret_input)
 assert security.secret_kind(content) == "AWS Access Key"
