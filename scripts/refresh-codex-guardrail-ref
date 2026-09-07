@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 開發者便利指令：把「移除／重新加入 marketplace」「移除／重新安裝 loader plugin」
+# 「重新部署 bin」這一串手動步驟收成一行，取代 CLI_REFERENCE.md 記載的手動序列。
+# 只是這些 codex CLI 呼叫的封裝，不引入新的信任邊界；適用於已有本機 checkout 的
+# 開發者，尚未部署到 $CODEX_HOME/guardrail/bin（不經 checkout 的一行更新見
+# CLI_REFERENCE.md 既有的手動序列）。
+
+repo='https://github.com/ashiyasayo/ai-guardrail-kit.git'
+marketplace='ai-guardrail-kit'
+plugin='ai-guardrail-loader'
+ref=''
+python_bin=${AI_GUARDRAIL_PYTHON:-python3}
+if ! "$python_bin" -c 'import sys; raise SystemExit(sys.version_info < (3, 9))' >/dev/null 2>&1; then python_bin=python; fi
+export PYTHONUTF8=${PYTHONUTF8:-1}
+
+usage() {
+  printf 'usage: refresh-codex-guardrail-ref <ref> [--repo URL] [--marketplace NAME] [--plugin NAME]\n' >&2
+}
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --repo) [[ $# -ge 2 ]] || { usage; exit 2; }; repo=$2; shift 2;;
+    --marketplace) [[ $# -ge 2 ]] || { usage; exit 2; }; marketplace=$2; shift 2;;
+    --plugin) [[ $# -ge 2 ]] || { usage; exit 2; }; plugin=$2; shift 2;;
+    -h|--help) usage; exit 0;;
+    --) shift; break;;
+    -*) printf 'refresh-codex-guardrail-ref: unknown option %s\n' "$1" >&2; usage; exit 2;;
+    *) if [[ -n $ref ]]; then printf 'refresh-codex-guardrail-ref: unexpected argument %s\n' "$1" >&2; usage; exit 2; fi; ref=$1; shift;;
+  esac
+done
+[[ -n $ref ]] || { usage; exit 2; }
+
+# marketplace add 對已註冊的來源會直接拒絕（"already added from a different
+# source"），且 plugin 沒有 update 子指令；remove 允許在尚未安裝時失敗，
+# 用 || true 讓整個序列在乾淨環境與既有環境下都能重跑。
+codex plugin marketplace remove "$marketplace" >/dev/null 2>&1 || true
+codex plugin marketplace add "$repo" --ref "$ref" --sparse .agents --sparse codex/plugins
+codex plugin remove "$plugin@$marketplace" >/dev/null 2>&1 || true
+codex plugin add "$plugin@$marketplace"
+
+plugin_root=$(codex plugin list --json | "$python_bin" -c '
+import json, sys
+data = json.load(sys.stdin)
+plugin_id = sys.argv[1]
+for item in data.get("installed", []):
+    if item.get("pluginId") == plugin_id:
+        path = (item.get("source") or {}).get("path")
+        if path:
+            print(path)
+            raise SystemExit(0)
+raise SystemExit("refresh-codex-guardrail-ref: plugin not found in \"codex plugin list\": " + plugin_id)
+' "$plugin@$marketplace")
+
+"$plugin_root/hooks/install-codex-guardrail-loader" --plugin-root "$plugin_root" --update
+printf 'Refreshed %s@%s to ref %s\n' "$plugin" "$marketplace" "$ref"

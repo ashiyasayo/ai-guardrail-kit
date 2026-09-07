@@ -8,6 +8,15 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- 新增開發者便利腳本 `scripts/refresh-codex-guardrail-ref`，把「切換 Codex
+  marketplace／loader plugin 到新 ref」原本要手動執行的 marketplace
+  remove/add、plugin remove/add、`install-codex-guardrail-loader --update`
+  五個步驟收成一行指令。僅封裝既有 `codex` CLI 呼叫，不引入新的信任邊界；
+  僅適用於已有本機 checkout 的情境，不經 checkout 的手動序列仍保留在
+  `CLI_REFERENCE.md`。
+
 ## [0.6.1] - 2026-09-07
 
 ### Fixed
