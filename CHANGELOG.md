@@ -16,6 +16,13 @@ All notable changes to this project are documented in this file.
   `PYTHONDONTWRITEBYTECODE=1`，避免再產生這類衍生檔。影響 Codex 全部模式；
   既有已受影響的 runtime cache 會在下次驗證時自動視為合法，不需要手動
   prune 或重新安裝。
+- 修正上述失敗（以及其他任何 runtime 錯誤）觸發 fail-closed 時的輸出格式：
+  `manager.py` 的 `_failure_output()` 與 loader 自身更早期的
+  `_fail_closed()` 先前對 `UserPromptSubmit` 事件一律回傳 PreToolUse 專用的
+  `permissionDecision` 形狀，導致 Codex 回報「hook returned invalid user
+  prompt submit JSON output」而掩蓋真正的錯誤代碼；現在 `UserPromptSubmit`
+  改回傳 `{"continue": false, "stopReason", "systemMessage"}`，與既有
+  `pii_guard.py` 的輸出形狀一致。
 
 ## [0.6.0] - 2026-09-07
 

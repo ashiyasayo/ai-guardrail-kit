@@ -1208,9 +1208,12 @@ def resolve_runtime(event: Mapping[str, Any], store: RuntimeStore) -> Tuple[Opti
 
 
 def _failure_output(event_name: str, code: str) -> bytes:
+    reason = "AI Guardrail unavailable (" + code + ")"
     if event_name == "SessionStart":
-        return _json_bytes({"hookSpecificOutput": {"hookEventName": event_name, "additionalContext": "AI Guardrail unavailable (" + code + ")"}})
-    return _json_bytes({"hookSpecificOutput": {"hookEventName": event_name, "permissionDecision": "deny", "permissionDecisionReason": "AI Guardrail unavailable (" + code + ")"}})
+        return _json_bytes({"hookSpecificOutput": {"hookEventName": event_name, "additionalContext": reason}})
+    if event_name == "UserPromptSubmit":
+        return _json_bytes({"continue": False, "stopReason": reason, "systemMessage": reason})
+    return _json_bytes({"hookSpecificOutput": {"hookEventName": event_name, "permissionDecision": "deny", "permissionDecisionReason": reason}})
 
 
 def _hook_environment(store: RuntimeStore, identity: Mapping[str, Any]) -> Dict[str, str]:

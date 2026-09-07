@@ -196,5 +196,43 @@ with tempfile.TemporaryDirectory() as td:
     resolved_identity, resolved_payload, _ = m.resolve_runtime(event, store)
     assert resolved_identity == identity and resolved_payload is not None, \
         'registered project selector must resolve normally'
+
+# fail-closed 輸出形狀必須與觸發它的事件相符：UserPromptSubmit 用
+# {"continue": false, "stopReason", "systemMessage"}，不能沿用 PreToolUse 專用
+# 的 hookSpecificOutput.permissionDecision（否則 Codex 會回報 "hook returned
+# invalid user prompt submit JSON output"，掩蓋原本的 E_CACHE_CORRUPT 根因）。
+for event_name, checker in (
+    ('SessionStart', lambda o: o['hookSpecificOutput']['hookEventName'] == 'SessionStart' and 'additionalContext' in o['hookSpecificOutput']),
+    ('UserPromptSubmit', lambda o: o.get('continue') is False and isinstance(o.get('stopReason'), str) and isinstance(o.get('systemMessage'), str)),
+    ('PreToolUse', lambda o: o['hookSpecificOutput']['hookEventName'] == 'PreToolUse' and o['hookSpecificOutput']['permissionDecision'] == 'deny'),
+):
+    output = json.loads(m._failure_output(event_name, 'E_CACHE_CORRUPT'))
+    assert checker(output), (event_name, output)
+
+# loader.py 的更早期 fail-closed 路徑（manager.py 尚無法載入時）必須遵循同樣的
+# 事件對應輸出形狀；loader.py 沒有獨立的 scripts/ 副本，不受逐位元組同步測試
+# 約束，需要單獨載入驗證。
+loader_spec = importlib.util.spec_from_file_location(
+    'ai_guardrail_loader', Path(os.environ['ROOT']) / 'codex/plugins/ai-guardrail-loader/hooks/loader.py')
+loader_module = importlib.util.module_from_spec(loader_spec)
+loader_spec.loader.exec_module(loader_module)
+
+
+def _run_fail_closed(event_name):
+    captured = io.BytesIO()
+    old_stdout = sys.stdout
+    sys.stdout = type('X', (), {'buffer': captured})()
+    try:
+        loader_module._fail_closed(json.dumps({'hook_event_name': event_name}).encode())
+    finally:
+        sys.stdout = old_stdout
+    return json.loads(captured.getvalue())
+
+
+assert _run_fail_closed('SessionStart')['hookSpecificOutput']['additionalContext']
+prompt_output = _run_fail_closed('UserPromptSubmit')
+assert prompt_output.get('continue') is False and isinstance(prompt_output.get('stopReason'), str) and isinstance(prompt_output.get('systemMessage'), str)
+pretool_output = _run_fail_closed('PreToolUse')
+assert pretool_output['hookSpecificOutput']['permissionDecision'] == 'deny'
 print('PASS: Codex runtime manager archive and payload integrity')
 PY
