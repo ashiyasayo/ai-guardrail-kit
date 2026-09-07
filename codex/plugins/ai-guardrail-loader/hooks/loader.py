@@ -16,16 +16,19 @@ def _fail_closed(event_bytes: bytes) -> int:
     event_name = event.get("hook_event_name") if isinstance(event, dict) else None
     if not isinstance(event_name, str):
         event_name = "PreToolUse"
+    reason = "AI Guardrail unavailable (E_RUNTIME_MISSING)"
     if event_name == "SessionStart":
         result = {"hookSpecificOutput": {
             "hookEventName": event_name,
-            "additionalContext": "AI Guardrail unavailable (E_RUNTIME_MISSING)",
+            "additionalContext": reason,
         }}
+    elif event_name == "UserPromptSubmit":
+        result = {"continue": False, "stopReason": reason, "systemMessage": reason}
     else:
         result = {"hookSpecificOutput": {
             "hookEventName": event_name,
             "permissionDecision": "deny",
-            "permissionDecisionReason": "AI Guardrail unavailable (E_RUNTIME_MISSING)",
+            "permissionDecisionReason": reason,
         }}
     sys.stdout.buffer.write((json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8"))
     return 0
