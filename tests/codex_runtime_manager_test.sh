@@ -3,7 +3,7 @@ set -euo pipefail
 export PYTHONUTF8=${PYTHONUTF8:-1}
 root=$(cd "$(dirname "$0")/.." && pwd -P)
 ROOT="$root" python3 - <<'PY'
-import hashlib, importlib.util, io, json, os, sys, tarfile, tempfile, time
+import hashlib, importlib.util, io, json, os, shutil, sys, tarfile, tempfile, time
 from pathlib import Path
 import os
 spec=importlib.util.spec_from_file_location('manager', Path(os.environ['ROOT'])/'scripts/codex-runtime-manager.py')
@@ -123,6 +123,17 @@ with tempfile.TemporaryDirectory() as td:
     store.install(identity, archive)
     assert (payload/'hooks/dispatch.py').read_bytes() == b'print("ok")\n'
 
+    # 執行 hook 時 CPython 匯入同目錄模組會在 payload 留下 __pycache__/*.pyc；
+    # 這是執行期自然產生的衍生檔，verify_cache 不應把它當成竄改而拒絕。
+    pycache_dir = payload / 'hooks' / '__pycache__'
+    pycache_dir.mkdir(parents=True)
+    (pycache_dir / 'dispatch.cpython-313.pyc').write_bytes(b'not-a-real-pyc')
+    (payload / 'hooks' / 'dispatch.cpython-313.pyo').write_bytes(b'not-a-real-pyo')
+    assert store.verify_cache(identity) == payload, \
+        'stray __pycache__/.pyc/.pyo must not fail runtime cache verification'
+    shutil.rmtree(pycache_dir)
+    (payload / 'hooks' / 'dispatch.cpython-313.pyo').unlink()
+
     archive2=bundle(data=b'print("unreferenced")\n'); digest2=hashlib.sha256(archive2).hexdigest()
     identity2=dict(identity); identity2.update({'archive_sha256':digest2, 'archive_size':len(archive2), 'commit':'2'*40, 'runtime_version':'test+2'})
     store.install(identity2, archive2)
@@ -156,6 +167,7 @@ with tempfile.TemporaryDirectory() as td:
         os.environ.pop('AI_GUARDRAIL_MANIFEST_PATH', None)
         os.environ.pop('SHOULD_NOT_LEAK_TOKEN', None)
     assert captured['python'] == sys.executable
+    assert captured['environment']['PYTHONDONTWRITEBYTECODE'] == '1'
     assert captured['environment']['AI_GUARDRAIL_MODE'] == 'harness'
     assert 'AI_GUARDRAIL_MANIFEST_PATH' not in captured['environment']
     assert 'SHOULD_NOT_LEAK_TOKEN' not in captured['environment']

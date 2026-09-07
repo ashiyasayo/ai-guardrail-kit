@@ -503,9 +503,14 @@ class RuntimeStore:
         actual_files: Dict[str, Dict[str, Any]] = {}
         for base, dirs, files in os.walk(payload, topdown=True, followlinks=False):
             base_path = Path(base)
+            # __pycache__ 與 .pyc/.pyo 是執行 hook 時 CPython 對既有 .py 原始檔
+            # 產生的確定性衍生檔，排除它們讓完整性比對只針對 archive 實際內容。
+            dirs[:] = [name for name in dirs if name != "__pycache__"]
             if any((base_path / name).is_symlink() for name in dirs):
                 raise _error("E_CACHE_CORRUPT", "runtime payload contains a symlink")
             for name in files:
+                if name.endswith((".pyc", ".pyo")):
+                    continue
                 target = base_path / name
                 if target.is_symlink() or not target.is_file():
                     raise _error("E_CACHE_CORRUPT", "runtime payload contains a non-regular file")
@@ -1222,6 +1227,7 @@ def _hook_environment(store: RuntimeStore, identity: Mapping[str, Any]) -> Dict[
     environment.update({
         "PYTHONUTF8": "1",
         "PYTHONIOENCODING": "utf-8",
+        "PYTHONDONTWRITEBYTECODE": "1",
         "AI_GUARDRAIL_MODE": str(identity["mode"]),
         "AI_GUARDRAIL_RUNTIME_VERSION": str(identity["runtime_version"]),
     })

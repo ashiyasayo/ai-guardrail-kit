@@ -8,6 +8,15 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Codex `ai-guardrail-loader` 的 runtime cache 完整性驗證（`verify_cache`）不再
+  把執行 hook 時 CPython 自然產生的 `__pycache__`／`.pyc`／`.pyo` 衍生檔誤判為
+  payload 遭竄改而回報 `E_CACHE_CORRUPT`；同時 hook 執行環境新增
+  `PYTHONDONTWRITEBYTECODE=1`，避免再產生這類衍生檔。影響 Codex 全部模式；
+  既有已受影響的 runtime cache 會在下次驗證時自動視為合法，不需要手動
+  prune 或重新安裝。
+
 ## [0.6.0] - 2026-09-07
 
 ### Security
