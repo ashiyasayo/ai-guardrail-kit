@@ -39,7 +39,7 @@ for mode in modes:
             info = tarfile.TarInfo('orchestration-policy.md')
             info.size = len(policy)
             bundle.addfile(info, io.BytesIO(policy))
-    manifest['modes'][mode] = {'archive_url': 'https://github.com/ashiyasayo/ai-guardrail-kit/releases/download/test/' + name, 'archive_sha256': hashlib.sha256(archive.read_bytes()).hexdigest(), 'archive_size': archive.stat().st_size, 'entrypoints': slots[mode]}
+    manifest['modes'][mode] = {'archive_url': 'https://github.com/ashiyasayo/ai-guardrail-kit/releases/download/' + commit + '/' + name, 'archive_sha256': hashlib.sha256(archive.read_bytes()).hexdigest(), 'archive_size': archive.stat().st_size, 'entrypoints': slots[mode]}
 Path(os.environ['AI_GUARDRAIL_MANIFEST_PATH']).write_text(json.dumps(manifest), encoding='utf-8')
 PY
 
