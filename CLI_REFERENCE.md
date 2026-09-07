@@ -144,6 +144,41 @@ $CODEX_HOME/guardrail/bin/prune-codex-runtime-cache --dry-run --max-age 30
 $CODEX_HOME/guardrail/bin/prune-codex-runtime-cache --apply --max-age 30
 ```
 
+## 更新已安裝的 Codex marketplace／plugin
+
+已用 `marketplace add` 註冊過來源的環境，若要切到另一個 ref（例如新發布的
+tag），`marketplace add` 會直接報錯拒絕（`marketplace 'xxx' is already added
+from a different source; remove it before adding this source`）；`codex plugin`
+也沒有 `update` 子指令。已驗證可行的更新序列如下：
+
+```bash
+# 1. 移除舊來源，改註冊到新 ref
+codex plugin marketplace remove ai-guardrail-kit
+codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git \
+  --ref vX.Y.Z --sparse .agents --sparse codex/plugins
+
+# 2. 確保 marketplace 快照確實刷新
+codex plugin marketplace upgrade ai-guardrail-kit
+
+# 3. 重新安裝 loader plugin（無 update 子指令，remove 後重新 add）
+codex plugin remove ai-guardrail-loader@ai-guardrail-kit
+codex plugin add ai-guardrail-loader@ai-guardrail-kit
+
+# 4. 查出新的 <plugin-directory>（source.path 欄位）
+codex plugin list --json
+
+# 5. 用 --update 重新部署 loader 到 $CODEX_HOME/guardrail/bin
+<plugin-directory>/hooks/install-codex-guardrail-loader --plugin-root <plugin-directory> --update
+
+# 6. 用 --update 強制重抓 manifest/archive，釘在新 ref
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/select-codex-mode" --update <mode> --scope project --ref vX.Y.Z /path/to/project
+"$guardrail_bin/verify-codex-mode" <mode> --scope project /path/to/project
+```
+
+完成後在 Codex 輸入 `/hooks` 重新信任更新後的 hook，並開新的 Codex thread／session
+讓變更生效。
+
 ## 釘版本與發版
 
 從 GitHub 註冊 Codex marketplace 時，以 `--ref` 選擇來源快照：
