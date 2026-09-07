@@ -8,6 +8,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-07
+
 ### Fixed
 
 - Codex `ai-guardrail-loader` 的 runtime cache 完整性驗證（`verify_cache`）不再
