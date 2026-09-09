@@ -144,6 +144,58 @@ loader 從 Codex event 的 `cwd` 找最近含 selector 的 project root，依 pr
 不安裝或移除 integrated-harness mode plugin。`--remove` 不刪除個人
 `orchestration-policy.md`，也不影響 project/local selector 或 unrelated hooks/plugins。
 
+## Complete uninstall
+
+`select-codex-mode --remove` 只移除指定 scope 的 selector；全域 loader、其 hooks 與
+runtime manager 仍會存在。要完整移除本產品的執行路徑，請依序完成下列步驟：
+
+全域 loader 已安裝時，優先使用一鍵命令。未帶 `--confirm` 僅輸出受管 selector 與預計
+動作，不會變更任何檔案；`--prune-cache` 是顯式選用的 cache 清理。
+
+```bash
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/uninstall-codex-guardrail"
+"$guardrail_bin/uninstall-codex-guardrail" --confirm --prune-cache
+```
+
+On Windows PowerShell, run the deployed manager directly instead of a Bash wrapper:
+
+```powershell
+$codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE '.codex' }
+$manager = Join-Path $codexHome 'guardrail\bin\codex-runtime-manager.py'
+py -3 $manager uninstall
+py -3 $manager uninstall --confirm --prune-cache
+```
+
+它會移除 registry 中的 project／local selector、固定位置的 user fallback、loader plugin、
+受管 hooks 與 marketplace registration，但保留個人 policy 及 unrelated hooks。需要逐步
+處理或 loader 尚未部署時，再使用下列手動程序：
+
+1. 對每一個曾設定的專案移除 `project` 與 `local` selector，並移除 `user` fallback。
+2. 在 marketplace 尚未移除、`<plugin-directory>` 仍可取得時卸載 loader。
+3. 最後移除 marketplace registration。
+
+```bash
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/select-codex-mode" --remove --scope project /path/to/project
+"$guardrail_bin/select-codex-mode" --remove --scope local /path/to/project
+"$guardrail_bin/select-codex-mode" --remove --scope user
+
+# 以 codex plugin list --json 找出 <plugin-directory>
+<plugin-directory>/hooks/install-codex-guardrail-loader --plugin-root <plugin-directory> --remove
+codex plugin marketplace remove ai-guardrail-kit
+```
+
+loader 會拒絕在任何已登錄 selector 仍引用 runtime 時卸載。遇到此錯誤時，請從對應專案
+用 selector 指令移除設定；不要直接刪除 selector registry 或 hooks 設定來規避保護。
+`--remove` 只移除本專案管理的 loader plugin、hooks 和 `$CODEX_HOME/guardrail/bin` 工具，
+不會刪除 runtime cache 或個人 `orchestration-policy.md`。如需清除未引用的 cache，請在
+loader 仍可使用時先執行下列命令；policy 則應由使用者依自身內容決定是否保留。
+
+```bash
+"$guardrail_bin/prune-codex-runtime-cache" --apply --max-age 0
+```
+
 ## Migration and rollback
 
 selector 會辨識舊 TOML marker、local/user hook marker 與 legacy global marker。只有

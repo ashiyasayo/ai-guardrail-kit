@@ -878,6 +878,23 @@ def _run_codex_plugin(action: str) -> None:
         raise _error("E_HOOK_FAILED", "Codex plugin operation failed")
 
 
+def _remove_codex_marketplace() -> None:
+    codex = shutil.which("codex")
+    if not codex:
+        raise _error("E_HOOK_FAILED", "Codex CLI is unavailable")
+    command = [codex, "plugin", "marketplace", "remove", "ai-guardrail-kit"]
+    if os.name == "nt" and Path(codex).suffix.lower() not in (".exe", ".cmd", ".bat"):
+        bash = shutil.which("bash")
+        if bash:
+            command = [bash, codex, "plugin", "marketplace", "remove", "ai-guardrail-kit"]
+    try:
+        result = subprocess.run(command, capture_output=True, timeout=30, shell=False)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise _error("E_HOOK_FAILED", "Codex marketplace operation failed") from exc
+    if result.returncode != 0:
+        raise _error("E_HOOK_FAILED", "Codex marketplace operation failed")
+
+
 def install_loader(repo: Optional[Path], plugin_root: Optional[Path], update: bool = False, remove: bool = False) -> None:
     home = codex_home()
     root = home / "guardrail" / "loader"
@@ -886,11 +903,11 @@ def install_loader(repo: Optional[Path], plugin_root: Optional[Path], update: bo
     current = root / "current.json"
     hooks = home / "hooks.json"
     plugin = plugin_root or (repo / "codex" / "plugins" / "ai-guardrail-loader" if repo else None)
-    if plugin is None:
+    if plugin is None and not remove:
         raise _error("E_RUNTIME_MISSING", "loader plugin root is unavailable")
-    source_loader = plugin / "hooks" / "loader.py"
-    source_manager = plugin / "hooks" / "manager.py"
-    if not source_manager.is_file() and repo:
+    source_loader = plugin / "hooks" / "loader.py" if plugin else None
+    source_manager = plugin / "hooks" / "manager.py" if plugin else None
+    if source_manager is not None and not source_manager.is_file() and repo:
         source_manager = repo / "scripts" / "codex-runtime-manager.py"
     bin_dir = home / "guardrail" / "bin"
     release = root / "releases" / LOADER_VERSION
@@ -898,7 +915,7 @@ def install_loader(repo: Optional[Path], plugin_root: Optional[Path], update: bo
         release / "loader.py", release / "manager.py", stable, stable_manager, current,
         bin_dir / "select-codex-mode", bin_dir / "verify-codex-mode",
         bin_dir / "install-codex-guardrail-loader", bin_dir / "prune-codex-runtime-cache",
-        bin_dir / "codex-runtime-manager.py", hooks,
+        bin_dir / "uninstall-codex-guardrail", bin_dir / "codex-runtime-manager.py", hooks,
     ]
     snapshots: Dict[Path, Optional[Tuple[bytes, int]]] = {}
     for path in managed_paths:
@@ -934,7 +951,7 @@ def install_loader(repo: Optional[Path], plugin_root: Optional[Path], update: bo
             for path in (current, stable, stable_manager, release / "loader.py", release / "manager.py",
                          bin_dir / "select-codex-mode", bin_dir / "verify-codex-mode",
                          bin_dir / "install-codex-guardrail-loader", bin_dir / "prune-codex-runtime-cache",
-                         bin_dir / "codex-runtime-manager.py"):
+                         bin_dir / "uninstall-codex-guardrail", bin_dir / "codex-runtime-manager.py"):
                 _remove_managed_file(path)
         except BaseException as error:
             try:
@@ -945,7 +962,7 @@ def install_loader(repo: Optional[Path], plugin_root: Optional[Path], update: bo
                 raise _error("E_ROLLBACK_FAILED", "loader uninstall rollback failed") from rollback
             raise error
         return
-    if not source_loader.is_file() or not source_manager.is_file():
+    if source_loader is None or source_manager is None or not source_loader.is_file() or not source_manager.is_file():
         raise _error("E_RUNTIME_MISSING", "loader sources are unavailable")
     try:
         _safe_path(root, parent=True)
@@ -965,7 +982,7 @@ def install_loader(repo: Optional[Path], plugin_root: Optional[Path], update: bo
         if bin_dir.is_symlink() or not bin_dir.is_dir():
             raise _error("E_SCOPE_UNSAFE", "loader bin directory is not real")
         for name in ("select-codex-mode", "verify-codex-mode", "install-codex-guardrail-loader",
-                     "prune-codex-runtime-cache"):
+                     "prune-codex-runtime-cache", "uninstall-codex-guardrail"):
             source = plugin / "hooks" / name
             if source.is_file():
                 _atomic_write(bin_dir / name, source.read_bytes(), 0o755)
@@ -1487,6 +1504,104 @@ def remove_selection(args: argparse.Namespace) -> None:
         raise _error("E_SCOPE_UNSAFE", "selector removal transaction failed") from exc
 
 
+def _uninstall_selector_targets(store: RuntimeStore) -> List[Tuple[Path, str]]:
+    """只接受 registry 記錄的 project/local selector，避免刪除猜測出的專案檔案。"""
+    targets: List[Tuple[Path, str]] = []
+    seen: set = set()
+    for item in _read_selector_registry(store):
+        scope = item["scope"]
+        path = Path(item["path"])
+        if scope == "user":
+            expected = store.selector_path("user", Path.cwd())
+        else:
+            if path.parent.name != "guardrail" or path.parent.parent.name != ".codex":
+                raise _error("E_CACHE_CORRUPT", "selector registry path is invalid")
+            expected = store.selector_path(scope, path.parent.parent.parent)
+        if path.resolve(strict=False) != expected.resolve(strict=False):
+            raise _error("E_CACHE_CORRUPT", "selector registry path does not match scope")
+        key = str(path.resolve(strict=False))
+        if key not in seen:
+            targets.append((path, scope))
+            seen.add(key)
+
+    # user selector 位於固定的 CODEX_HOME；即使舊版 registry 遺失，也不能遺留可生效的 fallback。
+    user_path = store.selector_path("user", Path.cwd())
+    user_key = str(user_path.resolve(strict=False))
+    if (user_path.exists() or user_path.is_symlink()) and user_key not in seen:
+        targets.append((user_path, "user"))
+    return targets
+
+
+def uninstall_guardrail(confirm: bool, prune: bool) -> None:
+    store = RuntimeStore(codex_home())
+    targets = _uninstall_selector_targets(store)
+    display_targets = ["%s (%s)" % (path, scope) for path, scope in targets]
+    if not confirm:
+        print("Would remove %d managed Codex selector(s):" % len(display_targets))
+        for target in display_targets:
+            print("  " + target)
+        print("Would then remove the loader plugin, managed hooks, and ai-guardrail-kit marketplace.")
+        if prune:
+            print("Would also prune unreferenced runtime cache entries.")
+        print("Re-run with --confirm to apply; personal orchestration policy is preserved.")
+        return
+
+    old_registry = snapshot_managed_file(store.selector_registry)
+    snapshots: Dict[Path, Optional[bytes]] = {}
+
+    def restore_selectors() -> None:
+        for path, content in snapshots.items():
+            if content is not None:
+                _atomic_write(path, content)
+        if old_registry is not None:
+            _atomic_write(store.selector_registry, old_registry)
+
+    try:
+        for path, scope in targets:
+            if not (path.exists() or path.is_symlink()):
+                continue
+            _safe_path(path)
+            if path.is_dir():
+                raise _error("E_SCOPE_UNSAFE", "selector is a directory")
+            # 確認 registry 和 selector 的內容仍一致，再刪除專案層檔案。
+            data = _load_selector(store, path, scope)
+            if scope in ("project", "local") and not _is_registered_selector(
+                    store, path, scope, data["identity"]["archive_sha256"]):
+                raise _error("E_CACHE_CORRUPT", "selector is not registered")
+            snapshots[path] = _read_regular_bytes(path)
+        for path in snapshots:
+            path.unlink()
+        _remove_managed_file(store.selector_registry)
+    except BaseException as exc:
+        try:
+            restore_selectors()
+        except BaseException as rollback:
+            raise _error("E_ROLLBACK_FAILED", "one-click selector removal rollback failed") from rollback
+        if isinstance(exc, ManagerError):
+            raise exc
+        raise _error("E_SCOPE_UNSAFE", "one-click selector removal failed") from exc
+
+    # install_loader 的 remove 路徑不讀 plugin payload，避免 marketplace plugin 來源成為卸載前提。
+    try:
+        install_loader(None, None, remove=True)
+    except BaseException:
+        try:
+            restore_selectors()
+        except BaseException as rollback:
+            raise _error("E_ROLLBACK_FAILED", "one-click loader removal rollback failed") from rollback
+        raise
+    try:
+        _remove_codex_marketplace()
+    except ManagerError as error:
+        # loader 已成功移除，回復 selector 只會留下指向不存在 loader 的不一致狀態。
+        raise _error("E_HOOK_FAILED", "guardrail removed but marketplace removal failed") from error
+    if prune:
+        removed = prune_cache(store, 0, dry_run=False)
+        print("Pruned %d unreferenced Codex runtime cache entr%s" %
+              (len(removed), "y" if len(removed) == 1 else "ies"))
+    print("Removed Codex guardrail selectors, loader, and marketplace; personal policy was preserved.")
+
+
 def _verified_cache_candidate(store: RuntimeStore, candidate: Path) -> Optional[Dict[str, Any]]:
     try:
         metadata = _read_json(candidate / "runtime.json")
@@ -1603,6 +1718,9 @@ def parser() -> argparse.ArgumentParser:
     loader.add_argument("--plugin-root")
     loader.add_argument("--update", action="store_true")
     loader.add_argument("--remove", action="store_true")
+    uninstall = sub.add_parser("uninstall")
+    uninstall.add_argument("--confirm", action="store_true")
+    uninstall.add_argument("--prune-cache", action="store_true")
     prune = sub.add_parser("prune")
     prune.add_argument("--codex-home")
     prune.add_argument("--max-age", type=float, default=30.0)
@@ -1689,6 +1807,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             plugin_root = Path(args.plugin_root).resolve(strict=True) if args.plugin_root else None
             install_loader(repo, plugin_root, update=args.update, remove=args.remove)
             print("Installed Codex guardrail loader" if not args.remove else "Removed Codex guardrail loader")
+            return 0
+        if args.command == "uninstall":
+            uninstall_guardrail(args.confirm, args.prune_cache)
             return 0
         if args.command == "prune":
             if args.codex_home:

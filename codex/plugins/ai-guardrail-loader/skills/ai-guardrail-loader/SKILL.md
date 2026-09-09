@@ -16,3 +16,17 @@ The selector syntax accepts an optional `[project-dir]`. Provide it for
 `project` or `local` scope; for `user` scope, omit it to use the current
 directory as command context while writing the global user fallback. Start a
 new thread after switching modes.
+
+To remove the whole guardrail installation, use the global one-click command.
+Without `--confirm` it only lists managed selectors; `--prune-cache` is opt-in
+and removes only unreferenced runtime cache entries. Personal policy and
+unrelated hooks are preserved.
+
+```bash
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/uninstall-codex-guardrail"
+"$guardrail_bin/uninstall-codex-guardrail" --confirm --prune-cache
+```
+
+On Windows PowerShell, invoke `$CODEX_HOME/guardrail/bin/codex-runtime-manager.py`
+with `uninstall` (and then `--confirm`) using `py -3` or Python 3.9+.

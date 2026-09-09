@@ -6,4 +6,5 @@ cmp -s "$root/scripts/select-codex-mode" "$root/codex/plugins/ai-guardrail-loade
 cmp -s "$root/scripts/verify-codex-mode" "$root/codex/plugins/ai-guardrail-loader/hooks/verify-codex-mode"
 cmp -s "$root/scripts/install-codex-guardrail-loader" "$root/codex/plugins/ai-guardrail-loader/hooks/install-codex-guardrail-loader"
 cmp -s "$root/scripts/prune-codex-runtime-cache" "$root/codex/plugins/ai-guardrail-loader/hooks/prune-codex-runtime-cache"
+cmp -s "$root/scripts/uninstall-codex-guardrail" "$root/codex/plugins/ai-guardrail-loader/hooks/uninstall-codex-guardrail"
 printf 'PASS: Codex loader bootstrap copies\n'
