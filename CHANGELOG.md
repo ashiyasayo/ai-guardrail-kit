@@ -6,7 +6,7 @@ All notable changes to this project are documented in this file.
 發布座標是 Git tag `vX.Y.Z`；Claude plugin 的 `plugin.json` 版號是該模式自身的
 行為版本，不等於 repo 版本。
 
-## [Unreleased]
+## [0.7.0] - 2026-09-09
 
 ### Added
 
