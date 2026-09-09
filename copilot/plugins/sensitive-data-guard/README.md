@@ -113,6 +113,19 @@ copilot/plugins/sensitive-data-guard/
 
 ---
 
+## 解除安裝
+
+先關閉 VS Code，從目標專案 `.github/hooks/` 只刪除本模式複製的
+`sensitive-data-guard.json`、`launch.ps1`、`launch.sh`、`sensitive_data_guard.py`、
+`block_pii_prompt.py`、`block_secrets.py`、`pii_patterns.py` 與 `hook_protocol.py`。
+不要直接刪除整個 `.github/hooks/`，因為它可能也含專案自己的 hook 或另一套整合。
+
+只有在 `.github/hooks` 已沒有其他自訂 hook 時，才可選擇從 VS Code 設定移除
+`chat.hookFilesLocations[".github/hooks"]` 或停用 `chat.useCustomAgentHooks`；否則保留設定。
+Reload Window 後以 Copilot `/hooks` 確認 `PreToolUse` 和 `UserPromptSubmit` hook 已卸載。
+
+---
+
 ## 運作原理
 
 - **兩個事件**：`PreToolUse` 執行憑證檢查後執行個資檢查，任一命中即 deny；

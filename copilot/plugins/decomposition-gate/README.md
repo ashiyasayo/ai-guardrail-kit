@@ -96,6 +96,20 @@ copilot/plugins/decomposition-gate/
 
 ---
 
+## 解除安裝
+
+先關閉 VS Code，從目標專案 `.github/hooks/` 只刪除本模式複製的
+`decomposition-gate.json`、`launch.ps1`、`launch.sh`、`decomposition_gate.py` 與
+`hook_protocol.py`；只有在確認沒有其他用途時，才刪除
+`.github/guardrail/plan/decomposition.template.md`。不要刪除整個 `.github/hooks/`、
+`.github/guardrail/` 或已填寫的 `decomposition.md`，它們可能含其他自訂 hook 或專案成果。
+
+若 `.github/hooks` 已不含任何其他自訂 hook，才可選擇從 VS Code 設定移除
+`chat.hookFilesLocations[".github/hooks"]` 或停用 `chat.useCustomAgentHooks`；否則保留設定。
+Reload Window 後以 Copilot `/hooks` 確認此模式不再載入。
+
+---
+
 ## 使用流程
 
 1. 開始新任務。Copilot 若嘗試寫入（建檔 / 編輯 / 執行終端機），會被 deny，

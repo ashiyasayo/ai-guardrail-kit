@@ -104,6 +104,18 @@ cp your-project/.claude/plan/decomposition.template.md \
 
 在 Claude Code 使用 `/hooks` 確認三支 PreToolUse hook 已載入。
 
+## 解除安裝
+
+先關閉 Claude Code，從 `.claude/settings.json` 移除本方案加入的 `guard.py`、
+`block_pii_prompt.py` 與 `inject_protocol.py` hook command。只刪除確認由本方案複製、且
+未自行修改的 `.claude/hooks/` 內 guard、plan、PII、憑證、危險命令、核准與協定 hook，
+以及 `.claude/reasoning-protocol*.md`、`.claude/orchestration-policy.md`、
+`.claude/plan/decomposition.template.md`、`CLAUDE.md` 與 `ORCHESTRATOR.md`。
+
+不得直接刪除整個 `.claude/`、共用 `settings.json`、`.claude/.plan_approved` 或已填寫的
+`.claude/plan/decomposition.md`。若政策、設定或文件已由專案維護者修改／合併，應保留檔案
+並只移除本方案段落。重新開啟 Claude Code 後，以 `/hooks` 確認相關 hook 已不再載入。
+
 ## 安全設計
 
 - 所有 deny 均使用結構化 `hookSpecificOutput.permissionDecision` 回覆。
