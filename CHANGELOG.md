@@ -6,16 +6,23 @@ All notable changes to this project are documented in this file.
 發布座標是 Git tag `vX.Y.Z`；Claude plugin 的 `plugin.json` 版號是該模式自身的
 行為版本，不等於 repo 版本。
 
-## [Unreleased]
+## [0.7.0] - 2026-09-09
 
 ### Added
 
+- 新增 Codex `uninstall-codex-guardrail` 一鍵解除安裝入口。預設僅列出會受影響的受管
+  selector，必須明確指定 `--confirm` 才移除 selector、loader、受管 hooks 與 marketplace；
+  `--prune-cache` 才會額外清除未引用 runtime cache，個人 policy 與無關 hooks 一律保留。
 - 新增開發者便利腳本 `scripts/refresh-codex-guardrail-ref`，把「切換 Codex
   marketplace／loader plugin 到新 ref」原本要手動執行的 marketplace
   remove/add、plugin remove/add、`install-codex-guardrail-loader --update`
   五個步驟收成一行指令。僅封裝既有 `codex` CLI 呼叫，不引入新的信任邊界；
   僅適用於已有本機 checkout 的情境，不經 checkout 的手動序列仍保留在
   `CLI_REFERENCE.md`。
+- 補齊 Claude、Codex 與 copy-in 發佈型態的解除安裝說明。Codex 現明確要求依序移除
+  所有 selector、在 marketplace 尚存在時卸載 loader、最後移除 marketplace，避免受管
+  hooks 與全域工具殘留；copy-in 說明則明確要求只移除本套件加入的 entries／檔案，保留
+  使用者既有設定。
 
 ## [0.6.1] - 2026-09-07
 

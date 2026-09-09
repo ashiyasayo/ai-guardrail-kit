@@ -349,8 +349,49 @@ runtime archive 會先驗證 SHA-256，再安裝到 content-addressed cache，Co
 ```bash
 guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
 "$guardrail_bin/select-codex-mode" --remove --scope project /path/to/project
+```
+
+完整解除安裝必須先移除每個仍在使用的 `project`／`local` selector，以及 `user`
+fallback；只移除其中一個 project selector 不會卸載全域 loader。確認全部 selector
+均已移除後，**仍可存取 plugin 目錄時**執行 loader 的 `--remove`，最後才移除
+marketplace：
+
+較建議使用全域 loader 安裝的單一命令。第一次執行只列出會移除的受管 selector；確認
+範圍後才加上 `--confirm`。`--prune-cache` 是選用項，會一併刪除未引用的 runtime cache。
+
+```bash
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/uninstall-codex-guardrail"
+"$guardrail_bin/uninstall-codex-guardrail" --confirm --prune-cache
+```
+
+Windows PowerShell 可直接呼叫已部署的 Python manager，不需要 Git Bash 或 WSL：
+
+```powershell
+$codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE '.codex' }
+$manager = Join-Path $codexHome 'guardrail\bin\codex-runtime-manager.py'
+py -3 $manager uninstall
+py -3 $manager uninstall --confirm --prune-cache
+```
+
+沒有全域 loader 時，才使用下列手動程序：
+
+```bash
+# 針對每個曾設定的專案重複執行；user scope 不需要 project path
+"$guardrail_bin/select-codex-mode" --remove --scope project /path/to/project
+"$guardrail_bin/select-codex-mode" --remove --scope local /path/to/project
+"$guardrail_bin/select-codex-mode" --remove --scope user
+
+# <plugin-directory> 必須先由 codex plugin list --json 查得，且仍保留在本機
+<plugin-directory>/hooks/install-codex-guardrail-loader --plugin-root <plugin-directory> --remove
 codex plugin marketplace remove ai-guardrail-kit
 ```
+
+loader 卸載會先掃描已登錄 selector；若回報仍被 selector 引用，請回到對應專案移除
+selector，**不要**手動刪除 `$CODEX_HOME/guardrail/selector-index.json` 或 `hooks.json`
+來繞過檢查。`--remove` 會移除 loader plugin、受管 hooks 與全域管理工具，但刻意保留
+runtime cache 和個人 orchestration policy；若也要清除未引用 cache，請在卸載 loader
+**前**執行下方的 prune 指令。個人 policy 是否刪除應由使用者自行決定。
 
 清理未引用的 runtime cache 時，先預覽再明確套用：
 
@@ -372,6 +413,18 @@ $CODEX_HOME/guardrail/bin/prune-codex-runtime-cache --apply --max-age 30
 既有個人政策檔 `~/.codex/guardrail/orchestration-policy.md` 不會被自動刪除，
 需自行決定是否保留或手動刪除。完整行為見
 [`docs/codex-marketplace.md`](docs/codex-marketplace.md)。
+
+### copy-in（Claude Code／GitHub Copilot）
+
+copy-in 沒有可安全推測來源的全域 installer：目標專案可能已在相同目錄放入自己的
+hooks 或設定。因此解除安裝時，先關閉 Claude Code／VS Code，從設定檔移除**本套件加入的
+hook command／hook JSON entry**，再只刪除你當初複製的檔案；不要直接刪除整個
+`.claude/`、`.github/hooks/` 或共用設定檔。若曾修改複製後的檔案，先備份或比對再刪除。
+
+Claude copy-in 的各模式 README 列出其精確檔案清單與保留項目；Copilot 則請依所選模式的
+plugin README 移除對應 `.github/hooks/` 檔案。若 `.github/hooks` 已沒有任何其他自訂
+hook，才可選擇在 VS Code 設定移除 `chat.hookFilesLocations[".github/hooks"]` 或停用
+`chat.useCustomAgentHooks`，然後 Reload Window 並以 `/hooks` 確認不再載入。
 
 ### copy-in（複製即用）安裝
 

@@ -127,6 +127,31 @@ verification; direct native commands such as `claude plugin install`,
 `uninstall`, `enable`, or `disable` bypass selector mutual exclusion and can
 leave conflicting managed modes across scopes.
 
+## Uninstall
+
+For a repository-selector installation, run the selector removal and verifier from a checkout
+registered as the marketplace source, then start a new Claude Code session. The selector removes
+all managed modes it finds across `project`, `local`, and `user` scopes; it preserves unrelated
+plugins.
+
+```bash
+./scripts/select-claude-mode --remove --scope project /path/to/project
+./scripts/verify-claude-mode --no-managed-mode /path/to/project
+claude plugin marketplace remove ai-guardrail-kit
+```
+
+For a native user-scope installation, remove the exact installed mode with the native CLI before
+removing its marketplace registration:
+
+```bash
+claude plugin uninstall integrated-harness@ai-guardrail-kit --scope user
+claude plugin marketplace remove ai-guardrail-kit
+```
+
+Copy-in distributions are not marketplace plugins. Remove only the copied hook entries and files
+identified by that mode's top-level README; never delete a whole `.claude/` directory or merge-owned
+settings file that may contain the project's own configuration.
+
 ## Compatibility and security boundary
 
 The marketplace is additive. The existing top-level `decomposition-gate/`,

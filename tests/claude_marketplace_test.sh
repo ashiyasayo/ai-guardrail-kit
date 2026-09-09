@@ -137,6 +137,7 @@ required_documentation = {
     "./scripts/select-claude-mode integrated-harness --scope user .": "user selection",
     "./scripts/verify-claude-mode decomposition-gate .": "verification",
     "./scripts/select-claude-mode --remove --scope project .": "removal",
+    "claude plugin uninstall integrated-harness@ai-guardrail-kit --scope user": "native user removal",
 }
 for text, purpose in required_documentation.items():
     assert text in guide, f"missing {purpose}: {text}"
@@ -151,6 +152,7 @@ coupled_requirements = {
     r"existing top-level `decomposition-gate/`,\s+`harness/`, and `integrated-harness/` copy-in distributions remain supported": "specific copy-in compatibility",
     r"native commands bypass the selector's package source validation,\s+mutual-exclusion, and rollback boundary": "native user-scope boundary",
     r"direct native commands such as `claude plugin install`,\s+`uninstall`, `enable`, or `disable` bypass selector mutual exclusion": "specific native CLI bypass",
+    r"## Uninstall": "uninstall section",
 }
 for pattern, purpose in coupled_requirements.items():
     assert re.search(pattern, guide), f"missing coupled requirement: {purpose}"

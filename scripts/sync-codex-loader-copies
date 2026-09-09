@@ -14,11 +14,12 @@ for pair in \
   "$repo/scripts/select-codex-mode|$repo/codex/plugins/ai-guardrail-loader/hooks/select-codex-mode" \
   "$repo/scripts/verify-codex-mode|$repo/codex/plugins/ai-guardrail-loader/hooks/verify-codex-mode" \
   "$repo/scripts/install-codex-guardrail-loader|$repo/codex/plugins/ai-guardrail-loader/hooks/install-codex-guardrail-loader" \
-  "$repo/scripts/prune-codex-runtime-cache|$repo/codex/plugins/ai-guardrail-loader/hooks/prune-codex-runtime-cache"; do
+  "$repo/scripts/prune-codex-runtime-cache|$repo/codex/plugins/ai-guardrail-loader/hooks/prune-codex-runtime-cache" \
+  "$repo/scripts/uninstall-codex-guardrail|$repo/codex/plugins/ai-guardrail-loader/hooks/uninstall-codex-guardrail"; do
   source_copy=${pair%%|*}
   target_copy=${pair#*|}
-  [[ -f $source_copy && -f $target_copy ]] || { printf 'loader copy is missing\n' >&2; exit 1; }
-  if ! cmp -s "$source_copy" "$target_copy"; then
+  [[ -f $source_copy ]] || { printf 'loader source copy is missing\n' >&2; exit 1; }
+  if [[ ! -f $target_copy ]] || ! cmp -s "$source_copy" "$target_copy"; then
     if [[ $mode == check ]]; then printf 'loader copy is out of sync\n' >&2; exit 1; fi
     cp -p "$source_copy" "$target_copy"
   fi

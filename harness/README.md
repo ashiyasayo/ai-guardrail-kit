@@ -99,6 +99,18 @@ chmod +x your-project/.claude/hooks/*.py
 echo ".claude/.plan_approved" >> your-project/.gitignore
 ```
 
+## 解除安裝
+
+先關閉 Claude Code，從 `.claude/settings.json` 移除指向 `guard.py` 與
+`block_pii_prompt.py` 的 hook command。然後只刪除確認由本方案複製、且未被自行修改的
+`.claude/hooks/guard.py`、`plan_gate.py`、`block_secrets.py`、
+`block_dangerous_commands.py`、`redact_sensitive_info.py`、`block_pii_prompt.py` 與
+`pii_patterns.py`，以及安裝時新增但未合併的 `CLAUDE.md`。
+
+不要刪除整個 `.claude/`、共用 `settings.json`、`.claude/.plan_approved` 或既有計畫檔；
+它們可能屬於專案其他流程。若安裝時是合併設定或文件，只移除本方案的 entries／段落。
+重新開啟 Claude Code 後，以 `/hooks` 確認相關 hook 已卸載。
+
 ## 計畫核准流程（H 章節的實際操作）
 
 1. Opus 提交執行計畫，此時它只有讀取與分析權

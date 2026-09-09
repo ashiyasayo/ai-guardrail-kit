@@ -83,6 +83,20 @@ decomposition-gate/
 
 ---
 
+## 解除安裝
+
+先關閉 Claude Code，從 `.claude/settings.json` 移除本方案加入的 `decomposition_gate.py`
+與 `inject_protocol.py` hook command。接著只刪除確認由本方案複製、且不含自行修改的
+`.claude/hooks/decomposition_gate.py`、`.claude/hooks/inject_protocol.py`、
+`.claude/reasoning-protocol*.md`、`.claude/plan/decomposition.template.md` 與 `CLAUDE.md`。
+
+不要直接刪除整個 `.claude/`、共用 `settings.json`，或使用中／已填寫的
+`.claude/plan/decomposition.md`；它們可能含原專案內容。若安裝時曾合併 `CLAUDE.md` 或
+settings，應只移除屬於本方案的段落。完成後重新開啟 Claude Code，並以 `/hooks` 確認
+相關 hook 已不再載入。
+
+---
+
 ## 使用流程
 
 1. 開始新任務。Claude 若嘗試修改檔案，會被 deny，並收到提示：

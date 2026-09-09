@@ -137,6 +137,68 @@ AI_GUARDRAIL_PYTHON=py "$guardrail_bin/select-codex-mode" harness --scope projec
 wrapper 只管理 loader 與 user fallback；不移除 project/local selector、unrelated
 plugin、hooks 或個人 orchestration policy。
 
+## 完整解除安裝
+
+### Claude Code marketplace
+
+repository selector 會清除找到的全部受管 mode；完成後驗證並開啟新的 Claude Code
+session。若曾以原生 user scope 流程安裝，改以相同 scope 的原生命令移除。
+
+```bash
+./scripts/select-claude-mode --remove --scope project /path/to/project
+./scripts/verify-claude-mode --no-managed-mode /path/to/project
+claude plugin uninstall integrated-harness@ai-guardrail-kit --scope user
+claude plugin marketplace remove ai-guardrail-kit
+```
+
+### Codex loader 與 runtime
+
+優先使用一鍵指令：預設只列出受管 selector；`--confirm` 才執行解除安裝，
+`--prune-cache` 才會刪除未引用 runtime cache。
+
+```bash
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/uninstall-codex-guardrail"
+"$guardrail_bin/uninstall-codex-guardrail" --confirm --prune-cache
+```
+
+Windows PowerShell 請直接使用已部署 manager：
+
+```powershell
+$codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE '.codex' }
+$manager = Join-Path $codexHome 'guardrail\bin\codex-runtime-manager.py'
+py -3 $manager uninstall
+py -3 $manager uninstall --confirm --prune-cache
+```
+
+下列手動流程適用於需要逐步處理的情境：
+
+先對每個已設定的 project／local 專案移除 selector，並移除 user fallback。只有沒有任何
+selector 引用 loader 時，才可執行 loader 卸載；因此必須在移除 marketplace **之前**保留
+`<plugin-directory>`。`--remove` 會移除 loader plugin、受管 hooks 與管理工具，保留 cache
+及個人 policy。
+
+```bash
+guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+"$guardrail_bin/select-codex-mode" --remove --scope project /path/to/project
+"$guardrail_bin/select-codex-mode" --remove --scope local /path/to/project
+"$guardrail_bin/select-codex-mode" --remove --scope user
+
+# 先以 codex plugin list --json 找出 <plugin-directory>
+<plugin-directory>/hooks/install-codex-guardrail-loader --plugin-root <plugin-directory> --remove
+codex plugin marketplace remove ai-guardrail-kit
+```
+
+若 `--remove` 拒絕執行，代表仍有受管理的 selector；請移除該 selector，勿手動刪除
+`selector-index.json` 或 `hooks.json`。需要刪除未引用 runtime cache 時，應在卸載
+loader 前先執行上方的 `prune-codex-runtime-cache --apply`。
+
+### copy-in
+
+Claude Code 與 Copilot 的 copy-in 只可逆轉當初已知的複製：從設定中移除本套件新增的
+hook entries，再刪除相應 README 所列的檔案；不要刪除可能也含其他設定的 `.claude/`、
+`.github/hooks/` 或 settings 檔。完成後重新載入對應 IDE，並以 `/hooks` 確認。
+
 清理未引用 runtime（預設只預覽；`--apply` 才實際刪除）：
 
 ```bash

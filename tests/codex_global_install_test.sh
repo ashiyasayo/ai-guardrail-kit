@@ -8,8 +8,11 @@ mkdir -p "$tmp/bin" "$tmp/home" "$tmp/project/.codex"
 cp "$root/tests/helpers/fake-codex" "$tmp/bin/codex"; chmod +x "$tmp/bin/codex"
 export PATH="$tmp/bin:$PATH" HOME="$tmp/home" CODEX_HOME="$tmp/home/.codex" AI_GUARDRAIL_TEST_STATE="$tmp/state"
 export AI_GUARDRAIL_ALLOW_DEVELOPMENT_SOURCE=1 AI_GUARDRAIL_MANIFEST_PATH="$root/codex/runtime-manifest.json" AI_GUARDRAIL_ARCHIVE_DIR="$root/codex/runtime-archives"
+mkdir -p "$CODEX_HOME"
 printf 'unrelated@elsewhere\n' > "$tmp/state-seed"
 mkdir -p "$AI_GUARDRAIL_TEST_STATE"; cp "$tmp/state-seed" "$AI_GUARDRAIL_TEST_STATE/installed"
+codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref test --sparse .agents --sparse codex/plugins >/dev/null
+printf '%s\n' '{"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"keep-unrelated-hook"}]}]}}' > "$CODEX_HOME/hooks.json"
 
 # 直接從 marketplace plugin 自帶的 hook bootstrap，模擬沒有 repository checkout 的流程。
 "$root/codex/plugins/ai-guardrail-loader/hooks/install-codex-guardrail-loader" --plugin-root "$root/codex/plugins/ai-guardrail-loader" >/dev/null
@@ -47,7 +50,17 @@ if "$root/codex/plugins/ai-guardrail-loader/hooks/install-codex-guardrail-loader
   exit 1
 fi
 grep -Fxq 'ai-guardrail-loader@ai-guardrail-kit' "$AI_GUARDRAIL_TEST_STATE/installed"
-"$root/scripts/select-codex-mode" --remove --scope project "$tmp/project" >/dev/null
-"$root/codex/plugins/ai-guardrail-loader/hooks/install-codex-guardrail-loader" --plugin-root "$root/codex/plugins/ai-guardrail-loader" --remove >/dev/null
+"$root/scripts/select-codex-mode" harness --scope user --source local --ref main "$root" >/dev/null
+"$root/scripts/uninstall-codex-guardrail" > "$tmp/uninstall-preview"
+grep -Fq 'Re-run with --confirm to apply' "$tmp/uninstall-preview"
+grep -Fxq 'ai-guardrail-loader@ai-guardrail-kit' "$AI_GUARDRAIL_TEST_STATE/installed"
+[[ -f "$tmp/project/.codex/guardrail/runtime.json" ]]
+[[ -f "$CODEX_HOME/guardrail/default-runtime.json" ]]
+"$root/scripts/uninstall-codex-guardrail" --confirm >/dev/null
 ! grep -Fxq 'ai-guardrail-loader@ai-guardrail-kit' "$AI_GUARDRAIL_TEST_STATE/installed"
-printf 'PASS: global wrapper manages loader/user fallback only\n'
+[[ ! -f "$AI_GUARDRAIL_TEST_STATE/marketplace.ai-guardrail-kit.url" ]]
+[[ ! -f "$tmp/project/.codex/guardrail/runtime.json" ]]
+[[ ! -f "$CODEX_HOME/guardrail/default-runtime.json" ]]
+grep -Fq 'keep-unrelated-hook' "$CODEX_HOME/hooks.json"
+! grep -Fq 'loader.py' "$CODEX_HOME/hooks.json"
+printf 'PASS: global wrapper and one-click uninstall manage guardrail state only\n'

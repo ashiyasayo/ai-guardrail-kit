@@ -24,7 +24,7 @@ for plugin in data['plugins']:
     assert len(skills)==1
     assert ('new thread' in skills[0].read_text()) if name != 'ai-guardrail-loader' else True
 loader=root/'codex/plugins/ai-guardrail-loader/hooks'
-for name in ('loader.py','manager.py','select-codex-mode','verify-codex-mode','install-codex-guardrail-loader','prune-codex-runtime-cache'):
+for name in ('loader.py','manager.py','select-codex-mode','verify-codex-mode','install-codex-guardrail-loader','prune-codex-runtime-cache','uninstall-codex-guardrail'):
     assert (loader/name).is_file(), name
 manifest=json.loads((root/'codex/runtime-manifest.json').read_text())
 assert manifest['schema_version']==1 and set(manifest['modes'])==set(names[1:])
@@ -35,10 +35,12 @@ for item in manifest['modes'].values():
     assert archive.is_file() and archive.stat().st_size == item['archive_size']
     assert __import__('hashlib').sha256(archive.read_bytes()).hexdigest() == item['archive_sha256']
 guide=(root/'docs/codex-marketplace.md').read_text()
-for needle in ('ai-guardrail-loader@ai-guardrail-kit','runtime.local.json','--offline','E_ARCHIVE_UNSAFE','shell=False','no-checkout','selector-index.json','--apply'):
+for needle in ('ai-guardrail-loader@ai-guardrail-kit','runtime.local.json','--offline','E_ARCHIVE_UNSAFE','shell=False','no-checkout','selector-index.json','--apply','## Complete uninstall','install-codex-guardrail-loader --plugin-root <plugin-directory> --remove','uninstall-codex-guardrail" --confirm --prune-cache'):
     assert needle in guide, needle
 readme=(root/'README.md').read_text()
 assert 'hook 熱路徑' in readme and 'ai-guardrail-loader' in readme
+assert '完整解除安裝必須先移除每個仍在使用的' in readme
+assert '### copy-in（Claude Code／GitHub Copilot）' in readme
 cli_reference=(root/'CLI_REFERENCE.md').read_text()
 for label, document in (('README', readme), ('CLI_REFERENCE', cli_reference), ('marketplace guide', guide)):
     assert re.search(r'\$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX\.Y\.Z\n', document), label
