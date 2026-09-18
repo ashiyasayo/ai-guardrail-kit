@@ -624,9 +624,9 @@ fail-closed 預設與四種模式的跨平台相容測試。
 整合 `decomposition-gate` 的拆解品質檢查與 `harness` 的人類核准及安全 hooks，再加上
 精簡治理政策：`ORCHESTRATOR.md` 不再教導一般任務分解、模型路由或代理調度，只保留
 人類授權、外部副作用、修改範圍、驗收證據、成本與失敗揭露，並附維護說明
-（`MAINTENANCE.md`）。核准以
-`python3 .claude/hooks/approve_plan.py`（Windows 環境無 `python3` 時改用 `python`）
-綁定拆解文件的 SHA-256，並提供
+（`MAINTENANCE.md`）。核准時複製閘門顯示的
+`python3 <approve_plan.py> --project-dir "<專案根目錄>"`（Windows 環境無
+`python3` 時改用 `python`），綁定拆解文件的 SHA-256，並提供
 `strict`／`standard`／`light` 三種核准模式（由人類在政策檔設定，模型不得修改）。政策檔以
 專案 `.claude/orchestration-policy.md` 優先，專案檔不存在時讀取個人層級
 `~/.claude/orchestration-policy.md`，兩處皆無一律回落 `strict`。
