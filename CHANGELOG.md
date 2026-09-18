@@ -8,6 +8,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-09-18
+
 ### Fixed
 
 - Claude `integrated-harness` 的核准指令現會附上明確的 `--project-dir`，

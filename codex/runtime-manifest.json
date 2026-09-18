@@ -3,12 +3,12 @@
   "release": {
     "source": "https://github.com/ashiyasayo/ai-guardrail-kit",
     "ref": "main",
-    "commit": "6f503ad27293c2e8d7fb087db18c1ea9479fa680",
-    "runtime_version": "main+6f503ad2"
+    "commit": "6370c8b57546df3d1fc2c7b35eea1dd9f72b9717",
+    "runtime_version": "main+6370c8b5"
   },
   "modes": {
     "decomposition-gate": {
-      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/6f503ad27293c2e8d7fb087db18c1ea9479fa680/codex/runtime-archives/codex-runtime-decomposition-gate.tar.gz",
+      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/6370c8b57546df3d1fc2c7b35eea1dd9f72b9717/codex/runtime-archives/codex-runtime-decomposition-gate.tar.gz",
       "archive_sha256": "742e09762529d411d581e432fa25a228ee917683e7f9975a3fd025217e779ba5",
       "archive_size": 2341,
       "entrypoints": {
@@ -16,7 +16,7 @@
       }
     },
     "sensitive-data-guard": {
-      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/6f503ad27293c2e8d7fb087db18c1ea9479fa680/codex/runtime-archives/codex-runtime-sensitive-data-guard.tar.gz",
+      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/6370c8b57546df3d1fc2c7b35eea1dd9f72b9717/codex/runtime-archives/codex-runtime-sensitive-data-guard.tar.gz",
       "archive_sha256": "5b825b92a516d2f01a16d151198c4c4e1e8225377f9c32ac572532f41e7ff37a",
       "archive_size": 8509,
       "entrypoints": {
@@ -26,7 +26,7 @@
       }
     },
     "harness": {
-      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/6f503ad27293c2e8d7fb087db18c1ea9479fa680/codex/runtime-archives/codex-runtime-harness.tar.gz",
+      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/6370c8b57546df3d1fc2c7b35eea1dd9f72b9717/codex/runtime-archives/codex-runtime-harness.tar.gz",
       "archive_sha256": "17b065a366872bda971d15a60a2c8cd03d71a40e18a519074d285e63b06da8bb",
       "archive_size": 9279,
       "entrypoints": {
@@ -37,7 +37,7 @@
       }
     },
     "integrated-harness": {
-      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/6f503ad27293c2e8d7fb087db18c1ea9479fa680/codex/runtime-archives/codex-runtime-integrated-harness.tar.gz",
+      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/6370c8b57546df3d1fc2c7b35eea1dd9f72b9717/codex/runtime-archives/codex-runtime-integrated-harness.tar.gz",
       "archive_sha256": "8b838c3bf1c4e24ee9bbb6104f21933cc03cd146a4cf1ed43fa080cf9ee99444",
       "archive_size": 11414,
       "entrypoints": {
