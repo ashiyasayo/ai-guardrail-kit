@@ -372,7 +372,7 @@ with tempfile.TemporaryDirectory() as td:
     denied(ip, event(global_project, "exec_command", {"cmd": "git status"}), "找不到拆解文件")
     policy = guard / "orchestration-policy.md"
     shutil.copy(install / "integrated-harness/orchestration-policy.md", policy)
-    plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】x\n## 允許修改範圍\n- `src/`\n")
+    plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】x\n## 允許修改範圍\n- `src/` — 應用程式\n")
     assert asked(ip, event(project), python_utf8=False)
     first_reason = asked(ip, event(project))
     assert hashlib.sha256(plan.read_bytes()).hexdigest() in first_reason

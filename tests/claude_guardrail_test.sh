@@ -175,7 +175,7 @@ with tempfile.TemporaryDirectory() as td:
     shutil.copy(root / "integrated-harness/.claude/orchestration-policy.md", policy)
     plan.write_text(
         "## 已知資訊\n## 缺少的資訊\n【假設】none\n"
-        "## 允許修改範圍\n- `src/`\n"
+        "## 允許修改範圍\n- `src/` — 應用程式\n"
     )
     strict = assert_pair(
         integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py",

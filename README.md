@@ -630,6 +630,8 @@ fail-closed 預設與四種模式的跨平台相容測試。
 `strict`／`standard`／`light` 三種核准模式（由人類在政策檔設定，模型不得修改）。政策檔以
 專案 `.claude/orchestration-policy.md` 優先，專案檔不存在時讀取個人層級
 `~/.claude/orchestration-policy.md`，兩處皆無一律回落 `strict`。
+`允許修改範圍` 的反引號路徑後可加同行說明，例如
+``- `src/app.py` — 主程式``。
 
 Claude 的 SessionStart 推理協定另採風險分級校準：進度只在重要發現、阻礙或方向改變
 時更新；一般與機械性工作不強制對抗式審查或信心標示；小型工作與單純複核不啟動

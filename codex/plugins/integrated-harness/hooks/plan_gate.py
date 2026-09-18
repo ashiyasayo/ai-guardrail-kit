@@ -24,6 +24,26 @@ def section(text, heading):
         if line.strip().startswith("- "): values.append(line.strip()[2:].strip().strip("`"))
     return values
 
+def scope_section(text):
+    lines = text.splitlines()
+    try: start = lines.index("## 允許修改範圍") + 1
+    except ValueError: return []
+    values = []
+    for line in lines[start:]:
+        if line.startswith("## "): break
+        stripped = line.strip()
+        if not stripped.startswith("- "): continue
+        item = stripped[2:].strip()
+        if item.startswith("`"):
+            closing = item.find("`", 1)
+            if closing < 0 or "`" in item[closing + 1:]:
+                deny("計畫閘門：允許修改範圍的反引號格式無效。")
+            item = item[1:closing].strip()
+        elif "`" in item:
+            deny("計畫閘門：允許修改範圍的反引號格式無效。")
+        values.append(item)
+    return values
+
 def personal_policy_path():
     # Windows 的 Path.home() 不理會 HOME 環境變數，明確優先採用 HOME 以維持跨平台一致
     home = os.environ.get("HOME")
@@ -51,7 +71,7 @@ def plan(root):
 
 def scopes(text, root):
     result = []
-    for raw in section(text, "## 允許修改範圍"):
+    for raw in scope_section(text):
         directory = raw.endswith("/")
         candidate = Path(raw)
         if candidate.is_absolute(): deny("計畫閘門：允許範圍必須是專案相對路徑。")

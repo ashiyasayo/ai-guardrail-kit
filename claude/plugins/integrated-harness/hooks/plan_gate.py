@@ -197,7 +197,16 @@ def parse_scopes(content: str, root: str) -> tuple[list[tuple[str, bool]], str]:
             continue
         if not stripped.startswith("- "):
             return [], "允許修改範圍必須使用 Markdown 清單。"
-        raw = stripped[2:].strip().strip("`")
+        item = stripped[2:].strip()
+        if item.startswith("`"):
+            closing = item.find("`", 1)
+            if closing < 0 or "`" in item[closing + 1:]:
+                return [], "允許修改範圍的反引號格式無效。"
+            raw = item[1:closing].strip()
+        else:
+            if "`" in item:
+                return [], "允許修改範圍的反引號格式無效。"
+            raw = item
         is_directory = raw.endswith("/")
         if not raw or os.path.isabs(raw) or any(char in raw for char in "*?[]"):
             return [], f"無效的允許修改範圍：{raw or '<空白>'}。"

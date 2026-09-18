@@ -101,8 +101,8 @@ write_scoped_plan() {
 ## 假設
 - 【假設】測試只操作暫存目錄。
 ## 允許修改範圍
-- `src/a.py`
-- `tests/fixtures/`
+- `src/a.py` — 主程式
+- `tests/fixtures/`（測試資料）
 EOF
 }
 

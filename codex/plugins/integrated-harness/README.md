@@ -70,3 +70,8 @@ Before any approval decision, `integrated-harness` requires a valid
 explicit allowed-modification scope. It also rejects edits to the plan and
 policy files themselves. Start a new Codex thread after installing, switching,
 or refreshing the plugin so its hooks and skills are reloaded.
+
+Each entry under `## 允許修改範圍` may include a same-line description after
+a backtick-delimited path, for example ``- `src/app.py` — application code``.
+When a description is present, the path must be enclosed in backticks. An
+unquoted entry continues to treat the whole line as the path for compatibility.
