@@ -197,7 +197,16 @@ def parse_scopes(content: str, root: str) -> tuple[list[tuple[str, bool]], str]:
             continue
         if not stripped.startswith("- "):
             return [], "允許修改範圍必須使用 Markdown 清單。"
-        raw = stripped[2:].strip().strip("`")
+        item = stripped[2:].strip()
+        if item.startswith("`"):
+            closing = item.find("`", 1)
+            if closing < 0 or "`" in item[closing + 1:]:
+                return [], "允許修改範圍的反引號格式無效。"
+            raw = item[1:closing].strip()
+        else:
+            if "`" in item:
+                return [], "允許修改範圍的反引號格式無效。"
+            raw = item
         is_directory = raw.endswith("/")
         if not raw or os.path.isabs(raw) or any(char in raw for char in "*?[]"):
             return [], f"無效的允許修改範圍：{raw or '<空白>'}。"
@@ -212,6 +221,13 @@ def parse_scopes(content: str, root: str) -> tuple[list[tuple[str, bool]], str]:
     if not scopes:
         return [], "允許修改範圍至少需要一個路徑。"
     return scopes, ""
+
+
+def human_shell_quote(value: str) -> str:
+    """產生可貼到人類終端的字面參數，避免專案路徑被 shell 解譯。"""
+    if os.name == "nt":
+        return "'" + value.replace("'", "''") + "'"
+    return shlex.quote(value)
 
 
 def target_in_scope(target: str, scopes: list[tuple[str, bool]]) -> bool:
@@ -324,7 +340,15 @@ def check(data: dict) -> Optional[str]:
         return None
     passed, reason = check_approval(root)
     if not passed:
-        return f"計畫閘門：{reason} 請由人類審查計畫後執行 `python3 .claude/hooks/approve_plan.py`。（Windows 環境無 python3 時改用 python）"
+        approve_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "approve_plan.py")
+        command = (
+            f"python3 {human_shell_quote(approve_script)} "
+            f"--project-dir {human_shell_quote(os.path.realpath(root))}"
+        )
+        return (
+            f"計畫閘門：{reason} 請由人類審查計畫後執行 "
+            f"`{command}`。（Windows 環境無 python3 時改用 python）"
+        )
     return None
 
 

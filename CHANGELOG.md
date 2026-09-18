@@ -6,6 +6,19 @@ All notable changes to this project are documented in this file.
 發布座標是 Git tag `vX.Y.Z`；Claude plugin 的 `plugin.json` 版號是該模式自身的
 行為版本，不等於 repo 版本。
 
+## [Unreleased]
+
+## [0.7.1] - 2026-09-18
+
+### Fixed
+
+- Claude `integrated-harness` 的核准指令現會附上明確的 `--project-dir`，
+  `approve_plan.py` 並保留 `CLAUDE_PROJECT_DIR` 與目前目錄 fallback，避免人類終端
+  位於其他目錄時把核准寫到錯誤 workspace。Claude plugin 版號更新為 `0.7.1`。
+- Claude 與 Codex `integrated-harness` 的「允許修改範圍」現支援反引號路徑後的
+  同行說明，例如 ``- `src/app.py` — 主程式``；未加反引號的項目仍將整行視為
+  路徑，維持既有相容性。
+
 ## [0.7.0] - 2026-09-09
 
 ### Added

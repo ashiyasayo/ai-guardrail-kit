@@ -16,6 +16,8 @@ PLAN="$ROOT/.claude/hooks/plan_gate.py"
 SECRET="$ROOT/.claude/hooks/block_secrets.py"
 DANGER="$ROOT/.claude/hooks/block_dangerous_commands.py"
 APPROVE="$ROOT/.claude/hooks/approve_plan.py"
+APPROVAL_SHELL="$WORKDIR/human-shell"
+mkdir -p "$APPROVAL_SHELL"
 pass=0
 fail=0
 
@@ -70,6 +72,13 @@ PY
   fi
 }
 
+approve_plan() {
+  (
+    cd "$APPROVAL_SHELL"
+    env -u CLAUDE_PROJECT_DIR python3 "$APPROVE" --project-dir "$WORKDIR"
+  ) >/dev/null
+}
+
 run_hook() { printf '%s' "$2" | python3 "$1"; }
 
 write_basic_plan() {
@@ -92,8 +101,8 @@ write_scoped_plan() {
 ## 假設
 - 【假設】測試只操作暫存目錄。
 ## 允許修改範圍
-- `src/a.py`
-- `tests/fixtures/`
+- `src/a.py` — 主程式
+- `tests/fixtures/`（測試資料）
 EOF
 }
 
@@ -125,7 +134,7 @@ write_scoped_plan
 out="$(run_hook "$PLAN" '{"tool_name":"Write","tool_input":{"file_path":"src/a.py","content":"x"}}')"
 check_deny "有拆解但未核准仍拒絕" "$out" '尚未取得人類核准'
 
-python3 "$APPROVE" >/dev/null
+approve_plan
 out="$(run_hook "$PLAN" '{"tool_name":"Write","tool_input":{"file_path":"src/a.py","content":"x"}}')"
 check_allow "完整拆解及核准後放行" "$out"
 
@@ -154,7 +163,7 @@ cat > "$WORKDIR/.claude/orchestration-policy.md" <<'EOF'
 EOF
 mkdir -p "$WORKDIR/tests"
 printf '#!/usr/bin/env bash\n' > "$WORKDIR/tests/smoke_test.sh"
-python3 "$APPROVE" >/dev/null
+approve_plan
 
 out="$(run_hook "$PLAN" '{"tool_name":"Bash","tool_input":{"command":"touch output.txt"}}')"
 check_deny "strict 拒絕一般 Bash" "$out" 'strict.*Bash'
@@ -171,7 +180,7 @@ check_allow "strict 放行 tests 目錄腳本" "$out"
 rm -f "$WORKDIR/.claude/.plan_approved"
 out="$(run_hook "$PLAN" '{"tool_name":"Bash","tool_input":{"command":"npm test"}}')"
 check_deny "strict allowlist 命令仍須人工核准" "$out" '尚未取得人類核准'
-python3 "$APPROVE" >/dev/null
+approve_plan
 
 for command in \
   'npm test && touch escaped' \
@@ -214,7 +223,7 @@ check_deny "strict 空 allowlist 時保守拒絕" "$out" '至少需要一個測�
 
 rm -f "$WORKDIR/.claude/.plan_approved"
 cat > "$WORKDIR/.claude/orchestration-policy.md" <<'EOF'
-- 核准模式：standard
+- Approval Mode: standard
 EOF
 out="$(run_hook "$PLAN" '{"tool_name":"Write","tool_input":{"file_path":"src/a.py","content":"x"}}')"
 check_allow "standard 範圍內免人工核准" "$out"
@@ -224,13 +233,13 @@ out="$(run_hook "$PLAN" '{"tool_name":"Bash","tool_input":{"command":"touch outp
 check_allow "standard 計畫通過後放行一般 Bash" "$out"
 
 cat > "$WORKDIR/.claude/orchestration-policy.md" <<'EOF'
-- 核准模式：light
+- Approval Mode: light
 EOF
 out="$(run_hook "$PLAN" '{"tool_name":"Bash","tool_input":{"command":"touch output.txt"}}')"
 check_allow "light 計畫通過後放行一般 Bash" "$out"
 rm -f "$WORKDIR/.claude/orchestration-policy.md"
 
-python3 "$APPROVE" >/dev/null
+approve_plan
 
 out="$(run_hook "$PLAN" '{"tool_name":"Write","tool_input":{"file_path":".claude/.plan_approved","content":"x"}}')"
 check_deny "禁止工具自我核准" "$out"
@@ -252,7 +261,7 @@ check_deny "find 寫入參數不得放行" "$out"
 out="$(run_hook "$PLAN" '{"tool_name":"Bash","tool_input":{"command":"git branch -D main"}}')"
 check_deny "git branch 變更參數不得放行" "$out"
 
-python3 "$APPROVE" >/dev/null
+approve_plan
 out="$(run_hook "$PLAN" '{"tool_name":"Bash","tool_input":{"command":"touch .claude/.plan*"}}')"
 check_deny "禁止 glob 延長核准" "$out"
 
@@ -422,7 +431,7 @@ rm -f "$WORKDIR/.claude/.plan_approved"
 out="$(run_hook "$PLAN" '{"tool_name":"Bash","tool_input":{"command":"lsmalicious"}}')"
 check_deny "命令前綴不誤判為唯讀" "$out"
 
-python3 "$APPROVE" >/dev/null
+approve_plan
 python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["approved_at"]=0; json.dump(d,open(p,"w"))' "$WORKDIR/.claude/.plan_approved"
 out="$(run_hook "$PLAN" '{"tool_name":"Write","tool_input":{"file_path":"src/a.py","content":"x"}}')"
 check_deny "過期核准拒絕寫入" "$out" '超過 60 分鐘'
@@ -482,7 +491,7 @@ check_allow "leading plus 非保護分支放行" "$out"
 
 cat > "$WORKDIR/.claude/orchestration-policy.md" <<'EOF'
 ## 核准模式
-- 核准模式：light
+- Approval Mode: light
 EOF
 out="$(run_hook "$PLAN" '{"tool_name":"Write","tool_input":{"file_path":"src/a.py","content":"x"}}')"
 check_allow "light 模式免核准放行" "$out"

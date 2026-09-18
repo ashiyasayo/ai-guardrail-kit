@@ -19,8 +19,12 @@ permissions 與 hook 支援，不會自動受到同等保護。
 `light`：基本拆解，免人工核准；只提供思考紀律，不提供授權控制。
 缺少本欄位或值無法辨識時，一律視為 `strict`。
 
-`strict` 下由人類執行 `python3 .claude/hooks/approve_plan.py`（Windows 環境無 `python3` 時改用 `python`）；核准紀錄綁定
-目前拆解文件的 SHA-256，有效期間為 60 分鐘。三種模式均不豁免憑證與危險命令 hooks。
+`strict` 下由人類執行閘門顯示的 `approve_plan.py --project-dir "<專案根目錄>"`
+指令（Windows 環境無 `python3` 時改用 `python`）；核准紀錄綁定目前拆解文件的
+SHA-256，有效期間為 60 分鐘。三種模式均不豁免憑證與危險命令 hooks。
+
+`## 允許修改範圍` 的路徑可以反引號包住，並在反引號後加入同行說明；
+未使用反引號時，整個清單項均視為路徑。
 
 下方 allowlist 只允許啟動列出的測試／建置入口；不得包含 pipe、redirect、多命令串接、
 command substitution 或環境變數指派前綴。入口內部仍受 permissions、sandbox 與

@@ -113,7 +113,7 @@ else:
 
 
 with tempfile.TemporaryDirectory() as td:
-    project = Path(td) / "project"
+    project = Path(td) / "project with spaces"
     (project / ".claude/plan").mkdir(parents=True)
 
     legacy_dg = root / "decomposition-gate/.claude/hooks/decomposition_gate.py"
@@ -175,15 +175,49 @@ with tempfile.TemporaryDirectory() as td:
     shutil.copy(root / "integrated-harness/.claude/orchestration-policy.md", policy)
     plan.write_text(
         "## 已知資訊\n## 缺少的資訊\n【假設】none\n"
-        "## 允許修改範圍\n- `src/`\n"
+        "## 允許修改範圍\n- `src/` — 應用程式\n"
     )
     strict = assert_pair(
         integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py",
         event(project), project,
     )
     assert_denied(strict, "尚未取得人類核准")
-    digest = hashlib.sha256(plan.read_bytes()).hexdigest()
+    for gate in (integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py"):
+        denial = run(gate, event(project), project)
+        assert "--project-dir" in (denial.reason or ""), denial
+        assert str(project.resolve()) in (denial.reason or ""), denial
+
+    # 顯式的專案根目錄必須優先於人類終端的 cwd 與繼承環境變數。
     approval = project / ".claude/.plan_approved"
+    elsewhere = Path(td) / "human-shell"
+    elsewhere.mkdir()
+    for approve in (
+        integrated_legacy / "approve_plan.py",
+        integrated_packaged / "approve_plan.py",
+    ):
+        approval.unlink(missing_ok=True)
+        approve_env = os.environ.copy()
+        approve_env["CLAUDE_PROJECT_DIR"] = str(elsewhere)
+        proc = subprocess.run(
+            [sys.executable, str(approve), "--project-dir", str(project.resolve())],
+            cwd=elsewhere, env=approve_env, text=True, capture_output=True,
+        )
+        assert proc.returncode == 0, (approve, proc.stdout, proc.stderr)
+        assert approval.is_file(), (approve, approval)
+
+    # 保留舊用法：在專案根目錄執行時，可不傳 --project-dir。
+    approval.unlink(missing_ok=True)
+    fallback_env = os.environ.copy()
+    fallback_env.pop("CLAUDE_PROJECT_DIR", None)
+    fallback = subprocess.run(
+        [sys.executable, str(integrated_legacy / "approve_plan.py")],
+        cwd=project, env=fallback_env, text=True, capture_output=True,
+    )
+    assert fallback.returncode == 0 and approval.is_file(), (
+        fallback.stdout, fallback.stderr, approval,
+    )
+
+    digest = hashlib.sha256(plan.read_bytes()).hexdigest()
     approval.write_text(json.dumps({"approved_at": time.time(), "plan_sha256": digest}))
     assert_allowed(assert_pair(
         integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py",
