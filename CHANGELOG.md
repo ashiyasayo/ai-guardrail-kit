@@ -8,6 +8,32 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Codex `ai-guardrail-loader` 的 `dispatch()` 在子 hook（實際 entrypoint）以非 0
+  exit code 結束時，`_failure_output` 現會附上觸發的 slot 名稱（例如
+  `pretool.security`／`pretool.pii`／`pretool.plan`），例如
+  `"AI Guardrail unavailable (E_HOOK_FAILED): pretool.security"`；原本這個情境
+  只會回傳固定字串 `"AI Guardrail unavailable (E_HOOK_FAILED)"`，使用者無法從
+  Codex CLI 的錯誤介面判斷是哪一類 hook 出問題。已同步套用到
+  `scripts/codex-runtime-manager.py`（規範來源）與
+  `codex/plugins/ai-guardrail-loader/hooks/manager.py`（發佈副本）。事件過大
+  或事件本身無法解析等更早期的失敗路徑（此時尚未解析出 slot）不受影響。
+
+- Claude `integrated-harness` 在 `strict` 模式下因缺少或過期人工核准而攔截時，
+  攔截訊息現會額外提示可請人類將 `orchestration-policy.md` 的 `Approval Mode`
+  改為 `standard`（仍需拆解與允許修改範圍）或 `light`（僅需拆解），不論被攔截
+  的工具是 `Write`／`Edit`／`Bash` 或委派子代理（`Agent`／`Task`）皆適用；
+  政策檔仍只能由人類編輯，模型無法藉此自行降低核准門檻。
+
+### Fixed
+
+- Claude `harness` 模式（copy-in 與 plugin）的計畫閘門核准提示，現會印出
+  `.claude/.plan_approved` 的完整絕對路徑（並依平台加上殼層引號），取代原本
+  寫死的相對路徑字串 `touch .claude/.plan_approved`；人類或 AI 都能直接複製
+  貼上執行，不需自行在檔案系統中查找核准旗標檔的實際位置。`integrated-harness`
+  模式的 `approve_plan.py` 提示原已輸出完整絕對路徑，不受影響。
+
 ## [0.7.1] - 2026-09-21
 
 ### Fixed

@@ -1224,8 +1224,10 @@ def resolve_runtime(event: Mapping[str, Any], store: RuntimeStore) -> Tuple[Opti
     return None, None, root
 
 
-def _failure_output(event_name: str, code: str) -> bytes:
+def _failure_output(event_name: str, code: str, detail: str = "") -> bytes:
     reason = "AI Guardrail unavailable (" + code + ")"
+    if detail:
+        reason += ": " + detail
     if event_name == "SessionStart":
         return _json_bytes({"hookSpecificOutput": {"hookEventName": event_name, "additionalContext": reason}})
     if event_name == "UserPromptSubmit":
@@ -1282,7 +1284,8 @@ def dispatch(event_bytes: bytes, store: RuntimeStore, process: Optional[HookProc
         if result[1]:
             sys.stdout.buffer.write(result[1])
         if result[0] != 0:
-            raise _error("E_HOOK_FAILED", "runtime hook returned failure")
+            sys.stdout.buffer.write(_failure_output(event_name, "E_HOOK_FAILED", slot))
+            return 0
         return 0
     except ManagerError as error:
         sys.stdout.buffer.write(_failure_output(str(event.get("hook_event_name", "PreToolUse")) if "event" in locals() and isinstance(event, dict) else "PreToolUse", error.code))
