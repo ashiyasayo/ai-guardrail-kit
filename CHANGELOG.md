@@ -8,6 +8,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-09-23
+
 ### Changed
 
 - Codex `ai-guardrail-loader` 的 `dispatch()` 在子 hook（實際 entrypoint）以非 0
