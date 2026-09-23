@@ -172,6 +172,27 @@ with tempfile.TemporaryDirectory() as td:
     assert 'AI_GUARDRAIL_MANIFEST_PATH' not in captured['environment']
     assert 'SHOULD_NOT_LEAK_TOKEN' not in captured['environment']
 
+    # 子程序（實際 hook entrypoint）非 0 結束時，dispatch() 的 fail-closed 輸出
+    # 必須附上觸發的 slot 名稱，方便使用者判斷是哪一類 hook 出問題，而不是只有
+    # 泛用的 "AI Guardrail unavailable (E_HOOK_FAILED)"。
+    class FailingProcess(m.HookProcess):
+        def run(self, python, entrypoint, event, environment):
+            return 1, b'', b'boom'
+    old_slot = os.environ.get('AI_GUARDRAIL_LOADER_SLOT')
+    os.environ['AI_GUARDRAIL_LOADER_SLOT'] = 'pretool.security'
+    captured_stdout = io.BytesIO()
+    old_stdout = sys.stdout
+    sys.stdout = type('X', (), {'buffer': captured_stdout})()
+    try:
+        assert m.dispatch(json.dumps({'cwd': str(project), 'hook_event_name': 'PreToolUse'}).encode(), store, FailingProcess()) == 0
+    finally:
+        sys.stdout = old_stdout
+        if old_slot is None: os.environ.pop('AI_GUARDRAIL_LOADER_SLOT', None)
+        else: os.environ['AI_GUARDRAIL_LOADER_SLOT'] = old_slot
+    failure_output = json.loads(captured_stdout.getvalue())
+    failure_reason = failure_output['hookSpecificOutput']['permissionDecisionReason']
+    assert 'E_HOOK_FAILED' in failure_reason and 'pretool.security' in failure_reason, failure_reason
+
 # AGK-004: 未登錄於受保護 registry 的 project/local selector，即使指向已快取
 # 且完整合法的 runtime，也不得被 resolve_runtime 採用（避免未受信任專案降級
 # 使用者原本期待的防護模式）。

@@ -348,6 +348,10 @@ def check(data: dict) -> Optional[str]:
         return (
             f"計畫閘門：{reason} 請由人類審查計畫後執行 "
             f"`{command}`。（Windows 環境無 python3 時改用 python）"
+            "若不需要每次都人工核准，可請人類將 "
+            f"`{human_shell_quote(exact_path(root, POLICY_PATH))}` 的 "
+            "`Approval Mode` 改為 `standard`（仍需拆解與允許修改範圍）或 "
+            "`light`（僅需拆解）。"
         )
     return None
 

@@ -62,6 +62,13 @@ def get_project_dir() -> str:
     return os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
 
 
+def human_shell_quote(value: str) -> str:
+    """產生可貼到人類終端的字面參數，避免專案路徑被 shell 解譯。"""
+    if os.name == "nt":
+        return "'" + value.replace("'", "''") + "'"
+    return shlex.quote(value)
+
+
 def is_approval_valid(flag_path: str) -> bool:
     """檢查核准旗標檔是否存在且未過期。"""
     if not os.path.isfile(flag_path):
@@ -129,10 +136,11 @@ def check(hook_input: dict) -> Optional[str]:
     if is_approval_valid(flag_path):
         return None
 
+    approval_command = f"touch {human_shell_quote(os.path.realpath(flag_path))}"
     return (
         "計畫閘門：本操作屬寫入性行為，但未偵測到有效的計畫核准。"
         "請先向人類提交執行計畫（任務分解、指派模型、驗收標準、風險點），"
-        "由人類在其終端機執行 `touch .claude/.plan_approved` 核准後方可施作。"
+        f"由人類在其終端機執行 `{approval_command}` 核准後方可施作。"
         f"核准有效期為 {APPROVAL_TTL_SECONDS // 60} 分鐘。"
     )
 

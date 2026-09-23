@@ -500,6 +500,7 @@ SDG 的完整能力已獨立列於上表。
 | `strict` Bash allowlist | — | — | 有；不在清單的一般 Bash 直接拒絕 | — | — | 有；符合清單後仍須原生 `ask` |
 | `standard` 行為 | — | — | 拆解＋範圍，免人工核准 | — | — | 拆解＋範圍，`apply_patch`／`exec_command` 仍原生 `ask` |
 | `light` 行為 | — | — | 只要求基本拆解；免範圍與人工核准 | — | — | 範圍內 `apply_patch` 免 `ask`；`exec_command` 仍 `ask` |
+| 子代理委派（`Agent`／`Task` 等非 Bash、非檔案寫入類工具） | — | — | `plan_gate.py` 依 `tool_name` 攔截，不區分呼叫來源（含 slash command 間接觸發）：不在 `PRE_PLAN_SAFE_TOOLS` 白名單者，`strict` 需拆解文件＋60 分鐘內人工核准才放行；`standard`／`light` 只需拆解文件存在即可放行 | — | — | 同一機制是否涵蓋 Codex 端子代理／委派工具尚未查證，暫缺 |
 | 永久危險命令阻擋 | — | 有 | 有 | — | 有 | 有 |
 | 危險命令涵蓋 | — | 毀滅性刪除、force push、下載即執行、`find -exec`、命令替換等 | 同 H | — | 與 Claude 對齊的 token 化判定＋regex fallback | 同 H |
 | 明文秘密／憑證阻擋 | — | 有 | 有 | — | 有 | 有 |
