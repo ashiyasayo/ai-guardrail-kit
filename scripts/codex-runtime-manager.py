@@ -841,9 +841,9 @@ def _loader_hook_data(path: Path, python: str, action: str) -> Dict[str, Any]:
     if action == "install":
         loader = path.parent / "guardrail" / "loader" / "loader.py"
         specs = [
-            ("PreToolUse", "exec_command|apply_patch", "pretool.decomposition"),
-            ("PreToolUse", "exec_command|apply_patch", "pretool.plan"),
-            ("PreToolUse", "exec_command|apply_patch", "pretool.security"),
+            ("PreToolUse", "^(Bash|exec_command|apply_patch)$", "pretool.decomposition"),
+            ("PreToolUse", "^(Bash|exec_command|apply_patch)$", "pretool.plan"),
+            ("PreToolUse", "^(Bash|exec_command|apply_patch)$", "pretool.security"),
             ("PreToolUse", "apply_patch", "pretool.pii"),
             ("UserPromptSubmit", None, "prompt.pii"),
             ("SessionStart", "startup|resume|clear|compact", "session.start"),
@@ -1264,7 +1264,7 @@ def dispatch(event_bytes: bytes, store: RuntimeStore, process: Optional[HookProc
         event = json.loads(event_bytes.decode("utf-8"))
         if not isinstance(event, dict):
             raise _error("E_HOOK_FAILED", "event is not an object")
-        identity, payload, _ = resolve_runtime(event, store)
+        identity, payload, project = resolve_runtime(event, store)
         if identity is None:
             return 0
         event_name = event.get("hook_event_name")
@@ -1280,6 +1280,8 @@ def dispatch(event_bytes: bytes, store: RuntimeStore, process: Optional[HookProc
         if not entrypoint.is_file() or entrypoint.is_symlink():
             raise _error("E_RUNTIME_MISSING", "verified entrypoint is unavailable")
         environment = _hook_environment(store, identity)
+        environment["AI_GUARDRAIL_PROJECT_ROOT"] = str(project)
+        environment["CODEX_HOME"] = str(store.root.parent)
         result = (process or SubprocessHookProcess()).run(sys.executable, entrypoint, event_bytes, environment)
         if result[1]:
             sys.stdout.buffer.write(result[1])
@@ -1692,6 +1694,57 @@ def verify_selection(args: argparse.Namespace) -> None:
         raise _error("E_CACHE_CORRUPT", "selector mode does not match expectation")
 
 
+def diagnose_selection(args: argparse.Namespace) -> None:
+    """只讀診斷接線與有效 selector；不把本機檢查冒充宿主信任或執行證據。"""
+    store = RuntimeStore(codex_home())
+    project = Path(args.project).resolve(strict=True)
+    verify_selection(args)
+    selected, _ = _selector_identity(store, store.selector_path(args.scope, project), args.scope)
+    effective, _, _ = resolve_runtime({"cwd": str(project)}, store)
+    if effective != selected:
+        raise _error("E_SELECTOR_INACTIVE", "selector is unregistered or shadowed by another scope")
+    if not loader_is_installed(store):
+        raise _error("E_LOADER_MISSING", "install the stable loader before reviewing /hooks")
+    hooks_path = store.root.parent / "hooks.json"
+    data = _read_json(hooks_path)
+    # 安裝時記錄的是該次 Python；診斷不得因目前 interpreter 不同而錯報接線。
+    found: Dict[str, Tuple[str, Any, str]] = {}
+    definitions = data.get("hooks")
+    if not isinstance(definitions, dict):
+        raise _error("E_HOOK_WIRING", "hooks must be an object")
+    for event, rules in definitions.items():
+        if not isinstance(rules, list):
+            raise _error("E_HOOK_WIRING", "hook rules must be an array")
+        for rule in rules:
+            if not isinstance(rule, dict) or not isinstance(rule.get("hooks"), list):
+                raise _error("E_HOOK_WIRING", "invalid hook rule")
+            for handler in rule.get("hooks", []):
+                if not isinstance(handler, dict):
+                    raise _error("E_HOOK_WIRING", "invalid hook handler")
+                command = handler.get("command", "")
+                if not _is_loader_command(command):
+                    continue
+                for slot in SLOTS:
+                    if slot in command:
+                        if slot in found:
+                            raise _error("E_HOOK_WIRING", "duplicate loader slot: " + slot)
+                        found[slot] = (event, rule.get("matcher"), command)
+    for slot in SLOTS:
+        if slot not in found:
+            raise _error("E_HOOK_WIRING", "missing loader slot: " + slot)
+        event, matcher, command = found[slot]
+        expected_event = "PreToolUse" if slot.startswith("pretool.") else ("UserPromptSubmit" if slot == "prompt.pii" else "SessionStart")
+        if event != expected_event or str(store.root / "loader" / "loader.py") not in command:
+            raise _error("E_HOOK_WIRING", "invalid loader event or path: " + slot)
+        expected_matcher = ("apply_patch" if slot == "pretool.pii" else "^(Bash|exec_command|apply_patch)$") if event == "PreToolUse" else (None if event == "UserPromptSubmit" else "startup|resume|clear|compact")
+        if matcher != expected_matcher:
+            raise _error("E_HOOK_WIRING", "outdated matcher; reinstall loader and review /hooks: " + slot)
+    print("PASS: cache, effective selector, loader files and hook wiring")
+    print("UNVERIFIED: host hooks feature, managed-only policy and exact-definition trust; review /hooks in the target client")
+    print("UNVERIFIED: actual host invocation and sandbox permissions; run the opt-in Codex integration test")
+    print("Plan drafts: .guardrail/plan/decomposition.md; installation and protected .codex settings require a human terminal or platform approval")
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="codex-runtime-manager")
     sub = p.add_subparsers(dest="command", required=True)
@@ -1714,6 +1767,14 @@ def parser() -> argparse.ArgumentParser:
     verify.add_argument("--scope", choices=SCOPES, default="project")
     verify.add_argument("--project", default=".")
     verify.add_argument("--offline", action="store_true")
+    verify.add_argument("--diagnose", action="store_true")
+    approve = sub.add_parser("approve")
+    approve.add_argument("--project", default=".")
+    approval_input = approve.add_mutually_exclusive_group(required=True)
+    approval_input.add_argument("--command", dest="operation_command")
+    approval_input.add_argument("--patch-file")
+    approval_input.add_argument("--event-file")
+    approve.add_argument("--confirm")
     dispatch_parser = sub.add_parser("dispatch")
     dispatch_parser.add_argument("--codex-home")
     loader = sub.add_parser("install-loader")
@@ -1798,9 +1859,28 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print("Removed Codex selector (%s)" % args.scope)
             return 0
         if args.command == "verify":
-            verify_selection(args)
-            print("Verified Codex selector (%s)" % args.scope)
+            if args.diagnose:
+                if args.no_managed_mode:
+                    raise _error("E_ARGUMENT", "--diagnose requires an active selector")
+                diagnose_selection(args)
+            else:
+                verify_selection(args)
+                print("Verified Codex selector/cache only (%s); hook trust and host execution are not checked" % args.scope)
             return 0
+        if args.command == "approve":
+            store = RuntimeStore(codex_home())
+            identity, payload, project = resolve_runtime({"cwd": str(Path(args.project).resolve(strict=True))}, store)
+            if identity is None or identity["mode"] not in ("harness", "integrated-harness"):
+                raise _error("E_APPROVAL_MODE", "effective mode does not support operation approvals")
+            helper = payload / "hooks" / "approval.py"
+            if not helper.is_file() or helper.is_symlink():
+                raise _error("E_RUNTIME_MISSING", "update the runtime before using operation approvals")
+            arguments = [sys.executable, "--", str(helper), "--project", str(project), "--mode", identity["mode"]]
+            for field, option in (("operation_command", "--command"), ("patch_file", "--patch-file"), ("event_file", "--event-file"), ("confirm", "--confirm")):
+                value = getattr(args, field)
+                if value is not None:
+                    arguments.extend([option, value])
+            return subprocess.run(arguments, env=_hook_environment(store, identity) | {"CODEX_HOME": str(store.root.parent)}, shell=False).returncode
         if args.command == "dispatch":
             if args.codex_home:
                 os.environ["CODEX_HOME"] = args.codex_home

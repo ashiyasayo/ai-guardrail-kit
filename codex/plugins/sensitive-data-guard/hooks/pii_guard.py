@@ -7,6 +7,7 @@ import sys
 from typing import Any, Dict, List, Optional, Tuple
 
 from pii_patterns import RULES
+from hook_protocol import deny, normalize_event
 
 
 def redact(text: str) -> Tuple[str, List[str]]:
@@ -37,12 +38,14 @@ def prompt_result(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def pre_tool_result(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    event = normalize_event(event)
     tool_input = event.get("tool_input")
     if not isinstance(tool_input, dict):
         return None
     updated = dict(tool_input)
     kinds: List[str] = []
-    for field in ("patch", "content", "new_string", "new_source"):
+    fields = ("command",) if event.get("tool_name") == "apply_patch" else ("patch", "content", "new_string", "new_source")
+    for field in fields:
         value = tool_input.get(field)
         if not isinstance(value, str):
             continue
@@ -65,11 +68,9 @@ def main() -> None:
     try:
         event = json.load(sys.stdin)
     except (OSError, UnicodeError, RecursionError, TypeError, ValueError):
-        print(json.dumps({"continue": False, "stopReason": "Invalid Codex PII hook input"}))
-        return
+        deny("Invalid Codex PII hook input")
     if not isinstance(event, dict):
-        print(json.dumps({"continue": False, "stopReason": "Invalid Codex PII hook input"}))
-        return
+        deny("Invalid Codex PII hook input")
     result = prompt_result(event) if event.get("hook_event_name") == "UserPromptSubmit" else pre_tool_result(event)
     if result is not None:
         print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))

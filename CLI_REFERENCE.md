@@ -110,6 +110,22 @@ Codex 三種 scope 的 selector 如下：`project` 是
 "$guardrail_bin/select-codex-mode" --remove --scope project /path/to/project
 ```
 
+新增 `verify-codex-mode <mode> --scope <scope> --diagnose [project-dir]` 可檢查
+有效 selector、loader 與事件接線；不代表宿主已信任或執行 hooks。
+
+需要核准的操作由人類在自己的終端機審閱，先 preview，再以輸出的 SHA-256 確認：
+
+```bash
+python3 "$guardrail_bin/codex-runtime-manager.py" approve --project /path/to/project --command 'npm test'
+python3 "$guardrail_bin/codex-runtime-manager.py" approve --project /path/to/project --command 'npm test' --confirm <SHA256>
+```
+
+patch 使用 `--patch-file reviewed.diff`；需要額外 tool input 欄位或子目錄 cwd 時使用
+`--event-file reviewed-event.json`（包含 `tool_name`、`tool_input`、`cwd`）。三種輸入擇一。
+只 preview 不會授權；憑證 10 分鐘內限一次匹配操作，計畫、政策、專案、cwd 或輸入變更
+即不匹配。模型不得執行核准指令或取得核准庫的寫入權限。Windows 可用 `py -3`。
+詳見 [Codex 相容性說明](docs/codex-hook-compatibility.md)。
+
 `--source github` 只使用核准 HTTPS origin；`local`／`test` 只在明確 development
 環境變數下可用。`--offline` 僅使用 runtime index 與完整 cache，不連網。`--update`
 才重新取得 manifest；普通重跑保留既有 identity。

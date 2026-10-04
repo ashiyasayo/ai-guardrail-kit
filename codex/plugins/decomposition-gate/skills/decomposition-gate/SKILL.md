@@ -5,7 +5,7 @@ description: Require a valid decomposition artifact before implementation work p
 
 # Decomposition Gate
 
-This workflow gates implementation on `.codex/guardrail/plan/decomposition.md`.
+This workflow gates implementation on `.guardrail/plan/decomposition.md`.
 It is workflow discipline, not authorization or a sandbox. Installation alone
 does not activate plugin hooks.
 

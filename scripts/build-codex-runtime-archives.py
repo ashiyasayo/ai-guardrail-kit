@@ -14,8 +14,8 @@ from typing import Dict, Iterable, List
 MODES = {
     "decomposition-gate": ["decomposition_gate.py", "hook_protocol.py"],
     "sensitive-data-guard": ["block_secrets.py", "pii_guard.py", "pii_patterns.py", "security_checks.py", "hook_protocol.py"],
-    "harness": ["plan_gate.py", "security_guard.py", "pii_guard.py", "pii_patterns.py", "security_checks.py", "hook_protocol.py"],
-    "integrated-harness": ["plan_gate.py", "security_guard.py", "pii_guard.py", "pii_patterns.py", "security_checks.py", "hook_protocol.py", "session_start.py"],
+    "harness": ["plan_gate.py", "approval.py", "security_guard.py", "pii_guard.py", "pii_patterns.py", "security_checks.py", "hook_protocol.py"],
+    "integrated-harness": ["plan_gate.py", "approval.py", "security_guard.py", "pii_guard.py", "pii_patterns.py", "security_checks.py", "hook_protocol.py", "session_start.py"],
 }
 
 

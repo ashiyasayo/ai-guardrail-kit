@@ -15,6 +15,26 @@ All notable changes to this project are documented in this file.
   一併變更的 `plan_gate.py` 核准提示行為。`decomposition-gate`／
   `sensitive-data-guard` 未變更，版號維持不動。
 
+## [0.8.0] - 2026-10-04
+
+### Fixed
+
+- Codex 四模式採官方 `Bash`／`tool_input.command` 事件與 `updatedInput.command`，
+  修正 shell hook 未觸發、patch 誤拒絕及 PII 未改寫；保留無衝突的舊輸入別名。
+- Codex harness／integrated-harness 不再回傳未受支援的 `ask`；改由人類終端機
+  審閱並建立 10 分鐘一次性操作核准，綁定專案、cwd、模式、操作、計畫及政策。
+- Codex 拆解草稿移至工作區 `.guardrail/plan/decomposition.md`，避免要求模型寫入
+  沙箱保護的 `.codex/`。既有計畫須人工遷移；light 模式計畫仍由人類管理。
+- Codex verifier 新增 `--diagnose`，檢查有效 selector 與 loader 接線，明確區分
+  cache 驗證、hook 信任與宿主執行證據；全域安裝器依 runtime manifest 選擇發布 ref。
+  同步更新 loader、runtime archives 與測試。
+
+### Migration
+
+- 更新 loader 與 runtime 後重新 `/hooks` 審閱並開新 thread；既有釘版不會自動更新。
+  核准庫不得授予模型寫入權限，hook 若無法消耗憑證會拒絕操作。詳見
+  `docs/codex-hook-compatibility.md`。
+
 ## [0.7.2] - 2026-09-23
 
 ### Changed

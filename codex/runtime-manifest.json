@@ -2,23 +2,23 @@
   "schema_version": 1,
   "release": {
     "source": "https://github.com/ashiyasayo/ai-guardrail-kit",
-    "ref": "main",
-    "commit": "6370c8b57546df3d1fc2c7b35eea1dd9f72b9717",
-    "runtime_version": "main+6370c8b5"
+    "ref": "v0.8.0",
+    "commit": "42e0e448ba159c88f346cffe91f07e9b0382e288",
+    "runtime_version": "v0.8.0+42e0e448"
   },
   "modes": {
     "decomposition-gate": {
-      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/6370c8b57546df3d1fc2c7b35eea1dd9f72b9717/codex/runtime-archives/codex-runtime-decomposition-gate.tar.gz",
-      "archive_sha256": "742e09762529d411d581e432fa25a228ee917683e7f9975a3fd025217e779ba5",
-      "archive_size": 2341,
+      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/42e0e448ba159c88f346cffe91f07e9b0382e288/codex/runtime-archives/codex-runtime-decomposition-gate.tar.gz",
+      "archive_sha256": "f8abf1a6df9fdc6c744fee03b0004c4784398fb8d55dc4c2a15f5cf539fa3ef7",
+      "archive_size": 2604,
       "entrypoints": {
         "pretool.decomposition": "hooks/decomposition_gate.py"
       }
     },
     "sensitive-data-guard": {
-      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/6370c8b57546df3d1fc2c7b35eea1dd9f72b9717/codex/runtime-archives/codex-runtime-sensitive-data-guard.tar.gz",
-      "archive_sha256": "5b825b92a516d2f01a16d151198c4c4e1e8225377f9c32ac572532f41e7ff37a",
-      "archive_size": 8509,
+      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/42e0e448ba159c88f346cffe91f07e9b0382e288/codex/runtime-archives/codex-runtime-sensitive-data-guard.tar.gz",
+      "archive_sha256": "cb6efb282eb331556a27361ee1da4a681eba544cb3ac7a66bc22f886d938cb79",
+      "archive_size": 8778,
       "entrypoints": {
         "pretool.security": "hooks/block_secrets.py",
         "pretool.pii": "hooks/pii_guard.py",
@@ -26,9 +26,9 @@
       }
     },
     "harness": {
-      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/6370c8b57546df3d1fc2c7b35eea1dd9f72b9717/codex/runtime-archives/codex-runtime-harness.tar.gz",
-      "archive_sha256": "17b065a366872bda971d15a60a2c8cd03d71a40e18a519074d285e63b06da8bb",
-      "archive_size": 9279,
+      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/42e0e448ba159c88f346cffe91f07e9b0382e288/codex/runtime-archives/codex-runtime-harness.tar.gz",
+      "archive_sha256": "5fd6ec528c83288da685c72698ba82cd3f68a30dff2c325e560792d716281852",
+      "archive_size": 11689,
       "entrypoints": {
         "pretool.plan": "hooks/plan_gate.py",
         "pretool.security": "hooks/security_guard.py",
@@ -37,9 +37,9 @@
       }
     },
     "integrated-harness": {
-      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/6370c8b57546df3d1fc2c7b35eea1dd9f72b9717/codex/runtime-archives/codex-runtime-integrated-harness.tar.gz",
-      "archive_sha256": "8b838c3bf1c4e24ee9bbb6104f21933cc03cd146a4cf1ed43fa080cf9ee99444",
-      "archive_size": 11414,
+      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/42e0e448ba159c88f346cffe91f07e9b0382e288/codex/runtime-archives/codex-runtime-integrated-harness.tar.gz",
+      "archive_sha256": "afc8a68c28a35e9c5fac9d8b94a71b5c55102c1d96a4e8da666b5b7aee15aa9a",
+      "archive_size": 13952,
       "entrypoints": {
         "pretool.plan": "hooks/plan_gate.py",
         "pretool.security": "hooks/security_guard.py",

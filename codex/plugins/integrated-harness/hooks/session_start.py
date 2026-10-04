@@ -7,9 +7,10 @@ import os
 
 
 REMINDER = """【護欄提醒 · integrated-harness】
-修改檔案前先建立 .codex/guardrail/plan/decomposition.md，內容須包含：
+修改檔案前先建立 .guardrail/plan/decomposition.md，內容須包含：
 ## 已知資訊、## 缺少的資訊、【假設】、## 允許修改範圍。
-strict／standard 模式在確定性檢查通過後使用 Codex 原生核准；light 模式僅可直接套用範圍內的 apply_patch。
+strict／standard 在確定性檢查通過後須人類終端機一次性核准；light 僅可直接套用人類計畫範圍內的 apply_patch。
+strict／standard 可單獨修改計畫草稿；light 計畫、政策及核准憑證不得由模型修改。
 危險指令、明文憑證與個資防線不因核准模式而停用。
 """
 

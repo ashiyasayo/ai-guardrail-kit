@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-import hashlib
 import os
 import re
 import shlex
 import sys
 from pathlib import Path
-from hook_protocol import ask, deny, load_event, project_root
+from hook_protocol import deny, load_event, project_root
+from approval import require_approval
 
-PLAN = ".codex/guardrail/plan/decomposition.md"
+PLAN = ".guardrail/plan/decomposition.md"
 POLICY = ".codex/guardrail/orchestration-policy.md"
 MARKERS = ("## 已知資訊", "## 缺少的資訊", "【假設】")
 MODE = re.compile(r"^\s*-\s+Approval Mode[：:]\s*(strict|standard|light)\s*$", re.MULTILINE)
-PATCH_PATH = re.compile(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", re.MULTILINE)
+PATCH_PATH = re.compile(r"^\*\*\* (?:(?:Add|Update|Delete) File|Move to): (.+)$", re.MULTILINE)
 UNSAFE = re.compile(r"[;&|><`\n\r*?\[\]]|\$\(")
 
 def section(text, heading):
@@ -45,6 +45,9 @@ def scope_section(text):
     return values
 
 def personal_policy_path():
+    codex_home = os.environ.get("CODEX_HOME")
+    if codex_home:
+        return Path(codex_home) / "guardrail/orchestration-policy.md"
     # Windows 的 Path.home() 不理會 HOME 環境變數，明確優先採用 HOME 以維持跨平台一致
     home = os.environ.get("HOME")
     return (Path(home) if home else Path.home()) / ".codex/guardrail/orchestration-policy.md"
@@ -91,11 +94,11 @@ def in_scope(path, allowed):
     return False
 
 def patch_targets(data, root):
-    patch = data.get("patch")
-    if not isinstance(patch, str) or not patch.startswith("*** Begin Patch\n") or not patch.endswith("*** End Patch"):
-        deny("Malformed native apply_patch payload.")
+    patch = data.get("command")
+    if not isinstance(patch, str) or not patch.startswith("*** Begin Patch\n") or not patch.rstrip("\r\n").endswith("*** End Patch"):
+        deny("Malformed apply_patch command payload.")
     raws = PATCH_PATH.findall(patch)
-    if not raws: deny("Malformed native apply_patch payload.")
+    if not raws: deny("Malformed apply_patch command payload.")
     targets = []
     for raw in raws:
         item = Path(raw)
@@ -132,20 +135,33 @@ def main():
     if os.environ.get("AI_GUARDRAIL_GLOBAL_DEFAULT") == "1" and not (root / PLAN).exists(): return
     tool, data = event["tool_name"], event["tool_input"]
     mode, allowlist = policy(root)
+    if tool == "apply_patch":
+        targets = patch_targets(data, root)
+        plan_path = root / PLAN
+        try:
+            plan_path.resolve().relative_to(root)
+        except ValueError:
+            deny("計畫閘門：計畫路徑逸出專案。")
+        if plan_path.is_symlink():
+            deny("計畫閘門：計畫檔不得是符號連結。")
+        # 草稿不代表核准；只修改計畫時可先建立或修訂，後續操作重新驗證內容。
+        if targets == [plan_path.resolve()]:
+            if mode == "light":
+                deny("light 模式的計畫範圍須由人類終端機建立或修改。")
+            return
     text = plan(root); allowed = scopes(text, root)
     if tool == "apply_patch":
         targets = patch_targets(data, root)
         if any(target in {(root / PLAN).resolve(), (root / POLICY).resolve()} for target in targets):
             deny("計畫與政策檔不得由 integrated harness 修改。")
         if any(not in_scope(target, allowed) for target in targets): deny("計畫閘門：目標不在計畫允許修改範圍。")
-    elif tool == "exec_command":
-        cmd = data.get("cmd")
-        if not isinstance(cmd, str): deny("Malformed native exec_command payload.")
+    elif tool == "Bash":
+        cmd = data.get("command")
+        if not isinstance(cmd, str): deny("Malformed Bash command payload.")
         if mode == "strict" and not strict_command(cmd, allowlist, root): deny("strict 模式禁止非 allowlist 指令。")
     else:
         deny("Unknown tool is not proven read-only.")
     if mode == "light" and tool == "apply_patch": return
-    digest = hashlib.sha256((root / PLAN).read_bytes()).hexdigest()
-    ask("Integrated harness native approval; current plan SHA-256: " + digest)
+    require_approval(event, root, "integrated-harness")
 
 if __name__ == "__main__": main()
