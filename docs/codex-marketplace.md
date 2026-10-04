@@ -123,7 +123,7 @@ loader 從 Codex event 的 `cwd` 找最近含 selector 的 project root，依 pr
 
 註冊的 event slots 保留既有順序與語意：
 
-- `PreToolUse exec_command|apply_patch`：decomposition、plan、security
+- `PreToolUse ^(Bash|exec_command|apply_patch)$`：decomposition、plan、security
 - `PreToolUse apply_patch`：獨立 PII updatedInput
 - `UserPromptSubmit`：PII prompt deny
 - `SessionStart startup|resume|clear|compact`：integrated-harness reminder
@@ -131,6 +131,13 @@ loader 從 Codex event 的 `cwd` 找最近含 selector 的 project root，依 pr
 安全事件 runtime 缺失或驗證失敗時 fail closed；SessionStart 輸出明確診斷。環境會
 移除 token、password、secret、auth、cookie、proxy 等敏感變數，且不記錄 event、prompt
 或 tool input。
+
+## Hook compatibility and approval
+
+計畫草稿使用 `.guardrail/plan/decomposition.md`；`.codex` 仍保存受保護的設定。
+`harness`／`integrated-harness` 使用人類終端機一次性核准，不回傳未支援的 `ask`。
+`verify-codex-mode --diagnose` 可檢查接線，但不替代 `/hooks` 信任或真實宿主測試。
+完整指令、遷移與限制見 [相容性說明](codex-hook-compatibility.md)。
 
 ## Global integrated-harness compatibility wrapper
 

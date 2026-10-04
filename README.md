@@ -47,8 +47,8 @@ Code session，接著可以繼續對話。命令會在目前工作目錄執行�
 ### 遠端控制器與手機的核准限制
 
 若 Claude Code 或 Codex 的 remote controller 用戶端（例如手機）無法執行 `!` 命令或
-顯示平台原生的核准 UI，便**不能**完成需要本機終端機或逐次 `ask` 的授權流程。因此
-`harness` 與 `integrated-harness` 的 `strict` 模式不是可直接在該用戶端執行開發的路徑。
+顯示平台原生的核准 UI，便**不能**完成需要本機終端機核准的授權流程。因此
+`harness` 與 `integrated-harness` 的 strict 核准路徑不是可直接在該用戶端執行開發的路徑。
 不得以提示詞中的「允許」、讓模型建立核准旗標，或修改政策檔來繞過此限制。
 
 需要暫時從手機處理低風險修改時，請先在可信任桌機為**個別專案**設定好模式與政策，並
@@ -59,6 +59,11 @@ Code session，接著可以繼續對話。命令會在目前工作目錄執行�
 必須實作可驗證身分、範圍與短期效期的外部簽章核准機制。
 
 ### Codex
+
+Codex hooks 採官方 `Bash`／`command` 事件格式。`ask` 尚未受支援，本專案改用
+人類終端機建立的 10 分鐘一次性核准；計畫草稿移到 `.guardrail/plan/`。
+升級須更新 loader 與 runtime，並重新 `/hooks` 信任。詳見
+[相容性、遷移與驗證](docs/codex-hook-compatibility.md)。
 
 Codex 使用單一全域 `ai-guardrail-loader` 與每專案 content-addressed runtime；完整的
 安裝、切換、更新、驗證及限制請見
@@ -481,25 +486,25 @@ SDG 的完整能力已獨立列於上表。
 
 | 功能 | Claude DG | Claude H | Claude IH | Codex DG | Codex H | Codex IH |
 | --- | --- | --- | --- | --- | --- | --- |
-| 主要定位 | 先拆解再寫入 | 人工核准＋安全防線 | 拆解、政策、核准、安全與編排 | 先拆解再寫入 | 原生逐次核准＋安全防線 | 拆解、政策、原生核准、安全與編排 |
+| 主要定位 | 先拆解再寫入 | 人工核准＋安全防線 | 拆解、政策、核准、安全與編排 | 先拆解再寫入 | 終端機一次性核准＋安全防線 | 拆解、政策、一次性核准、安全與編排 |
 | `PreToolUse` 確定性關卡 | 有 | 有 | 有 | 有 | 有 | 有 |
-| 拆解文件 | `.claude/plan/decomposition.md` | — | `.claude/plan/decomposition.md` | `.codex/guardrail/plan/decomposition.md` | — | `.codex/guardrail/plan/decomposition.md` |
+| 拆解文件 | `.claude/plan/decomposition.md` | — | `.claude/plan/decomposition.md` | `.guardrail/plan/decomposition.md` | — | `.guardrail/plan/decomposition.md` |
 | 拆解必要標記 | `已知資訊`、`缺少的資訊`、至少一個 `【假設】` | — | 同 DG | 同 Claude DG | — | 同 DG，另需允許修改範圍 |
 | 未完成拆解時封鎖寫入 | 有 | — | 有 | 有 | — | 有 |
 | 唯讀操作可在關卡前執行 | 有 | 有 | 有 | 有 | 有 | 由註冊 hook 與 Codex 原生唯讀流程處理 |
 | 緊急停用拆解關卡 | 人類建立 `.claude/plan/.gate_disabled` | — | — | 人類建立 `.codex/guardrail/plan/.gate_disabled` | — | — |
 | 防止模型自建／修改逃生口 | 有，檔案工具與 Bash 都攔截 | — | — | 有，`apply_patch` 與 `exec_command` 都攔截 | — | — |
-| 人類核准方式 | — | 人類建立 `.claude/.plan_approved` | `strict` 下執行 `approve_plan.py` | — | 每個受管寫入使用 Codex 原生 `ask` | `strict`／`standard` 依政策使用 Codex 原生 `ask` |
-| 核准有效範圍 | — | 旗標建立後 60 分鐘 | 綁定拆解文件 SHA-256，60 分鐘 | — | 單次工具呼叫 | 單次工具呼叫；提示包含目前計畫 SHA-256 |
-| 防止模型自我核准 | — | 有，禁止工具操作核准旗標 | 有，禁止修改核准紀錄與政策 | — | 由 Codex 原生核准 UI 負責 | 由 Codex 原生核准 UI 負責 |
+| 人類核准方式 | — | 人類建立 `.claude/.plan_approved` | `strict` 下執行 `approve_plan.py` | — | 人類終端機建立短效操作憑證 | `strict`／`standard` 使用短效操作憑證 |
+| 核准有效範圍 | — | 旗標建立後 60 分鐘 | 綁定拆解文件 SHA-256，60 分鐘 | — | 10 分鐘內一次匹配操作 | 10 分鐘內一次操作；綁定計畫／政策 SHA-256 |
+| 防止模型自我核准 | — | 有，禁止工具操作核准旗標 | 有，禁止修改核准紀錄與政策 | — | 受保護的 CODEX_HOME 核准庫與平台沙箱 | 受保護的 CODEX_HOME 核准庫與平台沙箱 |
 | 政策模式 | — | — | `strict`／`standard`／`light` | — | — | `strict`／`standard`／`light` |
 | 專案政策檔 | — | — | `.claude/orchestration-policy.md` | — | — | `.codex/guardrail/orchestration-policy.md` |
 | 個人政策 fallback | — | — | `~/.claude/orchestration-policy.md` | — | — | `~/.codex/guardrail/orchestration-policy.md` |
 | 無政策或政策無效 | — | — | fail closed 為 `strict` | — | — | fail closed 為 `strict`，空 Bash allowlist |
-| 允許修改範圍 | — | — | `strict`／`standard` 強制；`light` 不解析、不強制 | — | — | 所有模式的 `apply_patch` 都強制範圍；`light` 只免除 patch 的 `ask` |
-| `strict` Bash allowlist | — | — | 有；不在清單的一般 Bash 直接拒絕 | — | — | 有；符合清單後仍須原生 `ask` |
-| `standard` 行為 | — | — | 拆解＋範圍，免人工核准 | — | — | 拆解＋範圍，`apply_patch`／`exec_command` 仍原生 `ask` |
-| `light` 行為 | — | — | 只要求基本拆解；免範圍與人工核准 | — | — | 範圍內 `apply_patch` 免 `ask`；`exec_command` 仍 `ask` |
+| 允許修改範圍 | — | — | `strict`／`standard` 強制；`light` 不解析、不強制 | — | — | 所有模式的 `apply_patch` 都強制範圍；`light` 只免除 patch 的操作憑證 |
+| `strict` Bash allowlist | — | — | 有；不在清單的一般 Bash 直接拒絕 | — | — | 有；符合清單後仍須終端機核准 |
+| `standard` 行為 | — | — | 拆解＋範圍，免人工核准 | — | — | 拆解＋範圍，`apply_patch`／`exec_command` 仍須終端機核准 |
+| `light` 行為 | — | — | 只要求基本拆解；免範圍與人工核准 | — | — | 人類建立計畫後，範圍內 `apply_patch` 免操作憑證；Bash 仍須終端機核准 |
 | 子代理委派（`Agent`／`Task` 等非 Bash、非檔案寫入類工具） | — | — | `plan_gate.py` 依 `tool_name` 攔截，不區分呼叫來源（含 slash command 間接觸發）：不在 `PRE_PLAN_SAFE_TOOLS` 白名單者，`strict` 需拆解文件＋60 分鐘內人工核准才放行；`standard`／`light` 只需拆解文件存在即可放行 | — | — | 同一機制是否涵蓋 Codex 端子代理／委派工具尚未查證，暫缺 |
 | 永久危險命令阻擋 | — | 有 | 有 | — | 有 | 有 |
 | 危險命令涵蓋 | — | 毀滅性刪除、force push、下載即執行、`find -exec`、命令替換等 | 同 H | — | 與 Claude 對齊的 token 化判定＋regex fallback | 同 H |

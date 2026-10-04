@@ -28,12 +28,21 @@ for name in ('loader.py','manager.py','select-codex-mode','verify-codex-mode','i
     assert (loader/name).is_file(), name
 manifest=json.loads((root/'codex/runtime-manifest.json').read_text())
 assert manifest['schema_version']==1 and set(manifest['modes'])==set(names[1:])
-for item in manifest['modes'].values():
+for mode, item in manifest['modes'].items():
     assert re.fullmatch(r'[0-9a-f]{64}', item['archive_sha256'])
     assert item['archive_size'] > 0
     archive=root/'codex/runtime-archives'/pathlib.PurePosixPath(item['archive_url']).name
     assert archive.is_file() and archive.stat().st_size == item['archive_size']
     assert __import__('hashlib').sha256(archive.read_bytes()).hexdigest() == item['archive_sha256']
+    # archive 必須是目前審核來源，不能只與可能過期的 manifest 自洽。
+    with __import__('tarfile').open(archive) as bundle:
+        for member in bundle.getmembers():
+            if member.isfile():
+                source=root/'codex/plugins'/mode/member.name
+                assert bundle.extractfile(member).read()==source.read_bytes(), (mode,member.name)
+        if mode in ('harness','integrated-harness'):
+            assert 'hooks/approval.py' in bundle.getnames()
+
 guide=(root/'docs/codex-marketplace.md').read_text()
 for needle in ('ai-guardrail-loader@ai-guardrail-kit','runtime.local.json','--offline','E_ARCHIVE_UNSAFE','shell=False','no-checkout','selector-index.json','--apply','## Complete uninstall','install-codex-guardrail-loader --plugin-root <plugin-directory> --remove','uninstall-codex-guardrail" --confirm --prune-cache'):
     assert needle in guide, needle

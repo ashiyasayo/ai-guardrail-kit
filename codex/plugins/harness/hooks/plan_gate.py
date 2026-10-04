@@ -2,7 +2,8 @@
 import re
 import shlex
 import sys
-from hook_protocol import ask, deny, load_event, project_root
+from hook_protocol import deny, load_event, project_root
+from approval import require_approval
 
 UNSAFE = re.compile(
     r"[;&|><`\n\r*?\[\]]|\$\(|\btee\b|\bxargs\b|"
@@ -27,14 +28,16 @@ def readonly(cmd):
 def main():
     event = load_event(sys.stdin); project_root(event)
     tool, data = event["tool_name"], event["tool_input"]
-    if tool == "exec_command":
-        cmd = data.get("cmd")
+    if tool == "Bash":
+        cmd = data.get("command")
         if readonly(cmd): return
-        if not isinstance(cmd, str): deny("Malformed native exec_command payload.")
-        ask("Harness requires native Codex approval for this command.")
+        if not isinstance(cmd, str): deny("Malformed Bash command payload.")
+        require_approval(event, project_root(event), "harness")
+        return
     if tool == "apply_patch":
-        if not isinstance(data.get("patch"), str): deny("Malformed native apply_patch payload.")
-        ask("Harness requires native Codex approval for this patch.")
+        if not isinstance(data.get("command"), str): deny("Malformed apply_patch command payload.")
+        require_approval(event, project_root(event), "harness")
+        return
     deny("Unknown tool is not proven read-only.")
 
 if __name__ == "__main__": main()

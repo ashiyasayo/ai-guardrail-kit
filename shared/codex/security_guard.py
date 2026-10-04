@@ -10,8 +10,8 @@ from security_checks import dangerous_command, pending_content, secret_kind
 def main() -> None:
     event = load_event(sys.stdin)
     tool_input = event["tool_input"]
-    if event["tool_name"] == "exec_command":
-        kind = dangerous_command(tool_input.get("cmd", ""))
+    if event["tool_name"] == "Bash":
+        kind = dangerous_command(tool_input.get("command", ""))
         if kind:
             deny("危險指令攔截：" + kind)
     kind = secret_kind(pending_content(tool_input))

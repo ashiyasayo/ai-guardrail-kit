@@ -19,11 +19,13 @@ if (( no_managed )) && [[ $# -gt 0 && $1 != --* ]]; then exit 2; fi
 if (( ! no_managed )) && [[ $# -gt 0 ]] && [[ $1 != --* ]]; then expected=$1; shift; fi
 scope=project
 offline=0
+diagnose=0
 project='.'
 while [[ $# -gt 0 ]]; do
   case $1 in
     --scope) [[ $# -ge 2 ]] || exit 2; scope=$2; shift 2;;
     --offline) offline=1; shift;;
+    --diagnose) diagnose=1; shift;;
     --) shift; [[ $# -le 1 ]] || exit 2; project=${1:-.}; shift;;
     -*) exit 2;;
     *) [[ $project == '.' ]] || exit 2; project=$1; shift;;
@@ -33,4 +35,5 @@ args=(verify --scope "$scope" --project "$project")
 (( no_managed )) && args+=(--no-managed-mode)
 [[ -n $expected ]] && args+=("$expected")
 (( offline )) && args+=(--offline)
+(( diagnose )) && args+=(--diagnose)
 exec "$python_bin" "$manager" "${args[@]}"

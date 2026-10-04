@@ -53,6 +53,24 @@ selector commit 同步維護 `$CODEX_HOME/guardrail/selector-index.json`，讓�
 能在刪除前重建引用集合；prune 預設 dry-run，只有明確 `--apply` 才刪除已重新驗證、
 超過 grace period 且未被 selector 引用的 digest cache。
 
+## Codex hook 協定與授權邊界
+
+`shared/codex/hook_protocol.py` 將舊工具別名正規化為官方 Bash／command 格式，
+拒絕衝突欄位。PII updatedInput 同樣使用 command。未支援的 ask 不再作為核准機制。
+`shared/codex/approval.py` 由人類管理入口建立短效操作憑證，綁定專案、cwd、模式、
+輸入、計畫與政策雜湊；hook 原子取得消耗權後一次性刪除憑證。核准庫位於
+`$CODEX_HOME/guardrail/approvals/`，須在工作區外，且不得授予模型寫入權限。
+若 hook 執行環境無法消耗憑證，一律 deny，不降級成 allow 或未支援的 ask。
+
+計畫草稿在 `.guardrail/plan/`；政策、selector、緊急停用檔仍在受保護的 `.codex/`。
+strict／standard 允許只修改草稿的 patch，內容變更會使既有核准不匹配；light 的計畫
+仍由人類建立／修改，避免模型擴張免核准範圍。loader 傳遞已解析 project root，
+讓子目錄 session 仍檢查同一專案計畫。
+
+本機 verify 僅證明 selector/cache；`--diagnose` 另驗接線與有效選擇，明列宿主 trust、
+feature 及實際 sandbox 執行仍未驗證。完整影響矩陣見
+[Codex hook 相容性](docs/codex-hook-compatibility.md)。
+
 ## 多版本一致性架構
 
 每次功能變更都必須以「平台 × 模式 × 發佈型態」盤點影響範圍；根目錄
