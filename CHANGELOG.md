@@ -19,7 +19,8 @@ All notable changes to this project are documented in this file.
 - Codex 拆解草稿移至工作區 `.guardrail/plan/decomposition.md`，避免要求模型寫入
   沙箱保護的 `.codex/`。既有計畫須人工遷移；light 模式計畫仍由人類管理。
 - Codex verifier 新增 `--diagnose`，檢查有效 selector 與 loader 接線，明確區分
-  cache 驗證、hook 信任與宿主執行證據。同步更新 loader、runtime archives 與測試。
+  cache 驗證、hook 信任與宿主執行證據；全域安裝器依 runtime manifest 選擇發布 ref。
+  同步更新 loader、runtime archives 與測試。
 
 ### Migration
 

@@ -8,10 +8,11 @@ mkdir -p "$tmp/bin" "$tmp/home" "$tmp/project/.codex"
 cp "$root/tests/helpers/fake-codex" "$tmp/bin/codex"; chmod +x "$tmp/bin/codex"
 export PATH="$tmp/bin:$PATH" HOME="$tmp/home" CODEX_HOME="$tmp/home/.codex" AI_GUARDRAIL_TEST_STATE="$tmp/state"
 export AI_GUARDRAIL_ALLOW_DEVELOPMENT_SOURCE=1 AI_GUARDRAIL_MANIFEST_PATH="$root/codex/runtime-manifest.json" AI_GUARDRAIL_ARCHIVE_DIR="$root/codex/runtime-archives"
+runtime_ref=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["release"]["ref"])' "$AI_GUARDRAIL_MANIFEST_PATH")
 mkdir -p "$CODEX_HOME"
 printf 'unrelated@elsewhere\n' > "$tmp/state-seed"
 mkdir -p "$AI_GUARDRAIL_TEST_STATE"; cp "$tmp/state-seed" "$AI_GUARDRAIL_TEST_STATE/installed"
-codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref test --sparse .agents --sparse codex/plugins >/dev/null
+codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git --ref "$runtime_ref" --sparse .agents --sparse codex/plugins >/dev/null
 printf '%s\n' '{"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"keep-unrelated-hook"}]}]}}' > "$CODEX_HOME/hooks.json"
 
 # 直接從 marketplace plugin 自帶的 hook bootstrap，模擬沒有 repository checkout 的流程。
@@ -33,12 +34,12 @@ codex plugin marketplace upgrade ai-guardrail-kit
 grep -Fxq 'unrelated@elsewhere' "$AI_GUARDRAIL_TEST_STATE/installed"
 grep -Fxq 'ai-guardrail-loader@ai-guardrail-kit' "$AI_GUARDRAIL_TEST_STATE/installed"
 
-"$root/scripts/select-codex-mode" harness --scope project --source local --ref main "$tmp/project" >/dev/null
+"$root/scripts/select-codex-mode" harness --scope project --source local --ref "$runtime_ref" "$tmp/project" >/dev/null
 project_before=$(sha256sum "$tmp/project/.codex/guardrail/runtime.json" | cut -d' ' -f1)
 "$root/scripts/install-codex-global-integrated-harness" --remove "$root" >/dev/null
 "$root/scripts/verify-codex-global-integrated-harness" --no-installed "$root" >/dev/null
 [[ $project_before == "$(sha256sum "$tmp/project/.codex/guardrail/runtime.json" | cut -d' ' -f1)" ]]
-"$root/scripts/select-codex-mode" harness --scope user --source local --ref main "$root" >/dev/null
+"$root/scripts/select-codex-mode" harness --scope user --source local --ref "$runtime_ref" "$root" >/dev/null
 if "$root/scripts/install-codex-global-integrated-harness" --remove "$root" >/dev/null 2>&1; then
   printf 'FAIL: global wrapper removed an unowned user selector\n' >&2
   exit 1
@@ -50,7 +51,7 @@ if "$root/codex/plugins/ai-guardrail-loader/hooks/install-codex-guardrail-loader
   exit 1
 fi
 grep -Fxq 'ai-guardrail-loader@ai-guardrail-kit' "$AI_GUARDRAIL_TEST_STATE/installed"
-"$root/scripts/select-codex-mode" harness --scope user --source local --ref main "$root" >/dev/null
+"$root/scripts/select-codex-mode" harness --scope user --source local --ref "$runtime_ref" "$root" >/dev/null
 "$root/scripts/uninstall-codex-guardrail" > "$tmp/uninstall-preview"
 grep -Fq 'Re-run with --confirm to apply' "$tmp/uninstall-preview"
 grep -Fxq 'ai-guardrail-loader@ai-guardrail-kit' "$AI_GUARDRAIL_TEST_STATE/installed"

@@ -6,6 +6,7 @@ ROOT="$root" python3 - <<'PY'
 import importlib.util,json,os,re,subprocess,sys,tempfile
 from pathlib import Path
 root=Path(os.environ['ROOT'])
+runtime_ref=json.loads((root/'codex/runtime-manifest.json').read_text())['release']['ref']
 spec=importlib.util.spec_from_file_location('manager',root/'scripts/codex-runtime-manager.py')
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 with tempfile.TemporaryDirectory() as tmp:
@@ -25,7 +26,7 @@ with tempfile.TemporaryDirectory() as tmp:
         return json.loads(result.stdout) if result.stdout.strip() else None
     event={'cwd':str(project),'hook_event_name':'PreToolUse','model':'test','permission_mode':'default','session_id':'s','tool_name':'Bash','tool_input':{'command':'git reset --hard'},'tool_use_id':'u','transcript_path':None,'turn_id':'t'}
     for mode in m.MODES:
-        args=m.parser().parse_args(['select',mode,'--project',str(project),'--source','local','--ref','main'])
+        args=m.parser().parse_args(['select',mode,'--project',str(project),'--source','local','--ref',runtime_ref])
         prepared=m.prepare_selection(args);m.commit_selection(prepared,'project',store)
         diagnose=m.parser().parse_args(['verify',mode,'--project',str(project),'--diagnose'])
         m.diagnose_selection(diagnose)

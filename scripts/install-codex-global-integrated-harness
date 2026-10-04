@@ -29,5 +29,6 @@ fi
 export AI_GUARDRAIL_ALLOW_DEVELOPMENT_SOURCE=1
 export AI_GUARDRAIL_MANIFEST_PATH="$repo/codex/runtime-manifest.json"
 export AI_GUARDRAIL_ARCHIVE_DIR="$repo/codex/runtime-archives"
-"$script_dir/select-codex-mode" integrated-harness --scope user --source local --ref main --owner global-integrated-harness "$repo"
+runtime_ref=$("$python_bin" -c 'import json,sys; print(json.load(open(sys.argv[1]))["release"]["ref"])' "$AI_GUARDRAIL_MANIFEST_PATH")
+"$script_dir/select-codex-mode" integrated-harness --scope user --source local --ref "$runtime_ref" --owner global-integrated-harness "$repo"
 printf 'Installed global Codex integrated-harness fallback; loader is the only global plugin.\n'
