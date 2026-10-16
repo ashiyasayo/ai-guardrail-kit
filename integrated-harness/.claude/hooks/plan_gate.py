@@ -22,6 +22,10 @@ APPROVAL_MODE_PATTERN = re.compile(
 STRICT_BASH_ALLOWLIST_HEADER = "## Strict Bash 測試與建置 Allowlist"
 POLICY_LIST_ITEM_PATTERN = re.compile(r"^[ \t]*-[ \t]+`([^`]+)`[ \t]*$")
 ENV_ASSIGNMENT_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+# 只攔截完整路徑段 `.claude`：後接英數、底線或連字號視為不同名稱而放行（例如
+# Claude Security 固定使用的 `.claude-security-run`）；後接分隔符、`.`、引號、空白、
+# glob／展開字元或字串結尾仍攔截，因此 `.claude.json`、`.claude*` 維持保守。
+CLAUDE_DIR_SEGMENT_PATTERN = re.compile(r"\.claude(?![A-Za-z0-9_-])")
 REQUIRED_MARKERS = ("## 已知資訊", "## 缺少的資訊", "【假設】")
 SCOPE_HEADER = "## 允許修改範圍"
 FILE_TOOL_PATH_KEYS = {
@@ -309,7 +313,7 @@ def check(data: dict) -> Optional[str]:
         if is_read_only_bash(command):
             return None
         # 管理目錄不得透過 Bash 寫入，避免 glob、別名與路徑變形繞過保護。
-        if ".claude" in command:
+        if CLAUDE_DIR_SEGMENT_PATTERN.search(command):
             return ".claude 管理檔只能由人類或受管制的檔案工具修改；不得透過 Bash 變更。"
         if mode == "strict":
             prefixes, reason = parse_strict_bash_allowlist(root)
