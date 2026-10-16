@@ -11,6 +11,7 @@
 .codex/
 .shared/
 .superpowers/
+.codebase-memory/
 docs/superpowers/
 __pycache__/
 *.pyc
