@@ -236,6 +236,23 @@ with tempfile.TemporaryDirectory() as td:
         event(project), project,
     ))
 
+    # .claude 管理目錄的 Bash 保護只比對完整路徑段：前綴相同的其他名稱
+    # （Claude Security 固定使用的 .claude-security-run）不得被誤攔。
+    def bash(command):
+        return assert_pair(
+            integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py",
+            event(project, tool="Bash", tool_input={"command": command}), project,
+        )
+
+    assert_allowed(bash("mkdir -p CLAUDE-SECURITY-20261016-013818/.claude-security-run"))
+    for command in (
+        "mkdir .claude/x",
+        "rm .claude*",
+        "echo x > .claude.json",
+        "touch .claude",
+    ):
+        assert_denied(bash(command), ".claude 管理檔")
+
 # 個人層級政策檔 fallback：專案檔不存在時讀取 ~/.claude/orchestration-policy.md
 with tempfile.TemporaryDirectory() as td:
     project = Path(td) / "project"
