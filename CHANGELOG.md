@@ -8,10 +8,12 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-16
+
 ### Changed
 
 - Claude `harness`（`0.7.0` → `0.7.2`）與 `integrated-harness`（`0.7.1` →
-  `0.7.2`）的 plugin 版號已對齊本次 `v0.7.2` repo tag，反映兩模式在該次發版中
+  `0.7.2`）的 plugin 版號已對齊 `v0.7.2`，反映兩模式在該次發版中
   一併變更的 `plan_gate.py` 核准提示行為。`decomposition-gate`／
   `sensitive-data-guard` 未變更，版號維持不動。
 
