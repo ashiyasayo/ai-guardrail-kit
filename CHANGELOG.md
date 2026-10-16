@@ -15,6 +15,15 @@ All notable changes to this project are documented in this file.
   一併變更的 `plan_gate.py` 核准提示行為。`decomposition-gate`／
   `sensitive-data-guard` 未變更，版號維持不動。
 
+### Fixed
+
+- Claude `integrated-harness`（`0.7.2` → `0.7.3`）的 `plan_gate.py` 原本以子字串
+  比對 Bash 指令中的 `.claude`，連名稱只是前綴相同的目錄（例如 Claude Security
+  固定使用的 `CLAUDE-SECURITY-<時間>/.claude-security-run`）也一律攔截，且此規則
+  先於核准模式判斷，切換 `strict`／`standard`／`light` 都無法解除。現改為只比對
+  完整路徑段 `.claude`；`.claude/…`、`.claude*`、`.claude.json` 等仍維持攔截。
+  copy-in 與 plugin 兩份同步修正；`harness` 模式與 Codex 無此規則，不受影響。
+
 ## [0.8.0] - 2026-10-04
 
 ### Fixed
