@@ -8,6 +8,34 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-27
+
+### Added
+
+- 從 obra/superpowers 的核心方法精簡改編 `brainstorming`、
+  `systematic-debugging`、`subagent-driven-development` 與 `requesting-code-review`，
+  以 `shared/skills/` 為單一事實來源，同步發佈至 Claude
+  integrated-harness copy-in／marketplace 與 Codex loader；Codex mode runtime 不重複
+  攜帶技能。
+  未引入完整 Superpowers plugin 或 `using-superpowers` 入口；移除極低機率強制觸發、
+  計畫階段完整寫碼、全域強制 subagent 與 Git worktree 綑綁，並新增跨發佈副本同步
+  測試。只有明確採用子代理驅動開發時，才自動執行 fresh-context 的 Spec Compliance
+  與 Code Quality 雙重審查；Critical／Major finding 會在技能工作流中阻塞完成，
+  review 每階段最多兩輪。此關卡不宣稱為 hook 強制的確定性安全控制。
+
+### Fixed
+
+- `sync-shared-skills` 現拒絕目標檔與父目錄 symlink，避免同步時跟隨連結寫出 repository
+  邊界；同時移除無實際載入入口的 Codex integrated-harness 技能副本。
+- Codex 全域快速指引補上 Windows PowerShell 的 loader bootstrap 步驟，避免在 manager
+  尚未部署前直接執行 selector。
+
+### Changed
+
+- Claude `integrated-harness` plugin 版號由 `0.7.3` 升為 `0.8.0`。風險路由加入
+  reasoning protocol，而非 `orchestration-policy.md`；後者繼續只承載授權、成本與
+  環境治理邊界。
+
 ## [0.8.1] - 2026-10-16
 
 ### Changed
@@ -501,7 +529,15 @@ VS Code Agent hooks，且 macOS／Linux 路徑尚未實機驗證。以下彙整�
   once a plan exists, normal integrated-harness scope, policy, and approval
   checks apply.
 
-[Unreleased]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.8.1...v0.9.0
+[0.8.1]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.7.2...v0.8.0
+[0.7.2]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.7.1...v0.7.2
+[0.7.1]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.2.1...v0.3.0

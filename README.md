@@ -85,6 +85,47 @@ loader plugin（它提供一次性的遠端 bootstrap 入口）：
 codex plugin add ai-guardrail-loader@ai-guardrail-kit
 ```
 
+#### 全域套用快速指引（Loader＋四技能＋integrated-harness）
+
+若要讓目前使用者的所有 Codex 專案預設使用本套件，可依下列順序一次完成。Codex
+不直接全域安裝四個 mode plugin；只安裝全域 `ai-guardrail-loader`，再用 `user`
+selector 將 `integrated-harness` 設為全域 fallback：
+
+1. 先執行上方的 `codex plugin marketplace add ...` 與
+   `codex plugin add ai-guardrail-loader@ai-guardrail-kit`。
+2. 執行 `codex plugin list --json`，取得 `ai-guardrail-loader` 的
+   `<plugin-directory>`，並完成一次 loader bootstrap：
+
+   ```text
+   <plugin-directory>/hooks/install-codex-guardrail-loader --plugin-root <plugin-directory>
+   ```
+
+3. 將 `integrated-harness` 設為 user fallback 並驗證：
+
+   ```bash
+   guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
+   "$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX.Y.Z
+   "$guardrail_bin/verify-codex-mode" integrated-harness --scope user
+   ```
+
+   Windows PowerShell 可改用 Python manager：
+
+   ```powershell
+   $pluginRoot = '<plugin-directory>'
+   $codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE '.codex' }
+   $manager = Join-Path $codexHome 'guardrail\bin\codex-runtime-manager.py'
+   py -3 "$pluginRoot\hooks\manager.py" install-loader --plugin-root "$pluginRoot"
+   py -3 $manager select integrated-harness --scope user --ref vX.Y.Z
+   py -3 $manager verify integrated-harness --scope user
+   ```
+
+全域 Loader 會提供 `$brainstorming`、`$systematic-debugging`、
+`$subagent-driven-development` 與 `$requesting-code-review` 四個技能；user selector 則讓
+`integrated-harness` hooks 成為未另行設定專案的預設 runtime。`project`／`local`
+selector 仍可覆寫全域設定，優先序為 `local > project > user > disabled`。安裝、更新或
+切換後請開啟新的 Codex thread；首次安裝或 hook 更新後另以 `/hooks` 審閱並信任
+`ai-guardrail-loader`。
+
 #### Codex marketplace、git clone 與 selector 的關係
 
 這三個步驟的職責不同，不能把 marketplace 註冊視為 selector 的替代品：
@@ -644,6 +685,28 @@ Claude 的 SessionStart 推理協定另採風險分級校準：進度只在重�
 subagent；驗證深度依風險調整，避免沒有新證據的重複檢查。這些是執行行為提示，
 不改變 `ORCHESTRATOR.md`、政策檔及 hooks 的授權與安全邊界。
 
+Claude `integrated-harness` 與 Codex loader 另提供四個從
+[obra/superpowers](https://github.com/obra/superpowers) 思路精簡改編的獨立技能，沒有安裝
+完整 Superpowers plugin，也沒有掛載 `using-superpowers`：
+
+- `brainstorming`：只在需求模糊、公開契約／schema 變更或跨三個以上模組時使用；
+  藍圖只列路徑、簽章與十行內虛擬碼，不先寫完整實作，也不自動建文件、worktree
+  或派發 subagent。
+- `systematic-debugging`：複雜錯誤或首次修復失敗時，以四階段流程先定位根因，再做
+  單一假設驗證、最小修復及回歸保護；三次假設失敗即停損。
+- `subagent-driven-development`：常規任務禁止派發；僅限三個以上外部依賴、核心金流、
+  權限架構或相當風險的資料庫遷移／跨模組重構，完成時自動接續隔離 code review，
+  且子代理不得再派發孫代理。
+- `requesting-code-review`：由兩個不繼承實作對話的 reviewer 依序檢查 Spec Compliance
+  與資安、併發、回滾、測試四類紅線；Critical／Major 在技能工作流中阻塞完成，
+  Minor 記錄處理，每階段最多兩輪，finding 附最小修正 diff。此關卡不是由 hook
+  強制執行的確定性安全控制。
+
+四個技能以 `shared/skills/` 為單一事實來源，發佈至 Claude copy-in／marketplace、
+以及 Codex loader；Codex mode runtime 不重複攜帶技能。修改後執行
+`scripts/sync-shared-skills`，並以
+`scripts/sync-shared-skills --check` 驗證副本一致。
+
 - 適用：多人協作、高風險資料、正式系統，以及需要稽核軌跡的專案。
 - 除本目錄自帶的 `tests/` 外，儲存庫根層 `tests/` 的回歸測試涵蓋
   全部四種模式與兩個平台（`decomposition-gate` 另有
@@ -685,6 +748,9 @@ Codex 請使用 marketplace plugin 與 selector，不可沿用 copy-in 步驟。
   `scripts/sync-claude-hook-copies --check`（即 `tests/claude_shared_sync_test.sh`）確認
   沒有漂移。`block_secrets.py`／`block_dangerous_commands.py` 為刻意分歧分支，不在同步
   範圍，改由 `tests/claude_hook_parity_test.sh` 行為守護。
+- 跨 Claude／Codex 的四個工作流技能以
+  `shared/skills/` 為唯一審核來源；使用 `scripts/sync-shared-skills` 產生四組發佈副本，
+  `tests/shared_skills_sync_test.sh` 會阻止內容漂移。
 - copy-in（`harness/.claude/hooks`、`integrated-harness/.claude/hooks`）與 marketplace
   plugin 的**非 PII** hook（`guard.py`／`plan_gate.py`／`block_secrets.py`／
   `block_dangerous_commands.py`／`approve_plan.py`／`inject_protocol.py`）為兩份平行副本，
