@@ -21,8 +21,11 @@ for plugin in data['plugins']:
         # loader 以 $CODEX_HOME/hooks.json 管理 hook；此欄位只能指向單一設定檔。
         assert 'hooks' not in manifest
     skills=list((base/'skills').glob('*/SKILL.md'))
-    assert len(skills)==1
-    assert ('new thread' in skills[0].read_text()) if name != 'ai-guardrail-loader' else True
+    expected_skills = 5 if name == 'ai-guardrail-loader' else 1
+    assert len(skills)==expected_skills, (name, [skill.parent.name for skill in skills])
+    primary = base/'skills'/name/'SKILL.md'
+    assert primary.is_file()
+    assert ('new thread' in primary.read_text()) if name != 'ai-guardrail-loader' else True
 loader=root/'codex/plugins/ai-guardrail-loader/hooks'
 for name in ('loader.py','manager.py','select-codex-mode','verify-codex-mode','install-codex-guardrail-loader','prune-codex-runtime-cache','uninstall-codex-guardrail'):
     assert (loader/name).is_file(), name
@@ -56,7 +59,7 @@ for label, document in (('README', readme), ('CLI_REFERENCE', cli_reference), ('
     assert not re.search(r'\$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX\.Y\.Z\s+/path/to/', document), label
 for plugin in names[1:]:
     base = root/f'codex/plugins/{plugin}'
-    skill = next((base/'skills').glob('*/SKILL.md')).read_text()
+    skill = (base/'skills'/plugin/'SKILL.md').read_text()
     assert 'For `user` scope, omit `[project-dir]`' in skill, plugin
 print('PASS: Codex marketplace, loader and runtime manifest structure')
 PY

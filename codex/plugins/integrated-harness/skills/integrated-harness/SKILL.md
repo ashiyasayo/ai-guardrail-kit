@@ -19,6 +19,22 @@ agent for a task that takes only a handful of tool calls, or solely to re-check 
 primary agent's work. Match validation depth to risk and observable impact; do not
 repeat checks without new evidence.
 
+Route ambiguous, public-contract, or three-plus-module design work through the
+loader-provided `brainstorming` skill. Route complex failures, concurrency issues, or a
+failed first fix through `systematic-debugging`. Ordinary single-file work and
+fully specified fixes should proceed directly. Planning must not contain a full
+implementation, and skill routing never requires a worktree or subagent.
+
+Do not delegate ordinary tasks. Only use `subagent-driven-development` for
+high-risk changes involving three or more external dependencies, core payments,
+authorization architecture, or comparably risky database migrations or
+cross-module refactors with isolated ownership. When that workflow is selected, finish with
+the loader-provided `requesting-code-review`: one fresh-context reviewer checks spec
+compliance, then a different fresh-context reviewer checks code quality.
+Critical and Major findings block workflow completion until fixed and re-reviewed.
+This is a skill workflow gate, not a deterministic hook-enforced security gate. This review workflow is not
+an excuse to delegate ordinary work, and subagents must not spawn descendants.
+
 Deterministic denials do not become approvable. Light mode may allow a provably
 scoped `apply_patch`, while a mutating Bash command still requires an operation receipt. Obtain explicit
 human authorization before production or shared-infrastructure changes,

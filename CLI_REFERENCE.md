@@ -313,6 +313,19 @@ Claude 版會在 SessionStart 載入風險分級的執行協定：精簡進度�
 重複驗證，並將 subagent 限制於具一定規模且可真正獨立並行的工作。這不會放寬任何
 計畫、核准或安全 hook。
 
+Claude `integrated-harness` 與 Codex loader 提供 `$brainstorming` 與
+`$systematic-debugging`。前者只路由需求模糊、公開契約／schema 或跨三個以上模組的
+工作；後者路由複雜錯誤與首次修復失敗。兩者都不會自動建立 worktree、派發 subagent
+或安裝完整 Superpowers plugin。`orchestration-policy.md` 不需新增對應欄位，因為技能
+路由不是授權政策。
+
+需要子代理驅動開發時，可明確叫用 `$subagent-driven-development`；只有三個以上外部
+依賴、核心金流、權限架構或相當風險的資料庫遷移／跨模組重構才符合委派閘門。
+完成階段會自動叫用 `$requesting-code-review`，
+以兩個 fresh-context reviewer 依序進行規格符合性與品質審查。一般任務不會自動啟動
+此流程；Critical／Major finding 在修復並通過重審前會阻塞完成。這是技能工作流關卡，
+不是由 hook 強制執行的確定性安全關卡。
+
 Claude `decomposition-gate` 的 copy-in 與 marketplace 版本同樣會在 SessionStart
 載入風險分級協定；安裝或更新後必須開啟新 session 才會套用。
 

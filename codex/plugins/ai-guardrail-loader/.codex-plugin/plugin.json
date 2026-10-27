@@ -1,6 +1,6 @@
 {
   "name": "ai-guardrail-loader",
-  "description": "Stable Codex hook loader for verified per-project guardrail runtimes.",
+  "description": "Stable Codex hook loader for verified per-project guardrail runtimes, with four lightweight planning, debugging, delegated-development, and review skills.",
   "skills": "./skills/",
   "interface": {
     "displayName": "AI Guardrail Loader",

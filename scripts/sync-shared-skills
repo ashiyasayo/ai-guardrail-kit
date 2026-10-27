@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 四個工作流技能以 shared/skills 為唯一審核來源；
+# 其餘位置是 Claude／Codex 實際技能載入入口需要的可攜實體副本。
+script_dir=$(cd "$(dirname "$0")" && pwd -P)
+repo=${AI_GUARDRAIL_ROOT:-$(cd "$script_dir/.." && pwd -P)}
+mode=write
+
+case ${1:-} in
+  '') ;;
+  --check) mode=check ;;
+  --help|-h)
+    printf 'usage: sync-shared-skills [--check]\n'
+    exit 0
+    ;;
+  *)
+    printf 'sync-shared-skills: unknown option: %s\n' "$1" >&2
+    exit 2
+    ;;
+esac
+
+skills=(brainstorming systematic-debugging subagent-driven-development requesting-code-review)
+target_roots=(
+  "integrated-harness/.claude/skills"
+  "claude/plugins/integrated-harness/skills"
+  "codex/plugins/ai-guardrail-loader/skills"
+)
+
+validate_target_root() {
+  local target_root=$1
+  local current=$repo
+  local component
+
+  IFS='/' read -r -a components <<< "$target_root"
+  for component in "${components[@]}"; do
+    current="$current/$component"
+    if [[ -L $current ]]; then
+      printf 'sync-shared-skills: refusing symlink parent: %s\n' "$current" >&2
+      exit 1
+    fi
+  done
+
+  if [[ -e $current && ! -d $current ]]; then
+    printf 'sync-shared-skills: target root is not a directory: %s\n' "$current" >&2
+    exit 1
+  fi
+}
+
+for skill in "${skills[@]}"; do
+  source_path="$repo/shared/skills/$skill/SKILL.md"
+  [[ -f $source_path && ! -L $source_path ]] || {
+    printf 'sync-shared-skills: invalid source: %s\n' "$source_path" >&2
+    exit 1
+  }
+  for target_root in "${target_roots[@]}"; do
+    validate_target_root "$target_root"
+    target_path="$repo/$target_root/$skill/SKILL.md"
+    [[ ! -L $target_path ]] || {
+      printf 'sync-shared-skills: refusing symlink target: %s\n' "$target_path" >&2
+      exit 1
+    }
+    if cmp -s "$source_path" "$target_path"; then
+      continue
+    fi
+    if [[ $mode == check ]]; then
+      printf 'Shared skill copy is out of sync: %s\n' "${target_path#"$repo/"}" >&2
+      exit 1
+    fi
+    mkdir -p "$(dirname "$target_path")"
+    cp -p "$source_path" "$target_path"
+    printf 'Synced %s\n' "${target_path#"$repo/"}"
+  done
+done

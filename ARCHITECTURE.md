@@ -82,11 +82,11 @@ feature 及實際 sandbox 執行仍未驗證。完整影響矩陣見
 | Claude | `decomposition-gate` | copy-in、marketplace | `decomposition-gate/.claude/`、`claude/plugins/decomposition-gate/` | 協定與注入 hook 逐位元組比對、marketplace 結構測試、smoke test |
 | Claude | `sensitive-data-guard` | marketplace | `shared/claude/`、`claude/plugins/sensitive-data-guard/` | shared 同步檢查及 PII 行為測試 |
 | Claude | `harness` | copy-in、marketplace | `shared/claude/`、`harness/.claude/`、`claude/plugins/harness/` | shared 同步、copy-in parity 及 hook 行為測試 |
-| Claude | `integrated-harness` | copy-in、marketplace | `shared/claude/`、`integrated-harness/`、`claude/plugins/integrated-harness/` | 協定同步、copy-in parity、orchestration 與 hook 行為測試 |
+| Claude | `integrated-harness` | copy-in、marketplace | `shared/claude/`、`shared/skills/`、`integrated-harness/`、`claude/plugins/integrated-harness/` | 協定與技能同步、copy-in parity、orchestration 與 hook 行為測試 |
 | Claude | 四種模式 | marketplace／selector（project、local、user） | `shared/claude/`、`claude/plugins/`、`scripts/claude-mode-lib.sh` | shared 同步、marketplace、三 scope mode switch 及 guardrail 測試 |
 | Claude | 四種模式 | native user fallback | Claude 原生 `plugin install --scope user`；不經 repository selector | marketplace 文件與 CLI 操作契約測試 |
 | Codex | 四種模式 | runtime archive／selector（project、local、user） | `shared/codex/`、`codex/plugins/`、`scripts/codex-runtime-manager.py` | manifest/archive/cache、A/B scope、offline、rollback 測試 |
-| Codex | loader | marketplace／global install | `codex/plugins/ai-guardrail-loader/`、`$CODEX_HOME/guardrail/` | loader bootstrap、hook slot、plugin-id 與 rollback 測試 |
+| Codex | loader | marketplace／global install | `shared/skills/`、`codex/plugins/ai-guardrail-loader/`、`$CODEX_HOME/guardrail/` | 共用技能同步、loader bootstrap、hook slot、plugin-id 與 rollback 測試 |
 | Codex | `integrated-harness` | global compatibility wrapper | `scripts/install-codex-global-integrated-harness`、user selector | policy 不覆寫、legacy marker 遷移測試 |
 | Copilot | `decomposition-gate` | copy-in | `shared/copilot/`、`copilot/plugins/decomposition-gate/` | shared 同步檢查、Copilot smoke test；Preview 平台限制另見相關文件 |
 | Copilot | `sensitive-data-guard` | copy-in | `shared/copilot/`、`copilot/plugins/sensitive-data-guard/` | shared 同步檢查、三平台 PII 行為一致性測試、Copilot smoke test |
@@ -110,6 +110,25 @@ Claude `integrated-harness` 的執行行為校準位於 `reasoning-protocol.md` 
 播報、對抗式審查、信心標示、驗證深度及 subagent 委派；治理授權仍只由
 `ORCHESTRATOR.md`、政策檔與確定性 hooks 決定。copy-in 與 marketplace 版本的兩份
 協定必須逐字節一致。
+
+`brainstorming`、`systematic-debugging`、`subagent-driven-development` 與
+`requesting-code-review` 的唯一審核來源位於 `shared/skills/`。
+Claude copy-in、Claude marketplace 與 Codex loader 保留實體副本，以
+`scripts/sync-shared-skills` 產生並由同步測試逐位元組守護。Codex runtime
+archive 只承載 mode hooks；技能由唯一可安裝的 loader plugin 提供，因此不重複塞入
+runtime archive。Copilot 目前沒有此專案可用的 skill 載入介面，故不發佈這四個技能。
+
+風險分級路由屬執行方法，放在技能 description、Claude reasoning protocol 與 Codex
+skill 指引；`orchestration-policy.md` 仍只承載人類設定的授權、成本及環境邊界，避免
+把可更新的工作方法誤變成專案治理設定。
+
+`subagent-driven-development` 只有在三個以上外部依賴、核心金流、權限架構或相當風險
+的資料庫遷移／跨模組重構符合隔離委派閘門時，才會自動
+銜接 `requesting-code-review`。Spec Compliance 與 Code Quality 由兩個 fresh-context
+reviewer 依序執行，避免實作者的歷史與結論污染審查；Critical／Major finding 在技能
+工作流中阻塞完成，但不宣稱為 hook 強制的確定性安全關卡。每階段最多兩輪以限制 Token
+與代理數量，子代理不得再派發孫代理。一般任務不會因
+安裝技能而自動派發子代理。
 
 ## sensitive-data-guard 資料流
 
