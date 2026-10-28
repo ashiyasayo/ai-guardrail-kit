@@ -21,7 +21,10 @@ repeat checks without new evidence.
 
 Route ambiguous, public-contract, or three-plus-module design work through the
 loader-provided `brainstorming` skill. Route complex failures, concurrency issues, or a
-failed first fix through `systematic-debugging`. Ordinary single-file work and
+failed first fix through `systematic-debugging`. Before writing production code for
+a new feature, bug fix, or test-observable behavior change, use
+`test-driven-development`; skip it for pure configuration, documentation, or
+generated code. Ordinary single-file work and
 fully specified fixes should proceed directly. Planning must not contain a full
 implementation, and skill routing never requires a worktree or subagent.
 

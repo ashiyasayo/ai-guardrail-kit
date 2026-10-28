@@ -21,7 +21,7 @@ for plugin in data['plugins']:
         # loader 以 $CODEX_HOME/hooks.json 管理 hook；此欄位只能指向單一設定檔。
         assert 'hooks' not in manifest
     skills=list((base/'skills').glob('*/SKILL.md'))
-    expected_skills = 5 if name == 'ai-guardrail-loader' else 1
+    expected_skills = 6 if name == 'ai-guardrail-loader' else 1
     assert len(skills)==expected_skills, (name, [skill.parent.name for skill in skills])
     primary = base/'skills'/name/'SKILL.md'
     assert primary.is_file()

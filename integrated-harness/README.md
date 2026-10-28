@@ -10,10 +10,12 @@
 `integrated-harness` 是 `decomposition-gate` 與 `harness` 的整合版，也是三個 Claude copy-in 目錄中唯一同時
 具備「治理政策、推理協定、計畫品質檢查、人類授權及安全 hooks」的完整方案。
 
-`.claude/skills/` 另提供四個不依賴完整 Superpowers plugin 的工作流技能：
-`brainstorming`、`systematic-debugging`、`subagent-driven-development` 與
-`requesting-code-review`。前兩者避免過度規劃與猜測式修復；後兩者只在明確採用委派
-模式時，以 fresh-context 子代理依序執行規格符合性與程式碼品質審查。技能不會自動
+`.claude/skills/` 另提供五個不依賴完整 Superpowers plugin 的工作流技能：
+`brainstorming`、`systematic-debugging`、`subagent-driven-development`、
+`requesting-code-review` 與 `test-driven-development`。`brainstorming` 與
+`systematic-debugging` 避免過度規劃與猜測式修復；`subagent-driven-development` 與
+`requesting-code-review` 只在明確採用委派模式時，以 fresh-context 子代理依序執行規格
+符合性與程式碼品質審查；`test-driven-development` 要求新功能與修錯先寫失敗測試。技能不會自動
 建立 worktree，一般小型工作也不會自動派發子代理。
 
 | 層次 | 解決的問題 | 實作來源 |

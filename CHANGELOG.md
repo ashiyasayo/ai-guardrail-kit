@@ -8,6 +8,27 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- 從 obra/superpowers 的 `test-driven-development` 精簡改編同名技能，以
+  `shared/skills/` 為單一事實來源，同步發佈至 Claude integrated-harness
+  copy-in／marketplace 與 Codex loader。依組織規範調整：只路由可由自動化測試觀察的
+  新功能、修錯與行為變更；「先寫碼就刪除」改為只撤回自己未受測試保護的草稿；驗證
+  深度依影響面調整，但完成前須執行專案標準測試入口並據實回報失敗；加入測試資料不得含
+  憑證或真實個資、識別字使用英文，以及既有 Classic ASP／VB.NET／Laravel 先補特徵測試
+  的規則。`writing-good-tests.md` 的測試品質規則濃縮進 `SKILL.md`。
+- Claude `reasoning-protocol.md`（copy-in 與 marketplace）與 Codex
+  `integrated-harness` 技能指引加入 TDD 路由。
+- Claude `integrated-harness` 拆解範本（copy-in 與 marketplace）借鏡 superpowers
+  `writing-plans`：「執行計畫」加入「驗證指令 → 預期輸出」格式，並新增選填的
+  `## 介面`（跨模組或步驟相依時列出產出／使用的簽章）與 `## Review Focus`（高風險
+  工作列出測試未涵蓋的輸入及預期行為）。新區段位於允許修改範圍之後，hook 檢查項目
+  不變，既有拆解文件格式仍然相容。
+
+### Changed
+
+- Claude `integrated-harness` plugin 版號由 `0.8.0` 升為 `0.9.0`。
+
 ## [0.9.0] - 2026-10-28
 
 ### Added

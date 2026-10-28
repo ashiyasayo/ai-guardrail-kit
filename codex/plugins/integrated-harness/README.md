@@ -4,9 +4,9 @@
 handles writes after its deterministic guardrails have passed. It does not
 override the permanent dangerous-command or plaintext-secret denials.
 
-The installable loader also exposes four standalone workflow skills:
-`brainstorming`, `systematic-debugging`, `subagent-driven-development`, and
-`requesting-code-review`. Delegated development is opt-in and triggers two
+The installable loader also exposes five standalone workflow skills:
+`brainstorming`, `systematic-debugging`, `subagent-driven-development`,
+`requesting-code-review`, and `test-driven-development`. Delegated development is opt-in and triggers two
 fresh-context review stages at completion; it is not a global requirement to
 spawn agents or create Git worktrees.
 

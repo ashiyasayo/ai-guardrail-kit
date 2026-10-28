@@ -319,6 +319,10 @@ Claude `integrated-harness` 與 Codex loader 提供 `$brainstorming` 與
 或安裝完整 Superpowers plugin。`orchestration-policy.md` 不需新增對應欄位，因為技能
 路由不是授權政策。
 
+新功能、bug 修復或可由自動化測試觀察的行為變更，會在撰寫產品程式碼前路由至
+`$test-driven-development`：先寫失敗測試並確認 RED，再最小實作；純設定、文件或產生的
+程式碼不路由。
+
 需要子代理驅動開發時，可明確叫用 `$subagent-driven-development`；只有三個以上外部
 依賴、核心金流、權限架構或相當風險的資料庫遷移／跨模組重構才符合委派閘門。
 完成階段會自動叫用 `$requesting-code-review`，

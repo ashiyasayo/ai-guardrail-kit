@@ -52,6 +52,7 @@ for mode in modes:
             "systematic-debugging",
             "subagent-driven-development",
             "requesting-code-review",
+            "test-driven-development",
         }
 
     registration = json.loads(hooks_path.read_text())
