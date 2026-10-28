@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 四個工作流技能以 shared/skills 為唯一審核來源；
+# 五個工作流技能以 shared/skills 為唯一審核來源；
 # 其餘位置是 Claude／Codex 實際技能載入入口需要的可攜實體副本。
 script_dir=$(cd "$(dirname "$0")" && pwd -P)
 repo=${AI_GUARDRAIL_ROOT:-$(cd "$script_dir/.." && pwd -P)}
@@ -20,7 +20,7 @@ case ${1:-} in
     ;;
 esac
 
-skills=(brainstorming systematic-debugging subagent-driven-development requesting-code-review)
+skills=(brainstorming systematic-debugging subagent-driven-development requesting-code-review test-driven-development)
 target_roots=(
   "integrated-harness/.claude/skills"
   "claude/plugins/integrated-harness/skills"

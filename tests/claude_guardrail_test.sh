@@ -305,6 +305,88 @@ with tempfile.TemporaryDirectory() as td:
     )
     assert_allowed(assert_pair(*gates, allowed_bash, project, home=home))
 
+    # allowlist 未列 git 指令時，git commit 維持一般 Bash 攔截（防退化）
+    assert_denied(
+        assert_pair(*gates, event(project, tool="Bash", tool_input={"command": "git commit -m x"}),
+                    project, home=home),
+        "strict 模式禁止一般 Bash",
+    )
+
+# strict 模式且人類將 git add／git commit 加入 allowlist 時，套用 git 專屬規則：
+# 只放行範圍內路徑與 -m 訊息，並允許 git add 範圍內位於 .claude/ 底下的檔案。
+with tempfile.TemporaryDirectory() as td:
+    project = Path(td) / "project"
+    (project / ".claude/plan").mkdir(parents=True)
+    home = Path(td) / "home"
+    home.mkdir()
+    gates = (integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py")
+    template = (root / "integrated-harness/.claude/orchestration-policy.md").read_text()
+    git_policy = template.replace("- `npm run build`\n", "- `npm run build`\n- `git add`\n- `git commit`\n", 1)
+    assert git_policy != template
+    (project / ".claude/orchestration-policy.md").write_text(git_policy)
+    plan = project / ".claude/plan/decomposition.md"
+    plan.write_text(
+        "## 已知資訊\n## 缺少的資訊\n【假設】none\n"
+        "## 允許修改範圍\n- `src/`\n- `pkg/.claude/skills/demo/SKILL.md`\n"
+    )
+    digest = hashlib.sha256(plan.read_bytes()).hexdigest()
+    (project / ".claude/.plan_approved").write_text(
+        json.dumps({"approved_at": time.time(), "plan_sha256": digest})
+    )
+
+    def git(command):
+        return assert_pair(
+            *gates, event(project, tool="Bash", tool_input={"command": command}), project, home=home,
+        )
+
+    for command in (
+        "git add src/app.py",
+        "git add -- src/app.py src/lib/",
+        "git add pkg/.claude/skills/demo/SKILL.md",
+        "git commit -m feat",
+        'git commit -m "docs: mention .claude skills" --message "second paragraph"',
+        "git commit --message=fix",
+    ):
+        assert_allowed(git(command))
+
+    for command in (
+        "git add -A",
+        "git add --all",
+        "git add -u src/app.py",
+        "git add -f src/app.py",
+        "git add .",
+        "git add pkg/",
+        "git add pkg/.claude/other.md",
+        "git add docs/readme.md",
+        "git add :/",
+        "git add /etc/passwd",
+        "git add ../outside.txt",
+        "git add",
+        "git commit --amend -m x",
+        "git commit --no-verify -m x",
+        "git commit -n -m x",
+        "git commit -a -m x",
+        "git commit --all -m x",
+        "git commit -mx",
+        "git commit -m x src/app.py",
+        "git commit -m",
+        "git commit",
+    ):
+        assert_denied(git(command), "git 規則：")
+
+    # 核准旗標保護在 git 規則之前，不得因 git 豁免而放寬
+    assert_denied(git("git add .claude/.plan_approved"), "核准旗標只能由人類")
+
+    # git 規則不取代計畫核准：計畫變動後即使指令合法也須重新核准
+    plan.write_text(plan.read_text() + "- `docs/`\n")
+    assert_denied(git("git add src/app.py"), "拆解文件與核准版本不一致")
+
+    # standard 模式維持原本的 .claude 管理目錄攔截
+    (project / ".claude/orchestration-policy.md").write_text(
+        git_policy.replace("- Approval Mode: strict", "- Approval Mode: standard", 1)
+    )
+    assert_denied(git("git add pkg/.claude/skills/demo/SKILL.md"), ".claude 管理檔")
+
 for mode in ("harness", "integrated-harness"):
     for name in ("block_dangerous_commands.py", "block_secrets.py"):
         legacy = (root / mode / ".claude/hooks" / name).read_text()

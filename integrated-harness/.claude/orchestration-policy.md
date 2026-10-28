@@ -30,6 +30,10 @@ SHA-256，有效期間為 60 分鐘。三種模式均不豁免憑證與危險命
 command substitution 或環境變數指派前綴。入口內部仍受 permissions、sandbox 與
 程式碼審查約束。清單區段內只能放置反引號清單項目，直到下一個 `## ` 標題為止。
 
+如要讓模型提交，可加入 `git add` 與 `git commit`：`git add` 只接受允許修改範圍內的
+相對路徑且不得帶選項，`git commit` 只接受 `-m`／`--message`（拒絕 `--amend`、
+`--no-verify`、`-a` 等）。`git push` 屬對外動作，不建議加入。
+
 ## Strict Bash 測試與建置 Allowlist
 
 - `bash tests/`

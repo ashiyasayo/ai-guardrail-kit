@@ -17,11 +17,15 @@ cp -R "$repo/shared/skills" "$fixture/shared/skills"
 mkdir -p "$fixture/integrated-harness/.claude" \
   "$fixture/claude/plugins/integrated-harness/skills" \
   "$fixture/codex/plugins/ai-guardrail-loader/skills"
-if ln -s "$fixture/outside" "$fixture/integrated-harness/.claude/skills" 2>/dev/null; then
+if ln -s "$fixture/outside" "$fixture/integrated-harness/.claude/skills" 2>/dev/null \
+  && [[ -L "$fixture/integrated-harness/.claude/skills" ]]; then
   if AI_GUARDRAIL_ROOT="$fixture" bash "$repo/scripts/sync-shared-skills" >/dev/null 2>&1; then
     printf 'sync-shared-skills followed a symlink parent\n' >&2
     exit 1
   fi
+else
+  # Windows Git Bash 預設 ln -s 會複製目錄而非建立 symlink，無法驗證此防護。
+  printf 'SKIP: symlink parent check (ln -s did not create a real symlink)\n'
 fi
 
 python3 - "$repo" <<'PY'
@@ -34,6 +38,7 @@ for name in (
     "systematic-debugging",
     "subagent-driven-development",
     "requesting-code-review",
+    "test-driven-development",
 ):
     text = (root / "shared/skills" / name / "SKILL.md").read_text(encoding="utf-8")
     assert "using-superpowers" not in text
@@ -63,5 +68,16 @@ assert "Stage 2：Code Quality" in review
 assert "`Critical`" in review and "`Major`" in review and "`Minor`" in review
 assert "SQL 注入" in review and "race condition" in review and "最小修正 diff" in review
 assert "明確接受風險" not in review
+
+tdd = (root / "shared/skills/test-driven-development/SKILL.md").read_text(encoding="utf-8")
+assert "純設定" in tdd.split("---", 2)[1]
+assert "極小可能" in tdd
+assert "確認 RED（不得跳過）" in tdd
+assert "不得刪除、還原或覆寫使用者與協作者的既有修改" in tdd
+assert "不得 hardcode 任何憑證" in tdd
+assert "Mutation check" in tdd
+assert "Git worktree" in tdd
+# 原版「先寫碼就刪除」的絕對規則不得回流，否則會違反保留他人修改的原則。
+assert "Delete means delete" not in tdd
 print("PASS: shared workflow skills are synchronized and decoupled")
 PY

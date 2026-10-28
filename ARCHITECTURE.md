@@ -111,12 +111,12 @@ Claude `integrated-harness` 的執行行為校準位於 `reasoning-protocol.md` 
 `ORCHESTRATOR.md`、政策檔與確定性 hooks 決定。copy-in 與 marketplace 版本的兩份
 協定必須逐字節一致。
 
-`brainstorming`、`systematic-debugging`、`subagent-driven-development` 與
-`requesting-code-review` 的唯一審核來源位於 `shared/skills/`。
+`brainstorming`、`systematic-debugging`、`subagent-driven-development`、
+`requesting-code-review` 與 `test-driven-development` 的唯一審核來源位於 `shared/skills/`。
 Claude copy-in、Claude marketplace 與 Codex loader 保留實體副本，以
 `scripts/sync-shared-skills` 產生並由同步測試逐位元組守護。Codex runtime
 archive 只承載 mode hooks；技能由唯一可安裝的 loader plugin 提供，因此不重複塞入
-runtime archive。Copilot 目前沒有此專案可用的 skill 載入介面，故不發佈這四個技能。
+runtime archive。Copilot 目前沒有此專案可用的 skill 載入介面，故不發佈這五個技能。
 
 風險分級路由屬執行方法，放在技能 description、Claude reasoning protocol 與 Codex
 skill 指引；`orchestration-policy.md` 仍只承載人類設定的授權、成本及環境邊界，避免

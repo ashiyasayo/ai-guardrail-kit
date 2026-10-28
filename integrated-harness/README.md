@@ -10,10 +10,12 @@
 `integrated-harness` 是 `decomposition-gate` 與 `harness` 的整合版，也是三個 Claude copy-in 目錄中唯一同時
 具備「治理政策、推理協定、計畫品質檢查、人類授權及安全 hooks」的完整方案。
 
-`.claude/skills/` 另提供四個不依賴完整 Superpowers plugin 的工作流技能：
-`brainstorming`、`systematic-debugging`、`subagent-driven-development` 與
-`requesting-code-review`。前兩者避免過度規劃與猜測式修復；後兩者只在明確採用委派
-模式時，以 fresh-context 子代理依序執行規格符合性與程式碼品質審查。技能不會自動
+`.claude/skills/` 另提供五個不依賴完整 Superpowers plugin 的工作流技能：
+`brainstorming`、`systematic-debugging`、`subagent-driven-development`、
+`requesting-code-review` 與 `test-driven-development`。`brainstorming` 與
+`systematic-debugging` 避免過度規劃與猜測式修復；`subagent-driven-development` 與
+`requesting-code-review` 只在明確採用委派模式時，以 fresh-context 子代理依序執行規格
+符合性與程式碼品質審查；`test-driven-development` 要求新功能與修錯先寫失敗測試。技能不會自動
 建立 worktree，一般小型工作也不會自動派發子代理。
 
 | 層次 | 解決的問題 | 實作來源 |
@@ -92,6 +94,17 @@
 `strict` 模式拒絕一般 Bash；只有唯讀命令與人類 policy allowlist 的測試／建置入口
 可進入計畫／核准流程。Allowlist 入口仍可能執行專案程式，permissions 與 sandbox
 才是真正邊界。
+
+人類在 allowlist 加入 `git add`／`git commit` 後，strict 模式另套用 git 專屬規則，
+且仍須通過拆解與 60 分鐘人工核准：
+
+- `git add` 只接受 `--` 與允許修改範圍內的相對路徑；範圍內位於 `.claude/` 底下的檔案
+  可以加入，但 `-A`、`--all`、`-u`、`-f` 等選項、`.`、上層目錄、pathspec magic（`:` 開頭）
+  與絕對路徑一律拒絕。
+- `git commit` 只接受 `-m <訊息>`、`--message <訊息>` 或 `--message=<訊息>`，且至少一個；
+  `--amend`、`--no-verify`、`-a`、指定路徑等其他參數一律拒絕。訊息不得含換行或
+  `` ` ``、`>` 等 shell 結構，多段訊息請用多個 `-m`。
+- `git push` 與建立 PR 屬對外動作，不建議加入 allowlist。
 
 ## 安裝
 

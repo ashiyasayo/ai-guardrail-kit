@@ -85,7 +85,7 @@ loader plugin（它提供一次性的遠端 bootstrap 入口）：
 codex plugin add ai-guardrail-loader@ai-guardrail-kit
 ```
 
-#### 全域套用快速指引（Loader＋四技能＋integrated-harness）
+#### 全域套用快速指引（Loader＋五技能＋integrated-harness）
 
 若要讓目前使用者的所有 Codex 專案預設使用本套件，可依下列順序一次完成。Codex
 不直接全域安裝四個 mode plugin；只安裝全域 `ai-guardrail-loader`，再用 `user`
@@ -120,7 +120,8 @@ selector 將 `integrated-harness` 設為全域 fallback：
    ```
 
 全域 Loader 會提供 `$brainstorming`、`$systematic-debugging`、
-`$subagent-driven-development` 與 `$requesting-code-review` 四個技能；user selector 則讓
+`$subagent-driven-development`、`$requesting-code-review` 與
+`$test-driven-development` 五個技能；user selector 則讓
 `integrated-harness` hooks 成為未另行設定專案的預設 runtime。`project`／`local`
 selector 仍可覆寫全域設定，優先序為 `local > project > user > disabled`。安裝、更新或
 切換後請開啟新的 Codex thread；首次安裝或 hook 更新後另以 `/hooks` 審閱並信任
@@ -544,6 +545,7 @@ SDG 的完整能力已獨立列於上表。
 | 無政策或政策無效 | — | — | fail closed 為 `strict` | — | — | fail closed 為 `strict`，空 Bash allowlist |
 | 允許修改範圍 | — | — | `strict`／`standard` 強制；`light` 不解析、不強制 | — | — | 所有模式的 `apply_patch` 都強制範圍；`light` 只免除 patch 的操作憑證 |
 | `strict` Bash allowlist | — | — | 有；不在清單的一般 Bash 直接拒絕 | — | — | 有；符合清單後仍須終端機核准 |
+| `strict` git 專屬規則 | — | — | allowlist 列入 `git add`／`git commit` 時：`git add` 只接受允許修改範圍內的相對路徑（含範圍內 `.claude/` 底下的檔案），不得帶選項；`git commit` 只接受 `-m`／`--message` | — | — | 無；每個指令都須以完整指令 SHA-256 的終端機收據核准 |
 | `standard` 行為 | — | — | 拆解＋範圍，免人工核准 | — | — | 拆解＋範圍，`apply_patch`／`exec_command` 仍須終端機核准 |
 | `light` 行為 | — | — | 只要求基本拆解；免範圍與人工核准 | — | — | 人類建立計畫後，範圍內 `apply_patch` 免操作憑證；Bash 仍須終端機核准 |
 | 子代理委派（`Agent`／`Task` 等非 Bash、非檔案寫入類工具） | — | — | `plan_gate.py` 依 `tool_name` 攔截，不區分呼叫來源（含 slash command 間接觸發）：不在 `PRE_PLAN_SAFE_TOOLS` 白名單者，`strict` 需拆解文件＋60 分鐘內人工核准才放行；`standard`／`light` 只需拆解文件存在即可放行 | — | — | 同一機制是否涵蓋 Codex 端子代理／委派工具尚未查證，暫缺 |
@@ -685,7 +687,7 @@ Claude 的 SessionStart 推理協定另採風險分級校準：進度只在重�
 subagent；驗證深度依風險調整，避免沒有新證據的重複檢查。這些是執行行為提示，
 不改變 `ORCHESTRATOR.md`、政策檔及 hooks 的授權與安全邊界。
 
-Claude `integrated-harness` 與 Codex loader 另提供四個從
+Claude `integrated-harness` 與 Codex loader 另提供五個從
 [obra/superpowers](https://github.com/obra/superpowers) 思路精簡改編的獨立技能，沒有安裝
 完整 Superpowers plugin，也沒有掛載 `using-superpowers`：
 
@@ -701,8 +703,12 @@ Claude `integrated-harness` 與 Codex loader 另提供四個從
   與資安、併發、回滾、測試四類紅線；Critical／Major 在技能工作流中阻塞完成，
   Minor 記錄處理，每階段最多兩輪，finding 附最小修正 diff。此關卡不是由 hook
   強制執行的確定性安全控制。
+- `test-driven-development`：新功能、bug 修復或可由測試觀察的行為變更，在寫產品程式碼
+  前先寫失敗測試並確認 RED，再做最小實作與重構；純設定、文件、產生的程式碼不適用。
+  只撤回自己未受測試保護的草稿，不刪除他人既有修改；測試資料不得含憑證或真實個資；
+  既有 Classic ASP／VB.NET／Laravel 先補特徵測試並維持最小變動。
 
-四個技能以 `shared/skills/` 為單一事實來源，發佈至 Claude copy-in／marketplace、
+五個技能以 `shared/skills/` 為單一事實來源，發佈至 Claude copy-in／marketplace、
 以及 Codex loader；Codex mode runtime 不重複攜帶技能。修改後執行
 `scripts/sync-shared-skills`，並以
 `scripts/sync-shared-skills --check` 驗證副本一致。
@@ -711,6 +717,67 @@ Claude `integrated-harness` 與 Codex loader 另提供四個從
 - 除本目錄自帶的 `tests/` 外，儲存庫根層 `tests/` 的回歸測試涵蓋
   全部四種模式與兩個平台（`decomposition-gate` 另有
   `tests/smoke_test.sh`）。
+
+## 與 Superpowers plugin 的差異及安裝建議
+
+本專案的五個工作流技能是從 [obra/superpowers](https://github.com/obra/superpowers)
+精簡改編，並非完整移植；只隨 Claude `integrated-harness` 與 Codex loader 發佈，
+`decomposition-gate`、`sensitive-data-guard`、`harness` 三種模式不附帶這些技能。
+
+### 主要差異
+
+| 面向 | Superpowers plugin | 本專案改編版 |
+| --- | --- | --- |
+| 觸發方式 | SessionStart 注入 `using-superpowers`，要求「只要有 1% 可能適用就必須載入技能」 | 不掛載 `using-superpowers`；依技能 description 與 `reasoning-protocol.md` 的風險分級路由 |
+| 規劃產物 | `brainstorming`／`writing-plans` 產出 spec 與 plan 文件 | 只在對話中提供路徑、簽章與十行內虛擬碼；不自動建立中間文件，拆解改由計畫閘門處理 |
+| Git worktree | 部分流程搭配 `using-git-worktrees` | 任何技能都不自動建立 worktree 或切換分支 |
+| 子代理 | 子代理驅動開發可作為一般實作流程 | 常規任務禁止派發；僅限高風險且責任範圍可隔離的工作，子代理不得再派發下一層 |
+| Code review | 獨立審查流程 | 兩階段 fresh-context 審查，每階段最多兩輪，Critical／Major 阻塞完成 |
+| TDD | 先寫碼就刪除重來；每次執行整套測試 | 只撤回自己未受測試保護的草稿；驗證依影響面調整，完成前仍須跑標準測試入口；加入憑證、個資與既有系統最小變動規則 |
+| 授權邊界 | 無 | 技能路由不構成擴張授權的理由；人類核准、敏感資料與破壞性指令仍由 hooks 控制 |
+
+### 涵蓋範圍
+
+| Superpowers 技能 | 本專案狀態 |
+| --- | --- |
+| `brainstorming`、`systematic-debugging`、`subagent-driven-development`、`requesting-code-review`、`test-driven-development` | 已精簡改編 |
+| `writing-plans`、`executing-plans` | 部分替代：計畫閘門（拆解文件＋人類核准） |
+| `verification-before-completion` | 部分替代：推理協定「輸出前驗證」 |
+| `using-superpowers`、`using-git-worktrees` | 刻意不收錄 |
+| `receiving-code-review`、`finishing-a-development-branch`、`dispatching-parallel-agents`、`writing-skills` | 未收錄 |
+
+### 同時安裝的衝突
+
+在同一專案同時啟用 `integrated-harness` 與完整 Superpowers plugin 時：
+
+- 兩套技能同名（例如 `superpowers:brainstorming` 與 `integrated-harness:brainstorming`），
+  實際載入哪一個無法保證；載入 Superpowers 版本會帶回本專案刻意移除的行為。
+- `using-superpowers` 的「1% 強制載入」與本專案「不採極低機率強制觸發」的路由原則
+  互相矛盾，且每個 session 都會額外注入其內容。
+- Superpowers 的 spec／plan 文件產出與 worktree 流程，和本專案「不建立中間文件、不自動
+  建立 worktree」的規則衝突。
+
+### 安裝建議
+
+| 情境 | 建議 |
+| --- | --- |
+| 專案使用 `integrated-harness` | 不需安裝 Superpowers；若已全域安裝，建議在該專案停用 |
+| 專案使用其他三種模式，且需要上述工作流技能 | 可安裝 Superpowers；這些模式不附帶技能，也不會同名衝突 |
+| 需要本專案未收錄的技能（例如 `writing-skills`） | 全域保留 Superpowers，並在使用 `integrated-harness` 的專案個別停用 |
+
+Claude Code 可在專案的 `.claude/settings.json` 以 `enabledPlugins` 停用 Superpowers；
+plugin 識別名稱以 `/plugin` 介面顯示的 `名稱@marketplace` 為準，例如從官方 marketplace
+安裝時：
+
+```json
+{
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": false
+  }
+}
+```
+
+修改後須重新啟動 Claude Code session 才會生效。
 
 ## 如何選擇
 
@@ -748,8 +815,8 @@ Codex 請使用 marketplace plugin 與 selector，不可沿用 copy-in 步驟。
   `scripts/sync-claude-hook-copies --check`（即 `tests/claude_shared_sync_test.sh`）確認
   沒有漂移。`block_secrets.py`／`block_dangerous_commands.py` 為刻意分歧分支，不在同步
   範圍，改由 `tests/claude_hook_parity_test.sh` 行為守護。
-- 跨 Claude／Codex 的四個工作流技能以
-  `shared/skills/` 為唯一審核來源；使用 `scripts/sync-shared-skills` 產生四組發佈副本，
+- 跨 Claude／Codex 的五個工作流技能以
+  `shared/skills/` 為唯一審核來源；使用 `scripts/sync-shared-skills` 產生五組發佈副本，
   `tests/shared_skills_sync_test.sh` 會阻止內容漂移。
 - copy-in（`harness/.claude/hooks`、`integrated-harness/.claude/hooks`）與 marketplace
   plugin 的**非 PII** hook（`guard.py`／`plan_gate.py`／`block_secrets.py`／
