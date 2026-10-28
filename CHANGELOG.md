@@ -8,6 +8,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-28
+
 ### Added
 
 - Claude `integrated-harness` 的 `plan_gate.py`（copy-in 與 marketplace）新增 strict
@@ -18,7 +20,6 @@ All notable changes to this project are documented in this file.
   與無訊息提交。allowlist 未列 git 指令、standard／light 模式及核准旗標保護的行為不變；
   git 指令仍須通過拆解與人工核准。Codex 因每個指令皆以完整指令 SHA-256 的終端機收據
   核准，未加入此規則。
-
 - 從 obra/superpowers 的 `test-driven-development` 精簡改編同名技能，以
   `shared/skills/` 為單一事實來源，同步發佈至 Claude integrated-harness
   copy-in／marketplace 與 Codex loader。依組織規範調整：只路由可由自動化測試觀察的
@@ -37,6 +38,9 @@ All notable changes to this project are documented in this file.
 ### Changed
 
 - Claude `integrated-harness` plugin 版號由 `0.8.0` 升為 `0.9.0`。
+- README 新增「與 Superpowers plugin 的差異及安裝建議」章節：對照觸發方式、規劃
+  產物、worktree、子代理、審查與 TDD 的差異，說明同時安裝的衝突，並建議使用
+  `integrated-harness` 的專案以 `enabledPlugins` 停用完整 Superpowers plugin。
 
 ## [0.9.0] - 2026-10-28
 
