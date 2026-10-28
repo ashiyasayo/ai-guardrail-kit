@@ -95,6 +95,17 @@
 可進入計畫／核准流程。Allowlist 入口仍可能執行專案程式，permissions 與 sandbox
 才是真正邊界。
 
+人類在 allowlist 加入 `git add`／`git commit` 後，strict 模式另套用 git 專屬規則，
+且仍須通過拆解與 60 分鐘人工核准：
+
+- `git add` 只接受 `--` 與允許修改範圍內的相對路徑；範圍內位於 `.claude/` 底下的檔案
+  可以加入，但 `-A`、`--all`、`-u`、`-f` 等選項、`.`、上層目錄、pathspec magic（`:` 開頭）
+  與絕對路徑一律拒絕。
+- `git commit` 只接受 `-m <訊息>`、`--message <訊息>` 或 `--message=<訊息>`，且至少一個；
+  `--amend`、`--no-verify`、`-a`、指定路徑等其他參數一律拒絕。訊息不得含換行或
+  `` ` ``、`>` 等 shell 結構，多段訊息請用多個 `-m`。
+- `git push` 與建立 PR 屬對外動作，不建議加入 allowlist。
+
 ## 安裝
 
 將本目錄的 `.claude/`、`CLAUDE.md` 與 `ORCHESTRATOR.md` 複製或合併到目標專案。

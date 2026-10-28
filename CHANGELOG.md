@@ -10,6 +10,15 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- Claude `integrated-harness` 的 `plan_gate.py`（copy-in 與 marketplace）新增 strict
+  模式 git 專屬規則：人類在 strict allowlist 加入 `git add`／`git commit` 後，
+  `git add` 只接受允許修改範圍內的相對路徑（可加入範圍內 `.claude/` 底下的檔案），
+  拒絕 `-A`、`--all`、`-u`、`-f` 等選項、`.`、上層目錄、pathspec magic 與絕對路徑；
+  `git commit` 只接受 `-m`／`--message`，拒絕 `--amend`、`--no-verify`、`-a`、指定路徑
+  與無訊息提交。allowlist 未列 git 指令、standard／light 模式及核准旗標保護的行為不變；
+  git 指令仍須通過拆解與人工核准。Codex 因每個指令皆以完整指令 SHA-256 的終端機收據
+  核准，未加入此規則。
+
 - 從 obra/superpowers 的 `test-driven-development` 精簡改編同名技能，以
   `shared/skills/` 為單一事實來源，同步發佈至 Claude integrated-harness
   copy-in／marketplace 與 Codex loader。依組織規範調整：只路由可由自動化測試觀察的

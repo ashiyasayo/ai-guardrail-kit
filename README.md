@@ -545,6 +545,7 @@ SDG 的完整能力已獨立列於上表。
 | 無政策或政策無效 | — | — | fail closed 為 `strict` | — | — | fail closed 為 `strict`，空 Bash allowlist |
 | 允許修改範圍 | — | — | `strict`／`standard` 強制；`light` 不解析、不強制 | — | — | 所有模式的 `apply_patch` 都強制範圍；`light` 只免除 patch 的操作憑證 |
 | `strict` Bash allowlist | — | — | 有；不在清單的一般 Bash 直接拒絕 | — | — | 有；符合清單後仍須終端機核准 |
+| `strict` git 專屬規則 | — | — | allowlist 列入 `git add`／`git commit` 時：`git add` 只接受允許修改範圍內的相對路徑（含範圍內 `.claude/` 底下的檔案），不得帶選項；`git commit` 只接受 `-m`／`--message` | — | — | 無；每個指令都須以完整指令 SHA-256 的終端機收據核准 |
 | `standard` 行為 | — | — | 拆解＋範圍，免人工核准 | — | — | 拆解＋範圍，`apply_patch`／`exec_command` 仍須終端機核准 |
 | `light` 行為 | — | — | 只要求基本拆解；免範圍與人工核准 | — | — | 人類建立計畫後，範圍內 `apply_patch` 免操作憑證；Bash 仍須終端機核准 |
 | 子代理委派（`Agent`／`Task` 等非 Bash、非檔案寫入類工具） | — | — | `plan_gate.py` 依 `tool_name` 攔截，不區分呼叫來源（含 slash command 間接觸發）：不在 `PRE_PLAN_SAFE_TOOLS` 白名單者，`strict` 需拆解文件＋60 分鐘內人工核准才放行；`standard`／`light` 只需拆解文件存在即可放行 | — | — | 同一機制是否涵蓋 Codex 端子代理／委派工具尚未查證，暫缺 |

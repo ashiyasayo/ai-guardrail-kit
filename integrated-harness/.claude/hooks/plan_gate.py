@@ -184,6 +184,66 @@ def strict_bash_allowed(command: str, root: str, prefixes: list[list[str]]) -> b
     return False
 
 
+def strict_git_write_tokens(command: str) -> Optional[list[str]]:
+    """指令為 git add／git commit 時回傳 tokens；含不安全結構或無法解析時回傳 None。"""
+    if UNSAFE_SHELL_PATTERN.search(command):
+        return None
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return None
+    if len(tokens) >= 2 and tokens[0] == "git" and tokens[1] in {"add", "commit"}:
+        return tokens
+    return None
+
+
+def check_git_write(tokens: list[str], root: str, scopes: list[tuple[str, bool]]) -> str:
+    """strict allowlist 只比對前綴，此處以白名單收緊參數；違規回傳原因，合法回傳空字串。"""
+    args = tokens[2:]
+    if tokens[1] == "commit":
+        # 只接受訊息參數：--amend、--no-verify、-a 與路徑都可能提交未經範圍檢查的內容
+        has_message = False
+        index = 0
+        while index < len(args):
+            arg = args[index]
+            if arg in {"-m", "--message"}:
+                if index + 1 >= len(args):
+                    return f"git 規則：{arg} 缺少訊息內容。"
+                has_message = True
+                index += 2
+                continue
+            if arg.startswith("--message="):
+                has_message = True
+                index += 1
+                continue
+            return f"git 規則：git commit 只允許 -m／--message，不得使用 {arg}。"
+        if not has_message:
+            # 沒有訊息會開啟編輯器，在無人值守的工具呼叫中卡住
+            return "git 規則：git commit 至少需要一個 -m 訊息。"
+        return ""
+
+    paths: list[str] = []
+    for index, arg in enumerate(args):
+        if arg == "--":
+            paths.extend(args[index + 1:])
+            break
+        if arg.startswith("-"):
+            return f"git 規則：git add 不得使用選項 {arg}；只能列出允許修改範圍內的路徑。"
+        paths.append(arg)
+    if not paths:
+        return "git 規則：git add 至少需要一個路徑。"
+    root_real = os.path.realpath(root)
+    for raw in paths:
+        # pathspec magic（例如 :/、:(glob)）會改變比對語意，無法以檔案路徑判斷範圍
+        if not raw or raw.startswith(":") or os.path.isabs(raw):
+            return f"git 規則：git add 只接受專案內的相對路徑：{raw or '<空白>'}。"
+        target = os.path.realpath(os.path.join(root_real, raw))
+        # 以 realpath 比對範圍：上層目錄或 . 會涵蓋範圍外檔案，因此必須逐一落在範圍內
+        if not target_in_scope(target, scopes):
+            return f"git 規則：git add 路徑不在計畫允許修改範圍：{raw}。"
+    return ""
+
+
 def parse_scopes(content: str, root: str) -> tuple[list[tuple[str, bool]], str]:
     lines = content.splitlines()
     try:
@@ -312,14 +372,24 @@ def check(data: dict) -> Optional[str]:
             return "核准旗標只能由人類在自己的終端機操作，模型不得自我核准或撤銷。"
         if is_read_only_bash(command):
             return None
+        # strict 下的 git add／commit 改由 check_git_write 逐一比對範圍，
+        # 才能提交範圍內位於 .claude/ 底下的檔案；其他模式與指令維持全面攔截。
+        git_tokens = strict_git_write_tokens(command) if mode == "strict" else None
         # 管理目錄不得透過 Bash 寫入，避免 glob、別名與路徑變形繞過保護。
-        if CLAUDE_DIR_SEGMENT_PATTERN.search(command):
+        if git_tokens is None and CLAUDE_DIR_SEGMENT_PATTERN.search(command):
             return ".claude 管理檔只能由人類或受管制的檔案工具修改；不得透過 Bash 變更。"
         if mode == "strict":
             prefixes, reason = parse_strict_bash_allowlist(root)
             if reason or not strict_bash_allowed(command, root, prefixes):
                 detail = reason or "命令不在 strict 測試與建置 allowlist。"
                 return f"strict 模式禁止一般 Bash：{detail}"
+            if git_tokens is not None:
+                passed, reason, scopes = check_plan(root, mode)
+                if not passed:
+                    return f"計畫閘門：{reason} 請先完成任務拆解。"
+                git_reason = check_git_write(git_tokens, root, scopes)
+                if git_reason:
+                    return git_reason
     elif tool in FILE_TOOL_PATH_KEYS:
         path_key = FILE_TOOL_PATH_KEYS[tool]
         normalized = normalized_target(tool_input, root, path_key)
