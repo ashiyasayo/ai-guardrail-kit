@@ -28,6 +28,7 @@ jobs:
           commit="$(git rev-parse "${tag}^{commit}")"
           test "$(git rev-parse HEAD)" = "$commit"
           test "$(git cat-file -t "$tag")" = tag
+          git fetch origin main:refs/remotes/origin/main
           git merge-base --is-ancestor "$commit" origin/main
           [[ "$commit" =~ ^[0-9a-f]{40}$ ]]
           printf '%s\n' "$commit" > release-commit-sha.txt
