@@ -72,9 +72,13 @@ assert '.codex/guardrail/plan/decomposition.md' not in json.dumps(dg_manifest)
 for marker in ('## 問題與目標', '## 已知資訊', '## 缺少的資訊', '【假設】', '## 做法與驗證', '## 允許修改範圍'):
     assert marker in dg_skill, marker
 assert 'This mode has no human approval step' in dg_skill
+integrated_skill = (root/'codex/plugins/integrated-harness/skills/integrated-harness/SKILL.md').read_text()
+assert 'one complete,' in integrated_skill and 'entire command on one' in integrated_skill
+assert 'the plan in general' in integrated_skill
 loader_skill = (root/'codex/plugins/ai-guardrail-loader/skills/ai-guardrail-loader/SKILL.md').read_text()
 for marker in ('.guardrail/plan/decomposition.md', '## 已知資訊', '## 缺少的資訊', '【假設】', '## 允許修改範圍'):
     assert marker in loader_skill, marker
+assert 'one complete, copy-ready confirmation command on one line' in loader_skill
 assert 'Decomposition-gate has no human approval step' in loader_skill
 for path in (
     root/'codex/plugins/ai-guardrail-loader/skills/ai-guardrail-loader/SKILL.md',

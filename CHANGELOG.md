@@ -14,6 +14,11 @@ All notable changes to this project are documented in this file.
   `.guardrail/plan/decomposition.md`; its marketplace description now uses the
   path enforced by the hook.
 
+- Codex `integrated-harness` now gives a fillable plan structure and requires one
+  complete, copy-ready operation approval command line when a receipt is needed.
+  The command authorizes one operation bound to the plan and policy hashes, not
+  the plan in general.
+
 ## [0.11.2] - 2026-10-29
 
 ### Fixed

@@ -38,12 +38,14 @@ least one `【假設】`. Integrated-harness also enforces
 `## 允許修改範圍`; decomposition-gate records that scope for clarity but does
 not enforce it. Decomposition-gate has no human approval step.
 
-When a hook says that human approval is required, show the user complete,
-copy-ready preview and confirm commands. Fill in the actual Python manager
-absolute path, project absolute path, cwd, and the current command, patch, or
-event file. Never show only the operation SHA-256, a relative path, a
-placeholder, or only say that approval is needed. Only the human may run the
-approval command in their own terminal; the AI must not run it or request write
+When an integrated-harness or harness hook says that human approval is required,
+show one complete, copy-ready confirmation command on one line. Fill in the
+actual Python executable, manager absolute path, project absolute path, exact
+command, patch file, or event file, and `--confirm` with the hook's current
+operation digest. Never show a preview-plus-confirm pair, only the SHA-256, a
+relative path, a placeholder, or only say that approval is needed. The receipt
+authorizes one matching operation, not the plan in general. Only the human may
+run the command in their own terminal; the AI must not run it or request write
 access to the approval store.
 
 The loader is the only globally installed Codex plugin from this marketplace.
