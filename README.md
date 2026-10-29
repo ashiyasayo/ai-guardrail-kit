@@ -654,6 +654,10 @@ fail-closed 預設與四種模式的跨平台相容測試。
 風險分級協定：依任務風險調整分析、播報、subagent 委派與驗證深度，避免小型工作
 被固定多方案、反方審查或重複驗證放大。
 
+Codex 唯一全域安裝的 loader skill 會引導建立 `.guardrail/plan/decomposition.md`，列出目標、已知資訊、
+待確認資訊、明確假設、做法、驗證方式及修改範圍。Codex `decomposition-gate` 是流程閘門，
+不提供人工核准命令；需要操作收據時請選 `integrated-harness`。
+
 - 屬「流程紀律」而非「授權控制」：拆解文件可由模型自行完成，不能視為
   人工審批或安全沙箱。
 - 逃生口 `.claude/plan/.gate_disabled` 存在時停用關卡（緊急修復用）；此檔

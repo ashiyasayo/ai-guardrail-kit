@@ -8,6 +8,19 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.11.3] - 2026-10-29
+
+### Fixed
+
+- Codex's globally installed loader and `decomposition-gate` skills now explain how to write a useful
+  `.guardrail/plan/decomposition.md`; its marketplace description now uses the
+  path enforced by the hook.
+
+- Codex `integrated-harness` now gives a fillable plan structure and requires one
+  complete, copy-ready operation approval command line when a receipt is needed.
+  The command authorizes one operation bound to the plan and policy hashes, not
+  the plan in general.
+
 ## [0.11.2] - 2026-10-29
 
 ### Fixed
@@ -592,7 +605,8 @@ VS Code Agent hooks，且 macOS／Linux 路徑尚未實機驗證。以下彙整�
   once a plan exists, normal integrated-harness scope, policy, and approval
   checks apply.
 
-[Unreleased]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.11.2...HEAD
+[Unreleased]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.11.3...HEAD
+[0.11.3]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.10.0...v0.11.0

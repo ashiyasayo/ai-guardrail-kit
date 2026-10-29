@@ -49,17 +49,49 @@ a sandbox, and installation alone does not activate them.
 Activate it with `$CODEX_HOME/guardrail/bin/select-codex-mode integrated-harness [--scope project|local|user] [project-dir]`, then verify it with `$CODEX_HOME/guardrail/bin/verify-codex-mode integrated-harness [--scope project|local|user] [project-dir]`. For `user` scope, omit `[project-dir]` to use the global user fallback; provide it for `project` or `local` scope. Start a new thread after switching. The `./scripts/...` equivalents are only for a local checkout.
 
 Only the human may run `python3 "$CODEX_HOME/guardrail/bin/codex-runtime-manager.py" approve`
-in their own terminal. Preview with `--project <project> --command <command>` or
-`--patch-file <reviewed.diff>`, then confirm the displayed digest with `--confirm <SHA256>`.
-Use `--event-file <reviewed-event.json>` for exact tool input fields or a subdirectory cwd.
-When asking for approval, show complete copy-ready preview and confirm commands with the actual
-Python manager absolute path, project absolute path, cwd, operation input, and digest. Do not show
-placeholders, relative paths, only the digest, or merely say that approval is required.
+in their own terminal. Plan drafts live at `.guardrail/plan/decomposition.md`; create one
+before implementation and fill it with task-specific content using this structure:
+
+```md
+# 任務拆解：<任務名稱>
+
+## 問題與目標
+<重述要求及完成條件>
+
+## 已知資訊
+- <已確認事實>
+
+## 缺少的資訊
+- <會影響結果、尚未確認的資訊；沒有就寫「無」>
+
+## 假設
+- 【假設】<本次工作依賴的假設>
+
+## 做法與驗證
+- <預定修改及驗證方式>
+
+## 允許修改範圍
+- `<專案相對路徑>` — <修改原因>
+```
+
+Include the exact required markers `## 已知資訊`, `## 缺少的資訊`, `【假設】`,
+and `## 允許修改範圍`. Keep facts separate from assumptions and list only
+task-required paths inside the project root. Strict/standard mode permits a
+plan-only draft patch before approval; a mixed plan and implementation patch is
+not a draft-only patch. Light-mode plans must be created and changed by the human.
+
+For a pending operation, use the hook's current digest to prepare one complete,
+copy-ready confirmation command for the human. Put the entire command on one
+line and use the actual Python executable, manager absolute path, project
+absolute path, exact operation input (`--command`, `--patch-file`, or
+`--event-file` as appropriate), and `--confirm` with the current operation digest.
+Use `--event-file` when the operation has exact tool-input fields or a subdirectory
+cwd. A patch/event file named in the command must already contain the exact
+reviewed input. Do not show a preview-plus-confirm pair, placeholders, relative
+paths, only a digest, or merely say approval is required.
+This receipt authorizes one operation bound to the plan and policy hashes, not
+the plan in general. Only the human runs it in their own terminal.
 Never execute approval commands for the human, edit the approval store, or request sandbox
 access to that store. Missing or invalid receipts deny the operation. Permanent security
 denials still apply. Verify wiring with `verify-codex-mode --diagnose` and review `/hooks`.
-
-Plan drafts live at `.guardrail/plan/decomposition.md`. In strict/standard mode a patch
-may edit only the draft before approval; mixing implementation edits does not qualify.
-Light-mode plans must be created and changed by the human to preserve the scope boundary.
 Policies and emergency bypass files remain protected under `.codex/guardrail/`.
