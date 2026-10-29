@@ -141,6 +141,7 @@ def check(hook_input: dict) -> Optional[str]:
         "計畫閘門：本操作屬寫入性行為，但未偵測到有效的計畫核准。"
         "請先向人類提交執行計畫（任務分解、指派模型、驗收標準、風險點），"
         f"由人類在其終端機執行 `{approval_command}` 核准後方可施作。"
+        "AI 回覆使用者時必須完整照錄上述可複製命令，不得只說需要核准、改用相對路徑或 placeholder。"
         f"核准有效期為 {APPROVAL_TTL_SECONDS // 60} 分鐘。"
     )
 

@@ -49,10 +49,19 @@ with tempfile.TemporaryDirectory() as tmp:
         record=json.loads(receipt.read_text());record.update(changes);receipt.write_text(json.dumps(record))
         deny(data)
     receipt.unlink()
-    outside=base/'outside';outside.write_text('{}');receipt.symlink_to(outside)
-    deny(data)
-    assert outside.read_text()=='{}'
-    receipt.unlink()
+    outside=base/'outside';outside.write_text('{}')
+    try:
+        receipt.symlink_to(outside)
+    except OSError as exc:
+        # Windows 未啟用開發人員模式或沒有建立連結權限時，無法建構此攻擊情境；
+        # 其餘 approval 契約仍應繼續驗證，避免整支測試被環境能力中止。
+        if os.name != 'nt' or getattr(exc, 'winerror', None) != 1314:
+            raise
+        print('UNVERIFIED: approval symlink rejection (Windows symlink privilege unavailable)')
+    else:
+        deny(data)
+        assert outside.read_text()=='{}'
+        receipt.unlink()
     # 相同命令不得跨專案、cwd 或模式使用。
     approval.grant(data, project, mode, digest)
     other=base/'other';other.mkdir();deny(event(other))

@@ -40,7 +40,10 @@ wrapper。
 ## Codex runtime manager data flow
 
 `codex-runtime-manager` 將 `resolve`、`prepare`、`commit`、`verify` 與 `dispatch` 收在
-單一深 module。HTTPS manifest source 嚴格限制 origin、redirect hop、timeout 與下載大小；
+單一深 module。正式 HTTPS runtime 只接受由使用者從官方 Release 取得並明確提供的 40 位
+immutable commit。manifest v2 只保存官方 repository 與固定相對 archive path；manager
+以外部 commit 推導 canonical archive URL，避免 manifest 自報其所在 commit 的自我參照；
+branch、tag 與可變 ref 不屬於遠端信任根。HTTPS adapter 另限制 redirect hop、timeout 與下載大小；
 archive 先驗 SHA-256，再拒絕 traversal、drive/UNC、symlink、hardlink、device、FIFO、
 duplicate normalized path 與解壓炸彈。cache metadata 同時保存 selector identity 與
 每個 payload file digest，hook 每次重新驗證 metadata、完整 payload、entrypoint regular

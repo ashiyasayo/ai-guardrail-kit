@@ -7,7 +7,9 @@
    `light` 建立符合模式的 `.claude/plan/decomposition.md`。一般修改只要求拆解、
    方案與驗證。任務風險決定思考深度；核准模式只決定授權關卡，兩者互不取代。
 3. 不得修改 `.claude/orchestration-policy.md` 或建立、更新、刪除核准旗標；
-   `approve_plan.py` 只能由人類在自己的終端執行。
+   `approve_plan.py` 只能由人類在自己的終端執行。需要人工核准時，回覆必須完整照錄
+   hook 提供的可複製核准命令（含直譯器、`approve_plan.py` 絕對路徑及實際
+   `--project-dir`），不得只說「請核准」、只顯示相對路徑或使用 placeholder；AI 不得代跑。
 4. 資訊不足時明確說明，不得捏造；程式碼識別字使用英文，文件與回覆使用台灣繁體中文。
 5. 架構原則：新系統遵循 Clean Architecture、SOLID、TDD／BDD；既有系統從嚴採用
    最小變動原則，不為套用新架構進行非必要改寫（具體適用範圍見

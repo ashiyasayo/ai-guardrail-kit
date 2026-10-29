@@ -32,6 +32,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 MODES = ("decomposition-gate", "sensitive-data-guard", "harness", "integrated-harness")
 SCOPES = ("project", "local", "user")
 SCHEMA_VERSION = 1
+MANIFEST_SCHEMA_VERSION = 2
 MAX_MANIFEST_BYTES = 1024 * 1024
 MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
 MAX_ARCHIVE_FILES = 512
@@ -39,6 +40,8 @@ MAX_EXTRACTED_BYTES = 128 * 1024 * 1024
 MAX_EVENT_BYTES = 2 * 1024 * 1024
 MAX_OUTPUT_BYTES = 4 * 1024 * 1024
 APPROVED_HOSTS = {"raw.githubusercontent.com", "github.com", "objects.githubusercontent.com"}
+TRUSTED_REPOSITORY_SOURCE = "https://github.com/ashiyasayo/ai-guardrail-kit"
+TRUSTED_RAW_BASE = "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit"
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 MODE_RE = re.compile(r"^[a-z0-9-]+$")
@@ -170,42 +173,47 @@ def _validate_relative(value: Any) -> str:
     return value
 
 
-def validate_manifest(raw: bytes, *, expected_ref: Optional[str] = None) -> Dict[str, Any]:
+def validate_manifest(
+        raw: bytes, *, expected_ref: Optional[str] = None,
+        require_trusted_source: bool = False) -> Dict[str, Any]:
     if len(raw) > MAX_MANIFEST_BYTES:
         raise _error("E_MANIFEST_INVALID", "manifest exceeds size limit")
     try:
         data = json.loads(raw.decode("utf-8"))
     except (UnicodeError, json.JSONDecodeError):
         raise _error("E_MANIFEST_INVALID", "manifest is not valid UTF-8 JSON")
-    if not isinstance(data, dict) or data.get("schema_version") != SCHEMA_VERSION:
+    if not isinstance(data, dict) or data.get("schema_version") != MANIFEST_SCHEMA_VERSION:
         raise _error("E_MANIFEST_INVALID", "unsupported manifest schema")
     release = data.get("release")
     modes = data.get("modes")
     if not isinstance(release, dict) or not isinstance(modes, dict):
         raise _error("E_MANIFEST_INVALID", "manifest release and modes are required")
-    for field in ("source", "ref", "commit", "runtime_version"):
+    if set(release) != {"source", "ref", "runtime_version"}:
+        raise _error("E_MANIFEST_INVALID", "manifest release metadata schema is invalid")
+    for field in ("source", "ref", "runtime_version"):
         if not isinstance(release.get(field), str) or not release[field]:
             raise _error("E_MANIFEST_INVALID", "manifest release metadata is incomplete")
     _approved_url(release["source"])
+    if require_trusted_source and release["source"] != TRUSTED_REPOSITORY_SOURCE:
+        raise _error("E_SOURCE_DENIED", "manifest repository is not the trusted repository")
     _validate_ref(release["ref"])
-    if not COMMIT_RE.fullmatch(release["commit"]):
-        raise _error("E_MANIFEST_INVALID", "manifest commit is not a 40-hex value")
-    if expected_ref and release["ref"] != expected_ref:
+    if expected_ref and not require_trusted_source and release["ref"] != expected_ref:
         raise _error("E_MANIFEST_INVALID", "manifest ref does not match requested ref")
-    # 若請求的 ref 本身就是不可變的 40-hex commit（GitHub 依 commit 提供的內容不會
-    # 隨後被改寫），manifest 自報的 commit 欄位必須與其一致；否則 manifest 的
-    # commit 欄位只是自報值，無法證明 manifest 確實來自該 commit（AGK-003）。
-    if expected_ref and COMMIT_RE.fullmatch(expected_ref) and release["commit"] != expected_ref:
-        raise _error("E_MANIFEST_INVALID", "manifest commit does not match the immutable ref it was fetched from")
     for mode, item in modes.items():
         if mode not in MODES or not isinstance(item, dict):
             raise _error("E_MANIFEST_INVALID", "manifest contains an unknown mode")
-        url = item.get("archive_url")
+        if set(item) != {"archive_path", "archive_sha256", "archive_size", "entrypoints"}:
+            raise _error("E_MANIFEST_INVALID", "manifest archive metadata schema is invalid")
+        archive_path = item.get("archive_path")
         digest = item.get("archive_sha256")
         size = item.get("archive_size")
         entries = item.get("entrypoints")
-        if not isinstance(url, str) or not isinstance(digest, str) or not isinstance(size, int):
+        if not isinstance(archive_path, str) or not isinstance(digest, str) or not isinstance(size, int):
             raise _error("E_MANIFEST_INVALID", "archive metadata is incomplete")
+        _validate_relative(archive_path)
+        expected_path = "codex/runtime-archives/codex-runtime-" + mode + ".tar.gz"
+        if archive_path != expected_path:
+            raise _error("E_MANIFEST_INVALID", "archive path does not match mode")
         if not SHA256_RE.fullmatch(digest) or size < 1 or size > MAX_ARCHIVE_BYTES:
             raise _error("E_MANIFEST_INVALID", "archive digest or size is invalid")
         if not isinstance(entries, dict) or not entries:
@@ -216,14 +224,6 @@ def validate_manifest(raw: bytes, *, expected_ref: Optional[str] = None) -> Dict
             _validate_relative(entry)
         if set(entries) != MODE_SLOTS[mode]:
             raise _error("E_MANIFEST_INVALID", "manifest entrypoints do not match mode events")
-        _approved_url(url)
-        # archive URL 必須以路徑區段方式包含 manifest 自報的 commit，不得只落在
-        # approved host 上就被接受；否則 manifest 若指向可變 ref（如 main），
-        # archive 內容會在下載當下才被解析，與 manifest 宣稱的 commit 脫鉤
-        # （AGK-003 建議 3：repository owner/name、manifest commit 與 archive URL
-        # 的強制綁定）。
-        if f"/{release['commit']}/" not in url:
-            raise _error("E_MANIFEST_INVALID", "archive URL is not pinned to the manifest's commit")
     if set(modes) != set(MODES):
         raise _error("E_MANIFEST_INVALID", "manifest must describe all four modes")
     return data
@@ -246,6 +246,11 @@ def validate_identity(identity: Mapping[str, Any]) -> Dict[str, Any]:
     if not COMMIT_RE.fullmatch(str(identity.get("commit"))):
         raise _error("E_CACHE_CORRUPT", "runtime identity commit is invalid")
     _approved_url(identity.get("archive_url"))
+    if identity.get("source") == "github":
+        trusted_url = (TRUSTED_RAW_BASE + "/" + identity["commit"]
+                       + "/codex/runtime-archives/codex-runtime-" + mode + ".tar.gz")
+        if identity["archive_url"] != trusted_url:
+            raise _error("E_CACHE_CORRUPT", "github runtime archive is not the trusted repository artifact")
     if not SHA256_RE.fullmatch(str(identity.get("archive_sha256"))):
         raise _error("E_CACHE_CORRUPT", "runtime identity digest is invalid")
     if not isinstance(identity.get("archive_size"), int) or not 1 <= identity["archive_size"] <= MAX_ARCHIVE_BYTES:
@@ -1017,20 +1022,61 @@ def select_source(name: str) -> ManifestSource:
     raise _error("E_SOURCE_DENIED", "source alias is not approved")
 
 
-def identity_from_manifest(manifest: Mapping[str, Any], mode: str, source: str) -> Dict[str, Any]:
+def identity_from_manifest(
+        manifest: Mapping[str, Any], mode: str, source: str, trusted_commit: str) -> Dict[str, Any]:
     item = manifest["modes"][mode]
+    if not COMMIT_RE.fullmatch(trusted_commit):
+        raise _error("E_MANIFEST_INVALID", "runtime identity requires a 40-hex content identity")
     return validate_identity({
         "schema_version": 1,
         "mode": mode,
         "source": source,
         "ref": manifest["release"]["ref"],
-        "commit": manifest["release"]["commit"],
+        "commit": trusted_commit,
         "runtime_version": manifest["release"]["runtime_version"],
-        "archive_url": item["archive_url"],
+        # URL 由 manifest 外部的 immutable commit 與受驗證相對路徑組成，避免
+        # manifest 宣告其自身所在 commit 所造成的不可能自我參照。
+        "archive_url": TRUSTED_RAW_BASE + "/" + trusted_commit + "/" + item["archive_path"],
         "archive_sha256": item["archive_sha256"],
         "archive_size": item["archive_size"],
         "entrypoints": dict(item["entrypoints"]),
     })
+
+
+def preserve_compatible_development_identity(
+        existing: Optional[Mapping[str, Any]], candidate: Mapping[str, Any]) -> Dict[str, Any]:
+    """相同本機 payload 沿用舊 identity，避免共用 digest cache 被無謂替換。"""
+    checked = validate_identity(candidate)
+    if not isinstance(existing, dict):
+        return checked
+    old = validate_identity(existing)
+    development_sources = {"development", "local", "test"}
+    stable_fields = ("mode", "archive_sha256", "archive_size", "entrypoints")
+    if (old["source"] in development_sources
+            and checked["source"] in development_sources
+            and all(old[field] == checked[field] for field in stable_fields)):
+        # cache 以 archive digest 為鍵；payload 未變時沿用舊 identity，才能讓其他仍引用
+        # v1 development identity 的 selector 繼續驗證。正式 GitHub identity 不走此路徑。
+        return old
+    return checked
+
+
+def preserve_compatible_development_identity(
+        existing: Optional[Mapping[str, Any]], candidate: Mapping[str, Any]) -> Dict[str, Any]:
+    """相同本機 payload 沿用舊 identity，避免共用 digest cache 被無謂替換。"""
+    checked = validate_identity(candidate)
+    if not isinstance(existing, dict):
+        return checked
+    old = validate_identity(existing)
+    development_sources = {"development", "local", "test"}
+    stable_fields = ("mode", "archive_sha256", "archive_size", "entrypoints")
+    if (old["source"] in development_sources
+            and checked["source"] in development_sources
+            and all(old[field] == checked[field] for field in stable_fields)):
+        # cache 以 archive digest 為鍵；payload 未變時沿用舊 identity，才能讓其他仍引用
+        # v1 development identity 的 selector 繼續驗證。正式 GitHub identity 不走此路徑。
+        return old
+    return checked
 
 
 def _load_selector(store: RuntimeStore, path: Path, expected_scope: Optional[str] = None) -> Dict[str, Any]:
@@ -1321,18 +1367,17 @@ def prepare_selection(args: argparse.Namespace) -> Dict[str, Any]:
     elif existing_identity is not None and not args.update:
         requested_ref = _validate_ref(existing_identity["ref"])
     else:
-        # 正式（github 來源、非離線）安裝預設不再信任可變的 main 分支：未明確指定
-        # --ref 時要求人工提供 immutable commit 或已發佈的 release tag，避免上游
-        # main 分支或發佈流程遭入侵時被靜默信任（AGK-003）。離線／development／
-        # test 來源不受影響，因為它們不會對可變 ref 發出新的網路請求。
-        if source_name == "github" and not args.offline and os.environ.get("AI_GUARDRAIL_ALLOW_MUTABLE_REF") != "1":
+        # 正式遠端安裝沒有可接受的隱含 ref；local/test/offline 不發出新的遠端請求。
+        if source_name == "github" and not args.offline:
             raise _error(
                 "E_USAGE",
-                "fresh install requires --ref <commit-or-tag>; refusing to default to the "
-                "mutable 'main' branch (set AI_GUARDRAIL_ALLOW_MUTABLE_REF=1 to explicitly "
-                "opt into it for development or testing)",
+                "github runtime install requires --ref <40-hex-commit>",
             )
         requested_ref = _validate_ref("main")
+    if source_name == "github" and not args.offline and not COMMIT_RE.fullmatch(requested_ref):
+        # 使用者明確提供的 immutable commit 是 manifest 之外的信任錨；branch/tag
+        # 均可被重新指向，不能用來證明 manifest 的真實性（AGK-003）。
+        raise _error("E_USAGE", "github runtime ref must be an immutable 40-hex commit")
     if args.offline:
         index = _read_json(store.index)
         if index.get("schema_version") != 1 or not isinstance(index.get("entries"), list):
@@ -1351,8 +1396,23 @@ def prepare_selection(args: argparse.Namespace) -> Dict[str, Any]:
         return {"identity": identity, "selector": selector, "cache_hit": True,
                 "migrations": migrations, "owner": getattr(args, "owner", None)}
     source = select_source(source_name)
-    manifest = validate_manifest(source.fetch_manifest(requested_ref), expected_ref=requested_ref)
-    identity = identity_from_manifest(manifest, args.mode, "development" if source.development else source_name)
+    raw_manifest = source.fetch_manifest(requested_ref)
+    manifest = validate_manifest(
+        raw_manifest, expected_ref=requested_ref,
+        require_trusted_source=(source_name == "github"),
+    )
+    # 正式遠端以使用者從可信發布管道取得的 commit 為信任錨。開發來源沒有遠端
+    # Git commit，因此以 manifest 內容雜湊前 40 位作為穩定的本機 content identity。
+    trusted_commit = (requested_ref if source_name == "github"
+                      else hashlib.sha256(raw_manifest).hexdigest()[:40])
+    identity = identity_from_manifest(
+        manifest, args.mode, "development" if source.development else source_name,
+        trusted_commit,
+    )
+    if source.development:
+        identity = preserve_compatible_development_identity(existing_identity, identity)
+    if source.development:
+        identity = preserve_compatible_development_identity(existing_identity, identity)
     archive = source.fetch_archive(identity["archive_url"])
     validate_archive(archive, identity["archive_sha256"], identity["archive_size"])
     _, cache_hit = store.install(identity, archive)

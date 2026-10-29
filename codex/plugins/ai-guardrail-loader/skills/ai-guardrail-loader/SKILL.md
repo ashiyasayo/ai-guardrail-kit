@@ -5,6 +5,14 @@ description: Stable Codex loader for project-selected runtimes.
 
 # AI Guardrail Loader
 
+When a hook says that human approval is required, show the user complete,
+copy-ready preview and confirm commands. Fill in the actual Python manager
+absolute path, project absolute path, cwd, and the current command, patch, or
+event file. Never show only the operation SHA-256, a relative path, a
+placeholder, or only say that approval is needed. Only the human may run the
+approval command in their own terminal; the AI must not run it or request write
+access to the approval store.
+
 The loader is the only globally installed Codex plugin from this marketplace.
 After bootstrap, modes are selected with
 `$CODEX_HOME/guardrail/bin/select-codex-mode` and verified with

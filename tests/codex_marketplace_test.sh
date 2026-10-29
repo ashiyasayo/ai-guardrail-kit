@@ -30,11 +30,15 @@ loader=root/'codex/plugins/ai-guardrail-loader/hooks'
 for name in ('loader.py','manager.py','select-codex-mode','verify-codex-mode','install-codex-guardrail-loader','prune-codex-runtime-cache','uninstall-codex-guardrail'):
     assert (loader/name).is_file(), name
 manifest=json.loads((root/'codex/runtime-manifest.json').read_text())
-assert manifest['schema_version']==1 and set(manifest['modes'])==set(names[1:])
+assert manifest['schema_version']==2 and set(manifest['modes'])==set(names[1:])
+assert 'commit' not in manifest['release']
 for mode, item in manifest['modes'].items():
     assert re.fullmatch(r'[0-9a-f]{64}', item['archive_sha256'])
     assert item['archive_size'] > 0
-    archive=root/'codex/runtime-archives'/pathlib.PurePosixPath(item['archive_url']).name
+    expected_path='codex/runtime-archives/codex-runtime-' + mode + '.tar.gz'
+    assert item['archive_path'] == expected_path
+    assert 'archive_url' not in item
+    archive=root/item['archive_path']
     assert archive.is_file() and archive.stat().st_size == item['archive_size']
     assert __import__('hashlib').sha256(archive.read_bytes()).hexdigest() == item['archive_sha256']
     # archive 必須是目前審核來源，不能只與可能過期的 manifest 自洽。
@@ -55,11 +59,18 @@ assert '完整解除安裝必須先移除每個仍在使用的' in readme
 assert '### copy-in（Claude Code／GitHub Copilot）' in readme
 cli_reference=(root/'CLI_REFERENCE.md').read_text()
 for label, document in (('README', readme), ('CLI_REFERENCE', cli_reference), ('marketplace guide', guide)):
-    assert re.search(r'\$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX\.Y\.Z\n', document), label
-    assert not re.search(r'\$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX\.Y\.Z\s+/path/to/', document), label
+    assert re.search(r'\$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref <40-hex-commit>\n', document), label
+    assert not re.search(r'\$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref <40-hex-commit>\s+/path/to/', document), label
 for plugin in names[1:]:
     base = root/f'codex/plugins/{plugin}'
     skill = (base/'skills'/plugin/'SKILL.md').read_text()
     assert 'For `user` scope, omit `[project-dir]`' in skill, plugin
+for path in (
+    root/'codex/plugins/ai-guardrail-loader/skills/ai-guardrail-loader/SKILL.md',
+    root/'codex/plugins/harness/skills/harness/SKILL.md',
+    root/'codex/plugins/integrated-harness/skills/integrated-harness/SKILL.md',
+):
+    text=path.read_text()
+    assert 'complete' in text and 'copy-ready' in text and 'placeholder' in text, path
 print('PASS: Codex marketplace, loader and runtime manifest structure')
 PY

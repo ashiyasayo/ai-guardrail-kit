@@ -23,8 +23,9 @@ grep -Fxq 'unrelated@elsewhere' "$AI_GUARDRAIL_TEST_STATE/installed"
 grep -Fxq 'ai-guardrail-loader@ai-guardrail-kit' "$AI_GUARDRAIL_TEST_STATE/installed"
 ! grep -Eq '^(decomposition-gate|sensitive-data-guard|harness|integrated-harness)@' "$AI_GUARDRAIL_TEST_STATE/installed"
 grep -Fq 'loader.py' "$CODEX_HOME/hooks.json"
-grep -Fq 'AI_GUARDRAIL_LOADER_SLOT=pretool.security' "$CODEX_HOME/hooks.json"
-grep -Fq 'AI_GUARDRAIL_LOADER_SLOT=session.start' "$CODEX_HOME/hooks.json"
+# Unix 使用行前環境變數，Windows 使用 PowerShell $env 指派；兩者的 slot 契約相同。
+grep -Eq "AI_GUARDRAIL_LOADER_SLOT(=pretool\.security| = 'pretool\.security')" "$CODEX_HOME/hooks.json"
+grep -Eq "AI_GUARDRAIL_LOADER_SLOT(=session\.start| = 'session\.start')" "$CODEX_HOME/hooks.json"
 [[ -x "$CODEX_HOME/guardrail/bin/prune-codex-runtime-cache" ]]
 
 # marketplace upgrade 必須保留已安裝的 Loader 與其他使用者 plugin。

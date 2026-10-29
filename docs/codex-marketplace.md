@@ -56,7 +56,7 @@ $manager = Join-Path $codexHome 'guardrail\bin\codex-runtime-manager.py'
 py -3 "$pluginRoot\hooks\manager.py" install-loader --plugin-root "$pluginRoot"
 
 # 為所有未設定 project/local selector 的專案建立全域 fallback
-py -3 $manager select integrated-harness --scope user --ref main
+py -3 $manager select integrated-harness --scope user --ref <40-hex-commit>
 py -3 $manager verify integrated-harness --scope user
 ```
 
@@ -86,9 +86,9 @@ precedence 固定為 `local > project > user > disabled`。
 
 ```bash
 guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
-"$guardrail_bin/select-codex-mode" harness --scope project --ref vX.Y.Z /path/to/project
-"$guardrail_bin/select-codex-mode" integrated-harness --scope local --ref vX.Y.Z /path/to/project
-"$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX.Y.Z
+"$guardrail_bin/select-codex-mode" harness --scope project --ref <40-hex-commit> /path/to/project
+"$guardrail_bin/select-codex-mode" integrated-harness --scope local --ref <40-hex-commit> /path/to/project
+"$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref <40-hex-commit>
 "$guardrail_bin/verify-codex-mode" harness --scope project /path/to/project
 "$guardrail_bin/verify-codex-mode" integrated-harness --scope user
 "$guardrail_bin/select-codex-mode" --remove --scope local /path/to/project
@@ -102,14 +102,16 @@ guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
 實際語法是 `select-codex-mode [--update] <mode> [--scope ...] [--ref ...] [project-dir]`；
 移除時使用 `select-codex-mode --remove [--scope ...] [project-dir]`。
 
-`--update` 才會重新解析 manifest；普通重跑保留既有 identity。正式來源只接受
-`github` alias 與核准 HTTPS origin。`local`／`test` 必須明確設定
+`--update` 才會重新解析 manifest；普通重跑保留既有 identity。正式 `github` 來源只接受
+明確的 40 位 commit SHA；該值從官方 GitHub Release 的 `Immutable runtime identity` 取得。
+manager 以此外部信任錨和 manifest v2 的固定相對路徑推導官方 archive URL。
+branch、tag 與省略 ref 都會被拒絕。`local`／`test` 必須明確設定
 `AI_GUARDRAIL_ALLOW_DEVELOPMENT_SOURCE=1`、manifest path 與 archive directory。
 `--offline` 僅使用 `$CODEX_HOME/guardrail/runtime-index.json` 中唯一匹配的 identity，
 不呼叫 network adapter。
 
-manifest 會固定 `ref`、40-hex `commit`、runtime version、archive size、SHA-256 及
-entrypoints。archive 先驗 hash，再檢查 UTF-8 相對 POSIX regular files、拒絕
+manifest v2 會固定 `ref`、runtime version、相對 archive path、archive size、SHA-256 及
+entrypoints，但不自報其所在 commit。archive 先驗 hash，再檢查 UTF-8 相對 POSIX regular files、拒絕
 symlink、hardlink、device、FIFO、duplicate normalized path、path traversal 與解壓大小
 上限，最後才 atomic publish 到 `runtime-cache/sha256/<digest>/`。
 

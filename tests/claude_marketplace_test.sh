@@ -106,6 +106,10 @@ assert misleading_literal not in (integrated_root / "hooks/plan_gate.py").read_t
 plan_gate_source = (integrated_root / "hooks/plan_gate.py").read_text()
 assert "os.path.dirname(os.path.abspath(__file__))" in plan_gate_source
 assert '"approve_plan.py"' in plan_gate_source
+assert "必須完整照錄上述可複製命令" in plan_gate_source
+policy_source = (integrated_root / "orchestration-policy.md").read_text()
+assert "不得只說「請核准」" in policy_source
+assert "placeholder" in policy_source
 
 decomposition_copyin = root / "decomposition-gate"
 decomposition_plugin = root / "claude/plugins/decomposition-gate"

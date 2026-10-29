@@ -53,6 +53,15 @@ def main() -> int:
     parser.add_argument("--manifest", type=Path)
     args = parser.parse_args()
     manifest = json.loads(args.manifest.read_text(encoding="utf-8")) if args.manifest else None
+    if manifest:
+        if manifest.get("schema_version") != 2 or set(manifest.get("modes", {})) != set(MODES):
+            raise SystemExit("manifest must use schema v2 and describe all runtime modes")
+        for mode, item in manifest["modes"].items():
+            expected = "codex/runtime-archives/codex-runtime-" + mode + ".tar.gz"
+            if item.get("archive_path") != expected or "archive_url" in item:
+                raise SystemExit("manifest archive_path is not canonical: " + mode)
+        if "commit" in manifest.get("release", {}):
+            raise SystemExit("manifest v2 must not contain a self-referential release commit")
     for mode in MODES:
         path = args.output / ("codex-runtime-" + mode + ".tar.gz")
         digest = archive(args.root, mode, path)

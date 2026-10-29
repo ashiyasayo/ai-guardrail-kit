@@ -236,7 +236,11 @@ def run(hook, data, home=None, global_default=False, python_utf8=None):
     if global_default: env["AI_GUARDRAIL_GLOBAL_DEFAULT"] = "1"
     if python_utf8 is not None:
         env["PYTHONUTF8"] = "1" if python_utf8 else "0"
-    proc = subprocess.run([sys.executable, str(hook)], input=json.dumps(data), text=True, capture_output=True, env=env)
+    # 子程序關閉 UTF-8 mode 時，Windows stdout 會使用 ANSI code page；若父程序仍以
+    # UTF-8 解碼，測試會在讀取中文拒絕原因時失敗，而非驗證 hook 行為。
+    encoding = "mbcs" if os.name == "nt" and python_utf8 is False else "utf-8"
+    proc = subprocess.run([sys.executable, str(hook)], input=json.dumps(data), text=True,
+                          encoding=encoding, capture_output=True, env=env)
     assert proc.returncode == 0, (hook, proc.stderr)
     return json.loads(proc.stdout)["hookSpecificOutput"] if proc.stdout.strip() else None
 
@@ -421,16 +425,25 @@ with tempfile.TemporaryDirectory() as td:
     outside = td / "outside.sh"; outside.write_text("#!/bin/sh\n")
     external_scripts = td / "external-scripts"; external_scripts.mkdir()
     (external_scripts / "evil.sh").write_text("#!/bin/sh\n")
-    (tests / "link").symlink_to(external_scripts, target_is_directory=True)
+    symlink_command = []
+    try:
+        (tests / "link").symlink_to(external_scripts, target_is_directory=True)
+    except OSError as exc:
+        # Windows 的 symlink 權限是主機能力，不應阻斷其餘 strict allowlist 測試。
+        if os.name != "nt" or getattr(exc, "winerror", None) != 1314:
+            raise
+        print("UNVERIFIED: strict allowlist symlink escape (Windows symlink privilege unavailable)")
+    else:
+        symlink_command.append("bash tests/link/evil.sh")
     (project / "tests-prefix").mkdir()
     (project / "tests-prefix" / "evil.sh").write_text("#!/bin/sh\n")
     approval_required(ip, event(project, "Bash", {"command": "bash tests/smoke.sh"}))
     for command in (
         "bash tests/../../outside.sh",
-        "bash tests/link/evil.sh",
         "bash " + str(outside),
         "bash tests/smoke.sh && touch escaped",
         "bash tests-prefix/evil.sh",
+        *symlink_command,
     ):
         denied(ip, event(project, "Bash", {"command": command}), "strict 模式禁止非 allowlist 指令。")
     policy.unlink()

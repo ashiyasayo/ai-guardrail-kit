@@ -17,7 +17,6 @@ import hashlib, json, os, tarfile, io
 from pathlib import Path
 out = Path(os.environ['AI_GUARDRAIL_ARCHIVE_DIR'])
 out.mkdir()
-commit = '1' * 40
 modes = ('decomposition-gate', 'sensitive-data-guard', 'harness', 'integrated-harness')
 slots = {
     'decomposition-gate': {'pretool.decomposition': 'hooks/dispatch.py'},
@@ -25,7 +24,7 @@ slots = {
     'harness': {'pretool.plan': 'hooks/dispatch.py', 'pretool.security': 'hooks/dispatch.py', 'pretool.pii': 'hooks/dispatch.py', 'prompt.pii': 'hooks/dispatch.py'},
     'integrated-harness': {'pretool.plan': 'hooks/dispatch.py', 'pretool.security': 'hooks/dispatch.py', 'pretool.pii': 'hooks/dispatch.py', 'prompt.pii': 'hooks/dispatch.py', 'session.start': 'hooks/dispatch.py'},
 }
-manifest = {'schema_version': 1, 'release': {'source': 'https://github.com/ashiyasayo/ai-guardrail-kit', 'ref': 'test', 'commit': commit, 'runtime_version': 'test+' + commit[:8]}, 'modes': {}}
+manifest = {'schema_version': 2, 'release': {'source': 'https://github.com/ashiyasayo/ai-guardrail-kit', 'ref': 'test', 'runtime_version': 'test+manifest-v2'}, 'modes': {}}
 for mode in modes:
     name = 'codex-runtime-' + mode + '.tar.gz'
     archive = out / name
@@ -39,7 +38,7 @@ for mode in modes:
             info = tarfile.TarInfo('orchestration-policy.md')
             info.size = len(policy)
             bundle.addfile(info, io.BytesIO(policy))
-    manifest['modes'][mode] = {'archive_url': 'https://github.com/ashiyasayo/ai-guardrail-kit/releases/download/' + commit + '/' + name, 'archive_sha256': hashlib.sha256(archive.read_bytes()).hexdigest(), 'archive_size': archive.stat().st_size, 'entrypoints': slots[mode]}
+    manifest['modes'][mode] = {'archive_path': 'codex/runtime-archives/' + name, 'archive_sha256': hashlib.sha256(archive.read_bytes()).hexdigest(), 'archive_size': archive.stat().st_size, 'entrypoints': slots[mode]}
 Path(os.environ['AI_GUARDRAIL_MANIFEST_PATH']).write_text(json.dumps(manifest), encoding='utf-8')
 PY
 
@@ -127,7 +126,7 @@ PY
 grep -Fq 'legacy = true' "$legacy/.codex/config.toml"
 
 before=$(sha256sum "$tmp/project-a/.codex/guardrail/runtime.json" | cut -d' ' -f1)
-printf '%s\n' '{"schema_version":1,"release":{"source":"https://github.com/ashiyasayo/ai-guardrail-kit","ref":"test","commit":"1111111111111111111111111111111111111111","runtime_version":"test+11111111"},"modes":{}}' > "$tmp/bad-manifest.json"
+printf '%s\n' '{"schema_version":2,"release":{"source":"https://github.com/ashiyasayo/ai-guardrail-kit","ref":"test","runtime_version":"test+manifest-v2"},"modes":{}}' > "$tmp/bad-manifest.json"
 if AI_GUARDRAIL_MANIFEST_PATH="$tmp/bad-manifest.json" "$root/scripts/select-codex-mode" --update harness --scope project --source local --ref test "$tmp/project-a" >/dev/null 2>&1; then exit 1; fi
 after=$(sha256sum "$tmp/project-a/.codex/guardrail/runtime.json" | cut -d' ' -f1)
 [[ $before == "$after" ]]

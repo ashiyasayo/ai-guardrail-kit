@@ -3,10 +3,11 @@ set -euo pipefail
 export PYTHONUTF8=${PYTHONUTF8:-1}
 root=$(cd "$(dirname "$0")/.." && pwd -P)
 ROOT="$root" python3 - <<'PY'
-import hashlib, importlib.util, io, json, os, shutil, sys, tarfile, tempfile, time
+import hashlib, importlib.util, io, json, os, shlex, shutil, sys, tarfile, tempfile, time
 from pathlib import Path
 import os
-spec=importlib.util.spec_from_file_location('manager', Path(os.environ['ROOT'])/'scripts/codex-runtime-manager.py')
+root = Path(os.environ['ROOT'])
+spec=importlib.util.spec_from_file_location('manager', root/'scripts/codex-runtime-manager.py')
 m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 
 def bundle(member='hooks/dispatch.py', kind='regular', data=b'print("ok")\n'):
@@ -29,22 +30,23 @@ for kind in ('symlink','hardlink'):
 archive=bundle(); digest=hashlib.sha256(archive).hexdigest()
 identity={'schema_version':1,'mode':'harness','source':'test','ref':'test','commit':'1'*40,'runtime_version':'test+1','archive_url':'https://github.com/ashiyasayo/ai-guardrail-kit/releases/download/test/x.tar.gz','archive_sha256':digest,'archive_size':len(archive),'entrypoints':{'pretool.plan':'hooks/dispatch.py','pretool.security':'hooks/dispatch.py','pretool.pii':'hooks/dispatch.py','prompt.pii':'hooks/dispatch.py'}}
 
-# AGK-003: manifest 必須與其實際被要求的 commit 一致，archive URL 必須以路徑
-# 區段方式綁定到該 commit；兩者都只落在 approved host 上並不足夠。
+# AGK-003: manifest 不得自報自身 commit 或完整 URL；正式 URL 必須由 manifest
+# 外部的 trusted commit 與受驗證相對路徑組成。
 _commit_a = 'a' * 40
 _commit_b = 'b' * 40
 
 
-def _manifest_bytes(commit, archive_url):
+def _manifest_bytes(archive_path=None, source='https://github.com/ashiyasayo/ai-guardrail-kit'):
     payload = {
-        'schema_version': 1,
+        'schema_version': 2,
         'release': {
-            'source': 'https://github.com/ashiyasayo/ai-guardrail-kit',
-            'ref': commit, 'commit': commit, 'runtime_version': 'test+' + commit[:8],
+            'source': source,
+            'ref': 'v0.8.0', 'runtime_version': 'test+manifest-v2',
         },
         'modes': {
             mode: {
-                'archive_url': archive_url,
+                'archive_path': archive_path or (
+                    'codex/runtime-archives/codex-runtime-' + mode + '.tar.gz'),
                 'archive_sha256': digest, 'archive_size': len(archive),
                 'entrypoints': {
                     'decomposition-gate': {'pretool.decomposition': 'hooks/dispatch.py'},
@@ -59,28 +61,94 @@ def _manifest_bytes(commit, archive_url):
     return json.dumps(payload).encode()
 
 
-_pinned_url = 'https://github.com/ashiyasayo/ai-guardrail-kit/releases/download/' + _commit_a + '/x.tar.gz'
-_mutable_url = 'https://github.com/ashiyasayo/ai-guardrail-kit/releases/download/main/x.tar.gz'
+m.validate_manifest(_manifest_bytes(), expected_ref=_commit_a, require_trusted_source=True)
+trusted_identity = m.identity_from_manifest(
+    m.validate_manifest(_manifest_bytes(), expected_ref=_commit_a, require_trusted_source=True),
+    'harness', 'github', _commit_a)
+assert trusted_identity['commit'] == _commit_a
+assert trusted_identity['archive_url'] == (
+    'https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/' + _commit_a
+    + '/codex/runtime-archives/codex-runtime-harness.tar.gz')
 
-m.validate_manifest(_manifest_bytes(_commit_a, _pinned_url), expected_ref=_commit_a)
+# schema v2 development refresh 若 payload 未變，必須沿用舊 v1 identity；cache 以 digest
+# 共用，任意替換 metadata 會讓仍引用舊 identity 的其他 selector 全部失效。
+v2_development_identity = dict(trusted_identity)
+v2_development_identity.update(source='development', ref='test')
+assert m.preserve_compatible_development_identity(identity, v2_development_identity) == identity
+changed_development_identity = dict(v2_development_identity)
+changed_development_identity['archive_sha256'] = 'f' * 64
+assert m.preserve_compatible_development_identity(identity, changed_development_identity) == changed_development_identity
+
+for forbidden_field, forbidden_value in (
+    ('commit', _commit_b),
+    ('archive_url', 'https://raw.githubusercontent.com/attacker/repo/main/x.tar.gz'),
+):
+    payload = json.loads(_manifest_bytes())
+    target = payload['release'] if forbidden_field == 'commit' else payload['modes']['harness']
+    target[forbidden_field] = forbidden_value
+    try:
+        m.validate_manifest(json.dumps(payload).encode(), expected_ref=_commit_a,
+                            require_trusted_source=True)
+    except m.ManagerError as e:
+        assert e.code == 'E_MANIFEST_INVALID'
+    else:
+        raise AssertionError('forbidden manifest field was accepted: ' + forbidden_field)
+
+# 發布 manifest 的 release.ref 保留人類可讀 tag；遠端信任錨是另外提供的 commit。
+real_manifest = (root / 'codex/runtime-manifest.json').read_bytes()
+real_release = json.loads(real_manifest)['release']
+m.validate_manifest(real_manifest, expected_ref=_commit_a, require_trusted_source=True)
 
 try:
-    m.validate_manifest(_manifest_bytes(_commit_b, _pinned_url), expected_ref=_commit_a)
+    m.validate_manifest(_manifest_bytes('codex/runtime-archives/../runtime-archives/codex-runtime-harness.tar.gz'),
+                        expected_ref=_commit_a, require_trusted_source=True)
+except m.ManagerError as e:
+    assert e.code == 'E_ARCHIVE_UNSAFE'
+else:
+    raise AssertionError('non-canonical archive path was accepted')
+
+try:
+    m.validate_manifest(_manifest_bytes('codex/runtime-archives/codex-runtime-other.tar.gz'), expected_ref=_commit_a,
+                        require_trusted_source=True)
 except m.ManagerError as e:
     assert e.code == 'E_MANIFEST_INVALID'
 else:
-    raise AssertionError('manifest commit mismatched with the immutable fetch ref was accepted')
+    raise AssertionError('archive path for another mode was accepted')
 
+for description, payload in (
+    ('cross-repository source', _manifest_bytes(
+        source='https://github.com/attacker/ai-guardrail-kit')),
+):
+    try:
+        m.validate_manifest(payload, expected_ref=_commit_a, require_trusted_source=True)
+    except m.ManagerError as e:
+        assert e.code == 'E_SOURCE_DENIED'
+    else:
+        raise AssertionError(description + ' was accepted')
+
+# 既有 cache/index 也必須套用 repository 綁定；官方舊 tag cache 可離線沿用，
+# 但先前可能接受的跨 repository identity 不得繼續 dispatch。
+cached_github_identity = dict(identity)
+cached_github_identity.update({
+    'source': 'github', 'ref': 'v0.8.0', 'commit': _commit_a,
+    'archive_url': ('https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/'
+                    + _commit_a + '/codex/runtime-archives/codex-runtime-harness.tar.gz'),
+})
+assert m.validate_identity(cached_github_identity) == cached_github_identity
+untrusted_cached_identity = dict(cached_github_identity)
+untrusted_cached_identity['archive_url'] = (
+    'https://raw.githubusercontent.com/attacker/ai-guardrail-kit/' + _commit_a
+    + '/codex/runtime-archives/codex-runtime-harness.tar.gz')
 try:
-    m.validate_manifest(_manifest_bytes(_commit_a, _mutable_url), expected_ref=_commit_a)
+    m.validate_identity(untrusted_cached_identity)
 except m.ManagerError as e:
-    assert e.code == 'E_MANIFEST_INVALID'
+    assert e.code == 'E_CACHE_CORRUPT'
 else:
-    raise AssertionError('archive URL not pinned to the manifest commit was accepted')
+    raise AssertionError('cross-repository cached github identity was accepted')
 
 with tempfile.TemporaryDirectory() as td:
     manifest_path = Path(td) / 'manifest.json'
-    manifest_path.write_bytes(_manifest_bytes(_commit_a, _pinned_url))
+    manifest_path.write_bytes(_manifest_bytes())
     old_codex_home = os.environ.get('CODEX_HOME')
     os.environ['CODEX_HOME'] = str(Path(td) / '.codex-home')
     os.environ.pop('AI_GUARDRAIL_ALLOW_DEVELOPMENT_SOURCE', None)
@@ -97,6 +165,24 @@ with tempfile.TemporaryDirectory() as td:
             assert e.code == 'E_USAGE'
         else:
             raise AssertionError('fresh github install without --ref silently trusted the mutable main branch')
+
+        for mutable_ref in ('main', 'v0.8.0'):
+            args.ref = mutable_ref
+            try:
+                m.prepare_selection(args)
+            except m.ManagerError as e:
+                assert e.code == 'E_USAGE'
+            else:
+                raise AssertionError('mutable github ref was accepted: ' + mutable_ref)
+
+        os.environ['AI_GUARDRAIL_ALLOW_MUTABLE_REF'] = '1'
+        args.ref = 'main'
+        try:
+            m.prepare_selection(args)
+        except m.ManagerError as e:
+            assert e.code == 'E_USAGE'
+        else:
+            raise AssertionError('legacy mutable-ref environment override was accepted')
     finally:
         if old_codex_home is None:
             os.environ.pop('CODEX_HOME', None)
@@ -106,13 +192,14 @@ with tempfile.TemporaryDirectory() as td:
 loader=Path('C:/guardrail/loader/loader.py')
 assert m._loader_hook_command('C:/Program Files/Python/python.exe', loader, 'session.start', True) == (
     "$env:AI_GUARDRAIL_LOADER_SLOT = 'session.start'; $env:AI_GUARDRAIL_LOADER = '1'; "
-    "& 'C:/Program Files/Python/python.exe' -- 'C:/guardrail/loader/loader.py'")
+    "& 'C:/Program Files/Python/python.exe' -- '" + str(loader) + "'")
 assert m._is_loader_command(
     "$env:AI_GUARDRAIL_LOADER_SLOT = 'session.start'; $env:AI_GUARDRAIL_LOADER = '1'; "
-    "& 'C:/Program Files/Python/python.exe' -- 'C:/guardrail/loader/loader.py'")
-assert m._loader_hook_command('/usr/bin/python3', Path('/guardrail/loader/loader.py'), 'session.start', False) == (
+    "& 'C:/Program Files/Python/python.exe' -- '" + str(loader) + "'")
+unix_loader = Path('/guardrail/loader/loader.py')
+assert m._loader_hook_command('/usr/bin/python3', unix_loader, 'session.start', False) == (
     'AI_GUARDRAIL_LOADER_SLOT=session.start AI_GUARDRAIL_LOADER=1 '
-    '/usr/bin/python3 -- /guardrail/loader/loader.py')
+    '/usr/bin/python3 -- ' + shlex.quote(str(unix_loader)))
 
 with tempfile.TemporaryDirectory() as td:
     store=m.RuntimeStore(Path(td)/'.codex'); store.install(identity, archive)

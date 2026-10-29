@@ -80,10 +80,11 @@ PII updatedInput 回寫；預設不啟動 CLI 或 listener。此測試不驗證 
 
 ## 發佈邊界
 
-本次 archive 與 manifest hash 為工作樹產物，尚未發佈。正式遠端發佈前，先提交
-archive，再將 manifest 的 release commit 與 archive URL 釘到該不可變 archive commit，
-依既有來源驗證規則完成遠端取回測試；不能用舊 commit URL 搭配新 hash 宣稱已可遠端
-安裝。本次本機回歸使用明確開啟的 development source，不修改使用者已安裝的釘版。
+本次 archive 與 manifest hash 為工作樹產物，尚未發佈。正式遠端發佈時，manifest v2
+不寫入自身 commit；受保護的 release workflow 從 annotated tag target 取得完整 SHA，
+寫入官方 Release，manager 再以該 SHA 推導 manifest 與 archive URL。發布前必須依既有
+來源驗證規則完成遠端取回測試。本次本機回歸使用明確開啟的 development source，
+不修改使用者已安裝的釘版。
 
 ## 本次驗證紀錄（2026-10-04）
 
