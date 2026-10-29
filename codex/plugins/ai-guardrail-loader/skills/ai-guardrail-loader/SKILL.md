@@ -5,6 +5,39 @@ description: Stable Codex loader for project-selected runtimes.
 
 # AI Guardrail Loader
 
+The loader is the user's installed entry point for every selectable mode. When
+`decomposition-gate` or `integrated-harness` is active, create
+`.guardrail/plan/decomposition.md` before implementation. Write task-specific
+content using this structure:
+
+```md
+# 任務拆解：<任務名稱>
+
+## 問題與目標
+<重述要求及完成條件>
+
+## 已知資訊
+- <已確認事實>
+
+## 缺少的資訊
+- <會影響結果、尚未確認的資訊；沒有就寫「無」>
+
+## 假設
+- 【假設】<本次工作依賴的假設>
+
+## 做法與驗證
+- <預定修改及驗證方式>
+
+## 允許修改範圍
+- `<專案相對路徑>` — <修改原因>
+```
+
+Keep facts separate from assumptions and list only task-required paths inside
+the project root. Both modes require `## 已知資訊`, `## 缺少的資訊`, and at
+least one `【假設】`. Integrated-harness also enforces
+`## 允許修改範圍`; decomposition-gate records that scope for clarity but does
+not enforce it. Decomposition-gate has no human approval step.
+
 When a hook says that human approval is required, show the user complete,
 copy-ready preview and confirm commands. Fill in the actual Python manager
 absolute path, project absolute path, cwd, and the current command, patch, or

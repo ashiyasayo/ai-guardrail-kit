@@ -8,6 +8,12 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Codex's globally installed loader and `decomposition-gate` skills now explain how to write a useful
+  `.guardrail/plan/decomposition.md`; its marketplace description now uses the
+  path enforced by the hook.
+
 ## [0.11.2] - 2026-10-29
 
 ### Fixed
