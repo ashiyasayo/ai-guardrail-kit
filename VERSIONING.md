@@ -129,6 +129,9 @@ git push origin vX.Y.Z
 `.github/workflows/release.yml` 只接受 annotated tag，執行 full regression，從 tag target
 產生 `release-commit-sha.txt`，並把完整 40 位 SHA 寫進官方 GitHub Release 的
 `Immutable runtime identity`。不得手動從 manifest 複製 commit，也不得手動建立同名 Release。
+若 tag 已推送但自動 workflow 失敗，修正 workflow 並合併後，可從 `main` 手動重跑既有 tag：
+`gh workflow run release.yml --ref main -f tag=vX.Y.Z`；workflow 會再次驗證 annotated tag、
+合併狀態與完整回歸，再建立 Release。
 
 repository 管理者必須在 GitHub 建立受保護的 GitHub Environment `release`，限制可部署的
 tag pattern 為 `v*.*.*`，並依組織政策要求 reviewer。Release 頁面是 manifest 之外的
