@@ -8,6 +8,13 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-10-29
+
+### Fixed
+
+- Release workflow now verifies the `origin/main` ref provided by checkout directly, avoiding a
+  redundant fetch that failed on the hosted runner.
+
 ## [0.11.1] - 2026-10-29
 
 ### Fixed
@@ -585,7 +592,8 @@ VS Code Agent hooks，且 macOS／Linux 路徑尚未實機驗證。以下彙整�
   once a plan exists, normal integrated-harness scope, policy, and approval
   checks apply.
 
-[Unreleased]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.11.2...HEAD
+[0.11.2]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.10.0...v0.11.0
 [0.9.0]: https://github.com/ashiyasayo/ai-guardrail-kit/compare/v0.8.1...v0.9.0
