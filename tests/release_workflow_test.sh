@@ -17,11 +17,13 @@ for mode, item in manifest['modes'].items():
 workflow = (root / '.github/workflows/release.yml').read_text(encoding='utf-8')
 for required in (
     'environment: release',
+    'workflow_dispatch:',
+    'RELEASE_TAG: ${{ github.event_name == \'workflow_dispatch\' && inputs.tag || github.ref_name }}',
     'AGK_TEST_PROFILE: full',
     'git rev-parse "${tag}^{commit}"',
     'git merge-base --is-ancestor "$commit" origin/main',
     'release-commit-sha.txt',
-    'gh release create "$GITHUB_REF_NAME"',
+    'gh release create "$RELEASE_TAG"',
     '--verify-tag',
 ):
     assert required in workflow, required
