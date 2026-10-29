@@ -19,8 +19,8 @@
   - `required_status_checks`（`strict`，必要檢查 `tests`；CI 不過不能合併）
 - **CI**（`.github/workflows/ci.yml`）：`main` 的 push/PR 執行 `tests/run_all.sh` ＋
   `copilot/plugins/decomposition-gate/tests/smoke_test.sh`。
-- **正式版本以 tag 標記**：`git tag -a vX.Y.Z` + `gh release create`；版本是時間點快照，
-  非移動分支。
+- **正式版本以 tag 標記**：`git tag -a vX.Y.Z`；推送後由受保護的 release workflow 建立
+  GitHub Release、發布 tag target 的完整 40 位 SHA。版本是時間點快照，非移動分支。
 - **消費者安裝來源**：Codex `--ref main`（最新穩定）或 `--ref <tag>`（釘版本）；
   Claude 走預設分支 `main`。
 

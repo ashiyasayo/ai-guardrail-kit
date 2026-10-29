@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Verify immutable release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          commit="$(git rev-parse "${tag}^{commit}")"
+          test "$(git rev-parse HEAD)" = "$commit"
+          test "$(git cat-file -t "$tag")" = tag
+          git merge-base --is-ancestor "$commit" origin/main
+          [[ "$commit" =~ ^[0-9a-f]{40}$ ]]
+          printf '%s\n' "$commit" > release-commit-sha.txt
+      - name: Full regression
+        env:
+          AGK_TEST_PROFILE: full
+        run: bash tests/run_all.sh
+      - name: Publish trusted commit SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          commit="$(cat release-commit-sha.txt)"
+          cat > release-notes.md <<EOF
+          ## Immutable runtime identity
+
+          Trusted Codex runtime commit SHA (40 hex):
+
+          \`$commit\`
+
+          Use this exact value with \`select-codex-mode --source github --ref <40-hex-commit>\`.
+          It was derived by the protected release workflow from the annotated tag target, not from
+          \`codex/runtime-manifest.json\`.
+
+          Changelog: https://github.com/${GITHUB_REPOSITORY}/blob/$commit/CHANGELOG.md
+          EOF
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md

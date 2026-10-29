@@ -422,6 +422,7 @@ def check(data: dict) -> Optional[str]:
         return (
             f"計畫閘門：{reason} 請由人類審查計畫後執行 "
             f"`{command}`。（Windows 環境無 python3 時改用 python）"
+            "AI 回覆使用者時必須完整照錄上述可複製命令，不得只說需要核准、改用相對路徑或 placeholder。"
             "若不需要每次都人工核准，可請人類將 "
             f"`{human_shell_quote(exact_path(root, POLICY_PATH))}` 的 "
             "`Approval Mode` 改為 `standard`（仍需拆解與允許修改範圍）或 "

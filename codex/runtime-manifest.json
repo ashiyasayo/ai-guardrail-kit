@@ -1,14 +1,13 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "release": {
     "source": "https://github.com/ashiyasayo/ai-guardrail-kit",
     "ref": "v0.8.0",
-    "commit": "42e0e448ba159c88f346cffe91f07e9b0382e288",
     "runtime_version": "v0.8.0+42e0e448"
   },
   "modes": {
     "decomposition-gate": {
-      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/42e0e448ba159c88f346cffe91f07e9b0382e288/codex/runtime-archives/codex-runtime-decomposition-gate.tar.gz",
+      "archive_path": "codex/runtime-archives/codex-runtime-decomposition-gate.tar.gz",
       "archive_sha256": "f8abf1a6df9fdc6c744fee03b0004c4784398fb8d55dc4c2a15f5cf539fa3ef7",
       "archive_size": 2604,
       "entrypoints": {
@@ -16,7 +15,7 @@
       }
     },
     "sensitive-data-guard": {
-      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/42e0e448ba159c88f346cffe91f07e9b0382e288/codex/runtime-archives/codex-runtime-sensitive-data-guard.tar.gz",
+      "archive_path": "codex/runtime-archives/codex-runtime-sensitive-data-guard.tar.gz",
       "archive_sha256": "cb6efb282eb331556a27361ee1da4a681eba544cb3ac7a66bc22f886d938cb79",
       "archive_size": 8778,
       "entrypoints": {
@@ -26,7 +25,7 @@
       }
     },
     "harness": {
-      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/42e0e448ba159c88f346cffe91f07e9b0382e288/codex/runtime-archives/codex-runtime-harness.tar.gz",
+      "archive_path": "codex/runtime-archives/codex-runtime-harness.tar.gz",
       "archive_sha256": "5fd6ec528c83288da685c72698ba82cd3f68a30dff2c325e560792d716281852",
       "archive_size": 11689,
       "entrypoints": {
@@ -37,7 +36,7 @@
       }
     },
     "integrated-harness": {
-      "archive_url": "https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/42e0e448ba159c88f346cffe91f07e9b0382e288/codex/runtime-archives/codex-runtime-integrated-harness.tar.gz",
+      "archive_path": "codex/runtime-archives/codex-runtime-integrated-harness.tar.gz",
       "archive_sha256": "afc8a68c28a35e9c5fac9d8b94a71b5c55102c1d96a4e8da666b5b7aee15aa9a",
       "archive_size": 13952,
       "entrypoints": {

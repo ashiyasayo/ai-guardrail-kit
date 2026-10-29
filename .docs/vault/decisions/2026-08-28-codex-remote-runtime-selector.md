@@ -18,8 +18,9 @@ selector 只管理專案 runtime，因此不同專案可同時使用不同 mode 
 
 ## 影響
 
-- `runtime-manifest.json` 固化 release ref、commit、archive size／SHA-256；本 repo
-  的示範 manifest 以核准 GitHub raw HTTPS archive 提供來源。
+- `runtime-manifest.json` v2 固化 release ref、相對 archive path、size／SHA-256，不自報
+  其所在 commit。正式 commit 由受保護 release workflow 寫入官方 GitHub Release；manager
+  以此外部 40 位 SHA 推導核准的 GitHub raw HTTPS archive URL。
 - cache 使用 `$CODEX_HOME/guardrail/runtime-cache/sha256/<digest>/`，selector commit
   同步寫入 `selector-index.json`，供安全的低頻 prune 與 loader 引用檢查使用。
 - 舊 TOML／hooks marker 僅在完整且可辨識時遷移；混合或殘缺集合拒絕並維持原 bytes。

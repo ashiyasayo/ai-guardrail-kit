@@ -52,6 +52,9 @@ Only the human may run `python3 "$CODEX_HOME/guardrail/bin/codex-runtime-manager
 in their own terminal. Preview with `--project <project> --command <command>` or
 `--patch-file <reviewed.diff>`, then confirm the displayed digest with `--confirm <SHA256>`.
 Use `--event-file <reviewed-event.json>` for exact tool input fields or a subdirectory cwd.
+When asking for approval, show complete copy-ready preview and confirm commands with the actual
+Python manager absolute path, project absolute path, cwd, operation input, and digest. Do not show
+placeholders, relative paths, only the digest, or merely say that approval is required.
 Never execute approval commands for the human, edit the approval store, or request sandbox
 access to that store. Missing or invalid receipts deny the operation. Permanent security
 denials still apply. Verify wiring with `verify-codex-mode --diagnose` and review `/hooks`.

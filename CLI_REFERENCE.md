@@ -65,7 +65,7 @@ codex plugin add ai-guardrail-loader@ai-guardrail-kit
 # <plugin-directory> 由 codex plugin list --json 查得；只需 bootstrap 一次
 <plugin-directory>/hooks/install-codex-guardrail-loader --plugin-root <plugin-directory>
 guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
-"$guardrail_bin/select-codex-mode" harness --scope project --ref vX.Y.Z /path/to/project
+"$guardrail_bin/select-codex-mode" harness --scope project --ref <40-hex-commit> /path/to/project
 "$guardrail_bin/verify-codex-mode" harness --scope project /path/to/project
 ```
 
@@ -78,7 +78,7 @@ $codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USER
 $manager = Join-Path $codexHome 'guardrail\bin\codex-runtime-manager.py'
 
 py -3 "$pluginRoot\hooks\manager.py" install-loader --plugin-root "$pluginRoot"
-py -3 $manager select integrated-harness --scope user --ref main
+py -3 $manager select integrated-harness --scope user --ref <40-hex-commit>
 py -3 $manager verify integrated-harness --scope user
 ```
 
@@ -102,9 +102,9 @@ Codex 三種 scope 的 selector 如下：`project` 是
 `local > project > user > disabled`。
 
 ```bash
-"$guardrail_bin/select-codex-mode" harness --scope local --ref vX.Y.Z /path/to/project
-"$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX.Y.Z
-"$guardrail_bin/select-codex-mode" --update harness --scope project --ref vX.Y.Z /path/to/project
+"$guardrail_bin/select-codex-mode" harness --scope local --ref <40-hex-commit> /path/to/project
+"$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref <40-hex-commit>
+"$guardrail_bin/select-codex-mode" --update harness --scope project --ref <40-hex-commit> /path/to/project
 "$guardrail_bin/verify-codex-mode" harness --scope project --offline /path/to/project
 "$guardrail_bin/verify-codex-mode" integrated-harness --scope user
 "$guardrail_bin/select-codex-mode" --remove --scope project /path/to/project
@@ -114,6 +114,9 @@ Codex 三種 scope 的 selector 如下：`project` 是
 有效 selector、loader 與事件接線；不代表宿主已信任或執行 hooks。
 
 需要核准的操作由人類在自己的終端機審閱，先 preview，再以輸出的 SHA-256 確認：
+
+AI 要求核准時必須把下列形式展開為完整可複製命令，使用實際 manager、專案、cwd、
+操作輸入與 SHA-256，不得保留 placeholder 或只顯示摘要；AI 不得代為執行。
 
 ```bash
 python3 "$guardrail_bin/codex-runtime-manager.py" approve --project /path/to/project --command 'npm test'
@@ -130,16 +133,16 @@ patch 使用 `--patch-file reviewed.diff`；需要額外 tool input 欄位或子
 環境變數下可用。`--offline` 僅使用 runtime index 與完整 cache，不連網。`--update`
 才重新取得 manifest；普通重跑保留既有 identity。
 
-`--source github`（預設來源）的全新安裝若未指定 `--ref`，不再靜默信任可變的
-`main` 分支：會直接失敗並提示改用 `--ref <commit-or-tag>`（例如上方範例的
-`vX.Y.Z`）。僅在明確需要追蹤主幹最新內容的開發／測試情境下，才設定
-`AI_GUARDRAIL_ALLOW_MUTABLE_REF=1` 選擇退回舊行為。
+`--source github`（預設來源）只接受 `--ref <40-hex-commit>`。省略 ref、branch、tag
+與舊的 `AI_GUARDRAIL_ALLOW_MUTABLE_REF` 都會被拒絕。完整 SHA 從官方 GitHub Release
+的 `Immutable runtime identity` 複製；manager 以它和 manifest v2 的受驗證相對路徑
+推導官方 archive URL。`local`／`test`／`offline` 流程不受影響。
 
 Codex 的 shell wrapper 預設依序使用 `python3`、`python`。若 Windows 只有 `py`
 launcher 或 Python 不在 PATH，執行命令前設定 `AI_GUARDRAIL_PYTHON`，例如：
 
 ```bash
-AI_GUARDRAIL_PYTHON=py "$guardrail_bin/select-codex-mode" harness --scope project /path/to/project
+AI_GUARDRAIL_PYTHON=py "$guardrail_bin/select-codex-mode" harness --scope project --ref <40-hex-commit> /path/to/project
 ```
 
 全域相容 wrapper：
@@ -260,7 +263,7 @@ codex plugin list --json
 
 # 6. 用 --update 強制重抓 manifest/archive，釘在新 ref
 guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
-"$guardrail_bin/select-codex-mode" --update <mode> --scope project --ref vX.Y.Z /path/to/project
+"$guardrail_bin/select-codex-mode" --update <mode> --scope project --ref <40-hex-commit> /path/to/project
 "$guardrail_bin/verify-codex-mode" <mode> --scope project /path/to/project
 ```
 
@@ -288,11 +291,13 @@ git clone --depth 1 --branch v0.1.0 https://github.com/ashiyasayo/ai-guardrail-k
 維護者發版（`main` 受保護，CHANGELOG 定版須走 PR，合併後才打 tag）：
 
 ```bash
-git switch main && git pull
+git switch main && git pull --ff-only
 git tag -a vX.Y.Z -m "vX.Y.Z"
 git push origin vX.Y.Z
-gh release create vX.Y.Z --title "vX.Y.Z" --notes "<該版 CHANGELOG 段落>"
 ```
+
+推送 tag 後由受保護的 `release` environment workflow 執行 full regression、建立 GitHub
+Release，並發布完整 40 位 runtime commit SHA；不得手動從 manifest 取得或填寫該值。
 
 版本語意與各平台版號載體差異見 [`VERSIONING.md`](VERSIONING.md)。
 

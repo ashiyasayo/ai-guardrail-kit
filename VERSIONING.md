@@ -16,8 +16,8 @@
    `codex plugin marketplace add ... --ref <ref> --sparse` 註冊、Claude marketplace
    走預設分支、Copilot 直接複製 `copilot/plugins/` 下的檔案。三種安裝機制都**無法**
    只取用某個 plugin 的某個版本，因此獨立的 per-plugin 版本線在消費端不可解析。Codex
-   runtime manifest 的 `ref`、`commit`、archive SHA-256 是該 repo tag 的內容 identity，
-   不是新的 per-plugin 版號。
+   runtime manifest 的 `ref`、archive path 與 SHA-256 描述內容；正式 runtime 的 commit
+   identity 由官方 Release 另行發布，不是新的 per-plugin 版號。
 2. **這些 plugin 不是可自由組合的套件，而是同一產品的互斥變體。** 它們共用
    `shared/codex/`、`shared/claude/` 單一來源，並由逐位元組同步測試守護。
    「harness 搭配哪一版 shared」這種問題只有「同一個 commit 快照」答得出來。
@@ -120,14 +120,19 @@ git switch -c docs/release-x-y-z
 gh pr create --base main
 # CI 的 tests 檢查綠燈後合併
 
-# 2. 在合併後的 main 打 tag 並建立 Release
-git switch main && git pull
+# 2. 在合併後的 main 建立 annotated tag；推送後由 release workflow 建立 Release
+git switch main && git pull --ff-only
 git tag -a vX.Y.Z -m "vX.Y.Z"
 git push origin vX.Y.Z
-gh release create vX.Y.Z --title "vX.Y.Z" --notes "<貼上該版 CHANGELOG 段落>"
 ```
 
-本專案是純原始碼 repo，Release 不附加建置產物。
+`.github/workflows/release.yml` 只接受 annotated tag，執行 full regression，從 tag target
+產生 `release-commit-sha.txt`，並把完整 40 位 SHA 寫進官方 GitHub Release 的
+`Immutable runtime identity`。不得手動從 manifest 複製 commit，也不得手動建立同名 Release。
+
+repository 管理者必須在 GitHub 建立受保護的 GitHub Environment `release`，限制可部署的
+tag pattern 為 `v*.*.*`，並依組織政策要求 reviewer。Release 頁面是 manifest 之外的
+散布管道；需要更高保證的部署，應另行驗證組織核准的簽章 tag／commit。
 
 > **tag 是對外不可逆的動作。** 一旦公開，已釘版的使用者會依賴它；刪除 tag 或
 > Release 會破壞他們的安裝。發版前務必確認 CHANGELOG 已定稿。
@@ -147,6 +152,12 @@ Codex 範例：
 codex plugin marketplace add https://github.com/ashiyasayo/ai-guardrail-kit.git \
   --ref v0.1.0 --sparse .agents --sparse codex/plugins
 ```
+
+上表與範例描述 repository／marketplace 的發布座標。Codex loader 後續下載 runtime 時是
+另一條安全邊界：`select-codex-mode --source github` 只接受該版本所對應的完整 40 位 commit
+SHA，不接受 tag 或 `main`。這讓使用者提供的 immutable commit 成為 manifest 之外的信任錨，
+避免 tag／branch 被重新指向後連同 manifest 與 archive 一起替換。該 SHA 必須從官方 GitHub
+Release 的 `Immutable runtime identity` 取得，不得從 `runtime-manifest.json` 自行推斷。
 
 Claude Code 側，**已查證**`claude plugin marketplace add`
 不提供指定 ref／tag 的能力（`claude plugin marketplace add --help` 未列出對應參數），

@@ -8,6 +8,19 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Security
+
+- Claude `harness`（`0.7.2` → `0.7.3`）、Claude `integrated-harness`（`0.9.0` →
+  `0.9.1`）與 Codex loader／兩種核准模式現在明確要求：AI 遇到人工核准時必須顯示含
+  實際直譯器、核准程式與專案絕對路徑及操作參數的完整可複製命令，不得只報核准需求、
+  相對路徑、placeholder 或 SHA；核准命令仍只允許人類在自己的終端機執行。
+
+- Codex `ai-guardrail-loader` 完成 AGK-003 遠端 runtime 信任邊界修正：GitHub 來源現在只接受
+  使用者明確提供的 40 位 immutable commit，不再接受 branch、tag、隱含 `main` 或
+  `AI_GUARDRAIL_ALLOW_MUTABLE_REF`；manifest v2 移除無法成立的 self-commit／完整 URL，改由
+  官方 GitHub Release 發布外部 40 位 SHA，再以該 SHA、官方 repository 與受驗證相對路徑
+  推導 archive URL。local／test／offline 與既有已快取 selector 行為不變。
+
 ## [0.10.0] - 2026-10-28
 
 ### Added

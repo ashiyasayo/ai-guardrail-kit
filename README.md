@@ -30,6 +30,10 @@ hooks）」。`decomposition-gate`、`harness` 與 `integrated-harness` 三個�
 
 ## 快速開始
 
+任何模式若要求人工核准，AI 必須顯示可直接複製的完整核准命令，填入實際直譯器、
+核准程式絕對路徑、專案絕對路徑及本次操作參數；不得只顯示「請核准」、相對路徑、
+placeholder 或 SHA-256。命令仍只能由人類在自己的終端機執行，AI 不得代跑。
+
 ### 在 Codex 或 Claude Code 內執行命令
 
 不必離開 Codex 或 Claude Code，也不必另外開終端機；在互動輸入列的開頭加上 `!`，即可
@@ -104,7 +108,7 @@ selector 將 `integrated-harness` 設為全域 fallback：
 
    ```bash
    guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
-   "$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX.Y.Z
+   "$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref <40-hex-commit>
    "$guardrail_bin/verify-codex-mode" integrated-harness --scope user
    ```
 
@@ -115,7 +119,7 @@ selector 將 `integrated-harness` 設為全域 fallback：
    $codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE '.codex' }
    $manager = Join-Path $codexHome 'guardrail\bin\codex-runtime-manager.py'
    py -3 "$pluginRoot\hooks\manager.py" install-loader --plugin-root "$pluginRoot"
-   py -3 $manager select integrated-harness --scope user --ref vX.Y.Z
+   py -3 $manager select integrated-harness --scope user --ref <40-hex-commit>
    py -3 $manager verify integrated-harness --scope user
    ```
 
@@ -162,7 +166,7 @@ $codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USER
 $manager = Join-Path $codexHome 'guardrail\bin\codex-runtime-manager.py'
 
 py -3 "$pluginRoot\hooks\manager.py" install-loader --plugin-root "$pluginRoot"
-py -3 $manager select integrated-harness --scope user --ref main
+py -3 $manager select integrated-harness --scope user --ref <40-hex-commit>
 py -3 $manager verify integrated-harness --scope user
 ```
 
@@ -178,9 +182,9 @@ Codex thread。首次安裝或 plugin hook 更新後，請在 Codex 輸入 `/hoo
 
 ```bash
 guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
-"$guardrail_bin/select-codex-mode" harness --scope project --ref vX.Y.Z /path/to/target-project
+"$guardrail_bin/select-codex-mode" harness --scope project --ref <40-hex-commit> /path/to/target-project
 "$guardrail_bin/verify-codex-mode" harness --scope project /path/to/target-project
-"$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref vX.Y.Z
+"$guardrail_bin/select-codex-mode" integrated-harness --scope user --ref <40-hex-commit>
 "$guardrail_bin/verify-codex-mode" integrated-harness --scope user
 ```
 
@@ -188,16 +192,18 @@ guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
 
 ```bash
 cd /path/to/ai-guardrail-kit
-./scripts/select-codex-mode harness --scope user --ref vX.Y.Z
+./scripts/select-codex-mode harness --scope user --ref <40-hex-commit>
 ./scripts/verify-codex-mode harness --scope user
 ```
 
 `user` scope 省略路徑時預設使用目前 checkout 作為命令脈絡；若使用 `project`／`local`
 scope，才在命令最後指定目標專案路徑。這是本機開發／測試流程，不是遠端安裝後的必要步驟。
 
-`--source github`（預設來源）的全新安裝若省略 `--ref`，不再靜默信任可變的 `main`
-分支：會直接失敗並提示改用 `--ref <commit-or-tag>`；僅在明確需要追蹤主幹最新內容
-的開發／測試情境下，才設定 `AI_GUARDRAIL_ALLOW_MUTABLE_REF=1` 選擇退回舊行為。
+`--source github`（預設來源）的遠端下載只接受明確的 40 位 commit SHA；省略 `--ref`、
+branch、tag 與舊的 `AI_GUARDRAIL_ALLOW_MUTABLE_REF` 逃生口都會被拒絕。完整 SHA 應從
+官方 GitHub Release 的 `Immutable runtime identity` 取得；manifest v2 不再自報包含自己的
+commit，archive URL 由該外部 SHA 與受驗證的官方 repository 相對路徑推導。
+本機 `local`／`test` source 與既有 `--offline` cache 不受此限制。
 
 Windows PowerShell 不會直接執行這些沒有副檔名的 shell script；可在 Git Bash／WSL 使用
 全域 `$CODEX_HOME/guardrail/bin/...` 入口，或採用上方直接呼叫 Python manager 的流程。
@@ -213,9 +219,9 @@ Selector 支援三種 scope：`project` 寫入可提交的
 
 ```bash
 guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
-"$guardrail_bin/select-codex-mode" harness --scope project --ref vX.Y.Z .
-"$guardrail_bin/select-codex-mode" harness --scope local --ref vX.Y.Z .
-"$guardrail_bin/select-codex-mode" harness --scope user --ref vX.Y.Z
+"$guardrail_bin/select-codex-mode" harness --scope project --ref <40-hex-commit> .
+"$guardrail_bin/select-codex-mode" harness --scope local --ref <40-hex-commit> .
+"$guardrail_bin/select-codex-mode" harness --scope user --ref <40-hex-commit>
 "$guardrail_bin/verify-codex-mode" harness --scope user
 ```
 
@@ -377,7 +383,7 @@ Codex 只安裝一個全域 `ai-guardrail-loader`；模式與版本由 `project`
 
 ```bash
 guardrail_bin="${CODEX_HOME:-$HOME/.codex}/guardrail/bin"
-"$guardrail_bin/select-codex-mode" harness --scope project --ref vX.Y.Z /path/to/project
+"$guardrail_bin/select-codex-mode" harness --scope project --ref <40-hex-commit> /path/to/project
 "$guardrail_bin/verify-codex-mode" harness --scope project /path/to/project
 ```
 

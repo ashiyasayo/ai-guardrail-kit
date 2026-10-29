@@ -40,6 +40,14 @@ for copyin_dir, plugin_dir, filenames in IDENTICAL:
         if copyin.read_bytes() != plugin.read_bytes():
             failures.append(f"copy-in 與 plugin 不同步：{copyin_dir}/{filename}")
 
+for policy_name in (
+    "integrated-harness/.claude/orchestration-policy.md",
+    "claude/plugins/integrated-harness/orchestration-policy.md",
+):
+    policy = (root / policy_name).read_text(encoding="utf-8")
+    if "完整照錄 deny 訊息中的可複製命令" not in policy or "placeholder" not in policy:
+        failures.append(f"核准命令顯示契約缺失：{policy_name}")
+
 if failures:
     print("\n".join(failures), file=sys.stderr)
     raise SystemExit(1)

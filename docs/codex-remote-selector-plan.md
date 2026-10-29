@@ -69,7 +69,7 @@ $CODEX_HOME/guardrail/loader/current.json
 
 ### 3.2 runtime 發佈單位與 manifest
 
-每個 repo tag 發佈一份受版本控制的 runtime manifest。repo tag 仍是 `VERSIONING.md` 定義的唯一發布座標；manifest 的 `runtime_version` 是該 tag／commit 的不可變來源識別，不是新產品版號或 per-plugin SemVer。
+每個 repo tag 發佈一份受版本控制的 runtime manifest。repo tag 仍是 `VERSIONING.md` 定義的唯一發布座標；manifest 的 `runtime_version` 是人類可讀 release label，不包含自身 commit。完整 commit 由官方 Release 另行發布。
 
 建議遠端入口：
 
@@ -77,20 +77,19 @@ $CODEX_HOME/guardrail/loader/current.json
 https://raw.githubusercontent.com/ashiyasayo/ai-guardrail-kit/<ref>/codex/runtime-manifest.json
 ```
 
-manifest schema v1 必須包含：
+manifest schema v2 必須包含：
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "release": {
     "source": "https://github.com/ashiyasayo/ai-guardrail-kit",
     "ref": "vX.Y.Z",
-    "commit": "40-hex-commit",
-    "runtime_version": "vX.Y.Z+<short-commit>"
+    "runtime_version": "vX.Y.Z"
   },
   "modes": {
     "harness": {
-      "archive_url": "https://.../harness.tar.gz",
+      "archive_path": "codex/runtime-archives/codex-runtime-harness.tar.gz",
       "archive_sha256": "64-lower-hex",
       "archive_size": 12345,
       "entrypoints": {
@@ -106,12 +105,12 @@ manifest schema v1 必須包含：
 
 契約：
 
-- `schema_version`、mode、entrypoint key、URL scheme、SHA-256、大小上限及 commit 格式採 allowlist 驗證；未知必要欄位或 schema 版本直接拒絕。
+- `schema_version`、mode、entrypoint key、固定 archive path、SHA-256 與大小上限採 allowlist 驗證；未知欄位或 schema 版本直接拒絕。
 - 正式遠端來源只允許預先核准的 HTTPS origin；redirect 每一跳也要重新驗證 scheme／host，限制跳數、下載大小與 timeout。
 - archive 只能含 UTF-8、相對 POSIX 路徑的 regular files；拒絕絕對路徑、`..`、空段、Windows drive/UNC、NUL、symlink、hardlink、device、FIFO 及重複正規化路徑。
 - 先驗證 archive 位元組 SHA-256，再解壓到同一 cache volume 的 staging；解壓後驗證 entrypoint 為 staging 內 regular file，且不可經 symlink 逸出。
 - runtime 不得從 manifest 接受 shell command；entrypoint 僅為相對檔案路徑，執行命令由本地 loader 固定組成。
-- 正式 tag 的 manifest 與 archive 必須不可變；`main` 可供明確要求最新者使用，但 selector 解析後必須把 commit 與 SHA-256 固化進專案設定。
+- 正式遠端只接受官方 Release 另行發布的 40 位 commit，不接受 `main`／tag；selector 將外部 commit 與 SHA-256 固化進專案設定。
 
 ### 3.3 cache、安裝與更新
 
@@ -263,7 +262,7 @@ dispatch 契約：
 保留主要命令名稱，調整為：
 
 ```text
-select-codex-mode <mode> [--scope project|local|user] [--ref <tag|commit|main>]
+select-codex-mode <mode> [--scope project|local|user] [--ref <40-hex-commit>]
                   [--source <approved-source>] [--offline] [project-dir]
 select-codex-mode --update <mode> [同上]
 select-codex-mode --remove [--scope ...] [project-dir]
@@ -433,7 +432,7 @@ luna 不得修改 Claude、Copilot hook 或 Claude plugin 版號；若共同行�
 實作前主代理只需確認下列會實質改變結果的事項：
 
 1. 穩定 loader plugin 的正式名稱是否採 `ai-guardrail-loader`，以及 migration 期間四個 legacy mode plugin 是否仍留在 marketplace 顯示為 deprecated。
-2. 正式 runtime archive 的承載位置：GitHub Release assets（建議，tag 不可變且便於 size/digest）或 repo raw/tarball；無論選哪個，manifest 必須固化 commit 與 SHA-256。
+2. 正式 runtime archive 使用 repo raw；manifest 固化相對 path 與 SHA-256，外部 commit 由官方 Release 發布並由 manager 組成 canonical URL。
 3. 首次未指定 `--ref` 時預設 `latest stable tag`（建議）或 `main`；普通重跑仍不得隱式更新。
 4. `project` selector 是否預期提交版本控制；`local` selector 的 ignore 提示文字與是否提供獨立 `--write-ignore` 顯式選項。
 5. user fallback 的 root 無 `.git`／`.codex` marker 時，是否接受 cwd 作 root（本規格建議接受並明示診斷），或要求 fail closed。
