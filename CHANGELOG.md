@@ -8,6 +8,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.11.4] - 2026-11-02
+
 ### Fixed
 
 - Codex `integrated-harness`：SessionStart 現在會安全建立缺少的
