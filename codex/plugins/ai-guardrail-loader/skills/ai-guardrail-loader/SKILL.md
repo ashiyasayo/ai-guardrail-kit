@@ -10,6 +10,17 @@ The loader is the user's installed entry point for every selectable mode. When
 `.guardrail/plan/decomposition.md` before implementation. Write task-specific
 content using this structure:
 
+This exact path is the gate control artifact; a task plan under `.docs/` does not
+replace it. When the file is missing in strict or standard mode, immediately use
+one standalone `apply_patch` whose only target is this file. Do not ask the user to
+create it merely because the gate reports that the decomposition document is missing.
+In light mode the plan remains human-managed.
+When an operation receipt is required, write the exact pending patch yourself to
+`.guardrail/approval-requests/<operation SHA-256>.diff` with one standalone
+`apply_patch`, then ask the human to review and approve that file. This narrowly
+scoped review artifact is allowed without a receipt; never ask the human to create
+or reconstruct it.
+
 ```md
 # 任務拆解：<任務名稱>
 

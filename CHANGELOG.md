@@ -8,6 +8,15 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Codex `integrated-harness`：SessionStart 現在會安全建立缺少的
+  `.guardrail/plan/decomposition.md` 最小草稿，避免模型在首次編輯時因尚未主動建立拆解文件而
+  立即遭計畫閘門阻擋；既有計畫不會被覆寫，符號連結等不可信路徑則維持 fail-closed。
+- Codex `harness`／`integrated-harness`：允許模型在取得操作憑證前建立名稱綁定操作 SHA-256 的
+  `.guardrail/approval-requests/*.diff` 審查產物，並補強 decomposition gate、skills 與 CLI 指引，
+  避免待審 patch 本身被核准閘門阻擋。
+
 ## [0.11.3] - 2026-10-29
 
 ### Fixed

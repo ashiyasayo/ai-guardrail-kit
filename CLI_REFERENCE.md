@@ -125,6 +125,9 @@ python3 "$guardrail_bin/codex-runtime-manager.py" approve --project /path/to/pro
 
 patch 使用 `--patch-file reviewed.diff`；需要額外 tool input 欄位或子目錄 cwd 時使用
 `--event-file reviewed-event.json`（包含 `tool_name`、`tool_input`、`cwd`）。三種輸入擇一。
+Codex 可在不取得操作憑證前，自行建立唯一目標為
+`.guardrail/approval-requests/<operation SHA-256>.diff` 的待審檔；其他路徑、混合目標或
+不符合 64 位小寫 SHA-256 命名的檔案不適用此例外。
 只 preview 不會授權；憑證 10 分鐘內限一次匹配操作，計畫、政策、專案、cwd 或輸入變更
 即不匹配。模型不得執行核准指令或取得核准庫的寫入權限。Windows 可用 `py -3`。
 詳見 [Codex 相容性說明](docs/codex-hook-compatibility.md)。
