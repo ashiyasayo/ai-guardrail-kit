@@ -244,8 +244,9 @@ def run(hook, data, home=None, global_default=False, python_utf8=None):
     assert proc.returncode == 0, (hook, proc.stderr)
     return json.loads(proc.stdout)["hookSpecificOutput"] if proc.stdout.strip() else None
 
-def run_raw(hook, data):
-    proc = subprocess.run([sys.executable, str(hook)], input=json.dumps(data), text=True, capture_output=True)
+def run_raw(hook, data, env=None):
+    proc = subprocess.run([sys.executable, str(hook)], input=json.dumps(data), text=True,
+                          capture_output=True, env=env)
     assert proc.returncode == 0, (hook, proc.stderr)
     return json.loads(proc.stdout) if proc.stdout.strip() else None
 
@@ -275,13 +276,13 @@ with tempfile.TemporaryDirectory() as td:
     guard = project / ".codex" / "guardrail"; (guard / "plan").mkdir(parents=True)
 
     dg = install / "decomposition-gate/hooks/decomposition_gate.py"
-    denied(dg, event(project), "找不到或無法讀取拆解產出物")
+    denied(dg, event(project), "請先用一個獨立的 apply_patch 建立 .guardrail/plan/decomposition.md")
     plan = project / ".guardrail/plan/decomposition.md"
     plan.parent.mkdir(parents=True)
     plan_patch = "*** Begin Patch\n*** Add File: .guardrail/plan/decomposition.md\n+draft\n*** End Patch"
     assert run(dg, event(project, tool_input={"command": plan_patch})) is None
     assert run(dg, event(project, tool_input={"command": plan_patch + "\n"})) is None
-    denied(dg, event(project, tool_input={"command": plan_patch.replace(".guardrail/plan/decomposition.md", "x/.guardrail/plan/decomposition.md")}), "找不到或無法讀取拆解產出物")
+    denied(dg, event(project, tool_input={"command": plan_patch.replace(".guardrail/plan/decomposition.md", "x/.guardrail/plan/decomposition.md")}), "其他 .docs/ 計畫文件不能取代它")
     bypass_patch = "*** Begin Patch\n*** Add File: .codex/guardrail/plan/.gate_disabled\n+emergency\n*** End Patch"
     denied(dg, event(project, tool_input={"command": bypass_patch}), "逃生口")
     denied(dg, event(project, "Bash", {"command": "touch .codex/guardrail/plan/.gate_disabled"}), "逃生口")
@@ -300,6 +301,10 @@ with tempfile.TemporaryDirectory() as td:
 
     hp = install / "harness/hooks/plan_gate.py"
     assert not (install / "harness/scripts/approve_plan.py").exists()
+    review_digest = "a" * 64
+    review_patch = "*** Begin Patch\n*** Add File: .guardrail/approval-requests/" + review_digest + ".diff\n+pending review\n*** End Patch"
+    assert run(hp, event(project, tool_input={"command": review_patch})) is None
+    approval_required(hp, event(project, tool_input={"command": review_patch.replace(review_digest, "draft")}))
     approval_required(hp, event(project))
     assert run(hp, event(project, "Bash", {"command": "git status"})) is None
     # `find` is intentionally absent from the narrow read-only allowlist.
@@ -392,20 +397,29 @@ with tempfile.TemporaryDirectory() as td:
     denied(security_guard, legacy_danger, "危險指令攔截")
 
     ip = install / "integrated-harness/hooks/plan_gate.py"
+    assert run(ip, event(project, tool_input={"command": review_patch})) is None
     assert run(ip, event(project, tool_input={"command": plan_patch})) is None
     assert run(ip, event(project, tool_input={"command": plan_patch + "\n"})) is None
     mixed = plan_patch.replace("*** End Patch", "*** Add File: src/other.py\n+x\n*** End Patch")
     denied(ip, event(project, tool_input={"command": mixed}), "缺少有效允許修改範圍")
-    session = run_raw(install / "integrated-harness/hooks/session_start.py", {})
+    session_project = td / "session-project"; session_project.mkdir()
+    session_env = dict(os.environ, AI_GUARDRAIL_PROJECT_ROOT=str(session_project))
+    session = run_raw(install / "integrated-harness/hooks/session_start.py", {}, session_env)
     assert ".guardrail/plan/decomposition.md" in session["systemMessage"]
+    session_plan = session_project / ".guardrail/plan/decomposition.md"
+    assert session_plan.is_file()
+    assert "## 允許修改範圍" in session_plan.read_text(encoding="utf-8")
+    session_plan.write_text("existing\n", encoding="utf-8")
+    session = run_raw(install / "integrated-harness/hooks/session_start.py", {}, session_env)
+    assert session_plan.read_text(encoding="utf-8") == "existing\n"
     protocol = install / "integrated-harness/reasoning-protocol.md"
     protocol.write_text("## Codex protocol test\n")
-    session = run_raw(install / "integrated-harness/hooks/session_start.py", {})
+    session = run_raw(install / "integrated-harness/hooks/session_start.py", {}, session_env)
     assert "## Codex protocol test" in session["systemMessage"]
     protocol.unlink()
     global_project = td / "global-no-plan"; global_project.mkdir()
     assert run(ip, event(global_project, "Bash", {"command": "git status"}), global_default=True) is None
-    denied(ip, event(global_project, "Bash", {"command": "git status"}), "找不到拆解文件")
+    denied(ip, event(global_project, "Bash", {"command": "git status"}), "請先用一個獨立的 apply_patch 建立 .guardrail/plan/decomposition.md")
     policy = guard / "orchestration-policy.md"
     shutil.copy(install / "integrated-harness/orchestration-policy.md", policy)
     plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】x\n## 允許修改範圍\n- `src/` — 應用程式\n")
@@ -460,6 +474,8 @@ with tempfile.TemporaryDirectory() as td:
     # Packaged runtime is the exact audited shared runtime.
     for plugin in ("decomposition-gate", "sensitive-data-guard", "harness", "integrated-harness"):
         assert (install / plugin / "hooks/hook_protocol.py").read_bytes() == (root / "shared/codex/hook_protocol.py").read_bytes()
+    for plugin in ("harness", "integrated-harness"):
+        assert (install / plugin / "hooks/approval.py").read_bytes() == (root / "shared/codex/approval.py").read_bytes()
     for plugin in ("sensitive-data-guard", "harness", "integrated-harness"):
         assert (install / plugin / "hooks/security_checks.py").read_bytes() == (root / "shared/codex/security_checks.py").read_bytes()
         assert (install / plugin / "hooks/pii_guard.py").read_bytes() == (root / "shared/codex/pii_guard.py").read_bytes()

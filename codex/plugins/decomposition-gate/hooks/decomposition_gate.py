@@ -54,7 +54,10 @@ def main():
     try:
         content = (root / PLAN).read_text(encoding="utf-8")
     except (OSError, UnicodeError):
-        deny("Plan gate: 找不到或無法讀取拆解產出物。")
+        deny(
+            "Plan gate: 找不到或無法讀取拆解產出物。請先用一個獨立的 apply_patch 建立 "
+            ".guardrail/plan/decomposition.md；其他 .docs/ 計畫文件不能取代它。"
+        )
     if any(marker not in content for marker in MARKERS):
         deny("Plan gate: 拆解產出物不完整。")
 

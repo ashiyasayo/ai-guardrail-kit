@@ -5,7 +5,7 @@ import shlex
 import sys
 from pathlib import Path
 from hook_protocol import deny, load_event, project_root
-from approval import require_approval
+from approval import is_review_artifact_patch, require_approval
 
 PLAN = ".guardrail/plan/decomposition.md"
 POLICY = ".codex/guardrail/orchestration-policy.md"
@@ -68,7 +68,12 @@ def policy(root):
 
 def plan(root):
     try: text = (root / PLAN).read_text(encoding="utf-8")
-    except (OSError, UnicodeError): deny("計畫閘門：找不到拆解文件。")
+    except (OSError, UnicodeError):
+        deny(
+            "計畫閘門：找不到拆解文件。strict／standard 模式請先用一個獨立的 "
+            "apply_patch 建立 .guardrail/plan/decomposition.md；其他 .docs/ 計畫文件不能取代它。"
+            "light 模式的拆解文件須由人類終端機建立。"
+        )
     if any(marker not in text for marker in MARKERS): deny("計畫閘門：拆解文件缺少必要標記。")
     return text
 
@@ -136,6 +141,7 @@ def main():
     tool, data = event["tool_name"], event["tool_input"]
     mode, allowlist = policy(root)
     if tool == "apply_patch":
+        if is_review_artifact_patch(event, root): return
         targets = patch_targets(data, root)
         plan_path = root / PLAN
         try:

@@ -3,7 +3,7 @@ import re
 import shlex
 import sys
 from hook_protocol import deny, load_event, project_root
-from approval import require_approval
+from approval import is_review_artifact_patch, require_approval
 
 UNSAFE = re.compile(
     r"[;&|><`\n\r*?\[\]]|\$\(|\btee\b|\bxargs\b|"
@@ -26,17 +26,18 @@ def readonly(cmd):
     return False
 
 def main():
-    event = load_event(sys.stdin); project_root(event)
+    event = load_event(sys.stdin); root = project_root(event)
     tool, data = event["tool_name"], event["tool_input"]
     if tool == "Bash":
         cmd = data.get("command")
         if readonly(cmd): return
         if not isinstance(cmd, str): deny("Malformed Bash command payload.")
-        require_approval(event, project_root(event), "harness")
+        require_approval(event, root, "harness")
         return
     if tool == "apply_patch":
         if not isinstance(data.get("command"), str): deny("Malformed apply_patch command payload.")
-        require_approval(event, project_root(event), "harness")
+        if is_review_artifact_patch(event, root): return
+        require_approval(event, root, "harness")
         return
     deny("Unknown tool is not proven read-only.")
 

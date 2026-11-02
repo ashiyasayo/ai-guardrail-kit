@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import stat
 import sys
 import tempfile
@@ -16,6 +17,8 @@ from hook_protocol import deny, normalize_event
 TTL_SECONDS = 600
 PLAN = ".guardrail/plan/decomposition.md"
 POLICY = ".codex/guardrail/orchestration-policy.md"
+REVIEW_ARTIFACT = re.compile(r"^\.guardrail/approval-requests/[0-9a-f]{64}\.diff$")
+PATCH_TARGET = re.compile(r"^\*\*\* (?:(?:Add|Update|Delete) File|Move to): (.+)$", re.MULTILINE)
 
 
 def codex_home():
@@ -43,6 +46,31 @@ def digest_file(path, required=False):
     if path.is_symlink() or not path.is_file():
         raise ValueError("approval context must be a regular file")
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def is_review_artifact_patch(event, project):
+    """僅放行單一、不可執行且名稱綁定操作雜湊的待審 patch 產物。"""
+    normalized = normalize_event(event)
+    if normalized.get("tool_name") != "apply_patch":
+        return False
+    command = normalized.get("tool_input", {}).get("command")
+    if (not isinstance(command, str) or not command.startswith("*** Begin Patch\n")
+            or not command.rstrip("\r\n").endswith("*** End Patch")):
+        return False
+    targets = PATCH_TARGET.findall(command)
+    if len(targets) != 1 or not REVIEW_ARTIFACT.fullmatch(targets[0]):
+        return False
+    project = project.resolve()
+    request_dir = project / ".guardrail/approval-requests"
+    target = project / Path(targets[0])
+    try:
+        request_dir.resolve().relative_to(project)
+        target.resolve().relative_to(project)
+    except (OSError, ValueError):
+        return False
+    if request_dir.is_symlink() or target.is_symlink():
+        return False
+    return target.resolve().parent == request_dir.resolve()
 
 
 def operation(event, project, mode):
@@ -100,7 +128,11 @@ def require_approval(event, project, mode):
         receipt_path = directory / (digest + ".json")
         lock = directory / (digest + ".lock")
         if not receipt_path.exists():
-            deny("需要人類終端機核准（10 分鐘、一次性）；operation SHA-256: " + digest)
+            deny(
+                "需要人類終端機核准（10 分鐘、一次性）；operation SHA-256: " + digest
+                + "。Codex 應先自行建立 .guardrail/approval-requests/" + digest
+                + ".diff，再請人類以 --patch-file 審閱核准。"
+            )
         fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         os.close(fd)
         try:
