@@ -89,9 +89,8 @@ def plan(root):
     try: text = (root / PLAN).read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         deny(
-            "計畫閘門：找不到拆解文件。strict／standard 模式請先用一個獨立的 "
-            "apply_patch 建立 .guardrail/plan/decomposition.md；其他 .docs/ 計畫文件不能取代它。"
-            "light 模式的拆解文件須由人類終端機建立。"
+            "計畫閘門：找不到拆解文件。請先用一個獨立的 apply_patch 建立 "
+            ".guardrail/plan/decomposition.md；其他 .docs/ 計畫文件不能取代它。"
         )
     if any(marker not in text for marker in MARKERS): deny("計畫閘門：拆解文件缺少必要標記。")
     return text
@@ -173,22 +172,24 @@ def main():
             deny("計畫閘門：計畫檔不得是符號連結。")
         # 草稿不代表核准；只修改計畫時可先建立或修訂，後續操作重新驗證內容。
         if targets and all(target == plan_path.resolve() for target in targets):
-            if mode == "light":
-                deny("light 模式的計畫範圍須由人類終端機建立或修改。")
             return
-    text = plan(root); allowed = scopes(text, root)
+    text = plan(root)
+    # 與 Claude 對齊：light 只要求基本拆解，不解析或強制允許修改範圍。
+    allowed = [] if mode == "light" else scopes(text, root)
     if tool == "apply_patch":
         targets = patch_targets(data, root)
         if any(target in {(root / PLAN).resolve(), (root / POLICY).resolve()} for target in targets):
             deny("計畫與政策檔不得由 integrated harness 修改。")
-        if any(not in_scope(target, allowed) for target in targets): deny("計畫閘門：目標不在計畫允許修改範圍。")
+        if mode != "light" and any(not in_scope(target, allowed) for target in targets):
+            deny("計畫閘門：目標不在計畫允許修改範圍。")
     elif tool == "Bash":
         cmd = data.get("command")
         if not isinstance(cmd, str): deny("Malformed Bash command payload.")
         if mode == "strict" and not strict_command(cmd, allowlist, root): deny("strict 模式禁止非 allowlist 指令。")
     else:
         deny("Unknown tool is not proven read-only.")
-    if mode == "light" and tool == "apply_patch": return
+    # standard 保留拆解與範圍；light 只保留基本拆解。兩者皆免人工操作收據。
+    if mode in {"standard", "light"}: return
     require_approval(event, root, "integrated-harness")
 
 if __name__ == "__main__": main()

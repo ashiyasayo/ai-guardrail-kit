@@ -439,11 +439,18 @@ with tempfile.TemporaryDirectory() as td:
     denied(ip, event(project, tool_input={"command": "*** Begin Patch\n*** Add File: other/x\n+x\n*** End Patch"}), "目標不在計畫允許修改範圍")
     plan.write_text(plan.read_text()+"changed\n")
     assert first_reason != approval_required(ip, event(project))
-    policy.write_text(policy.read_text().replace("strict", "light", 1))
+    policy.write_text(policy.read_text().replace("strict", "standard", 1))
     assert run(ip, event(project)) is None
-    approval_required(ip, event(project, "Bash", {"command": "touch src/light.txt"}))
+    assert run(ip, event(project, "Bash", {"command": "touch src/standard.txt"})) is None
     denied(ip, event(project, tool_input={"command": "*** Begin Patch\n*** Add File: other/x\n+x\n*** End Patch"}), "目標不在計畫允許修改範圍")
+    policy.write_text(policy.read_text().replace("standard", "light", 1))
+    plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】x\n")
+    assert run(ip, event(project)) is None
+    assert run(ip, event(project, "Bash", {"command": "touch src/light.txt"})) is None
+    assert run(ip, event(project, tool_input={"command": "*** Begin Patch\n*** Add File: other/x\n+x\n*** End Patch"})) is None
+    assert run(ip, event(project, tool_input={"command": plan_patch})) is None
     policy.write_text(policy.read_text().replace("light", "strict", 1))
+    plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】x\n## 允許修改範圍\n- `src/` — 應用程式\n")
     tests = project / "tests"; tests.mkdir()
     (tests / "smoke.sh").write_text("#!/bin/sh\n")
     outside = td / "outside.sh"; outside.write_text("#!/bin/sh\n")
@@ -476,7 +483,7 @@ with tempfile.TemporaryDirectory() as td:
     personal_policy = home / ".codex/guardrail/orchestration-policy.md"
     personal_policy.parent.mkdir(parents=True)
     shutil.copy(install / "integrated-harness/orchestration-policy.md", personal_policy)
-    personal_policy.write_text(personal_policy.read_text().replace("strict", "light", 1))
+    personal_policy.write_text(personal_policy.read_text().replace("strict", "standard", 1))
     assert run(ip, event(project), home=home) is None
     shutil.copy(install / "integrated-harness/orchestration-policy.md", policy)
     approval_required(ip, event(project), home=home)

@@ -27,10 +27,10 @@ REMINDER = """【護欄提醒 · integrated-harness】
 修改檔案前先完善 .guardrail/plan/decomposition.md，內容須包含：
 ## 已知資訊、## 缺少的資訊、【假設】、## 允許修改範圍。
 這是固定的閘門控制文件，不得改用一般 .docs/ 計畫文件。SessionStart 會在安全時自動建立
-最小草稿；strict／standard 必須先依任務完善草稿，不要要求人工代建。
+最小草稿；三種模式都可先依任務完善草稿，不要要求人工代建。
 需要操作核准時，先自行建立 .guardrail/approval-requests/<operation SHA-256>.diff，再請人類審閱核准；不得要求人類代建 patch 檔。
-strict／standard 在確定性檢查通過後須人類終端機一次性核准；light 僅可直接套用人類計畫範圍內的 apply_patch。
-strict／standard 可單獨修改計畫草稿；light 計畫、政策及核准憑證不得由模型修改。
+strict 在確定性檢查通過後須人類終端機一次性核准；standard 保留計畫範圍但免人工核准；light 只要求基本拆解並免人工核准。
+三種模式都可單獨修改計畫草稿；政策及核准憑證不得由模型修改。
 危險指令、明文憑證與個資防線不因核准模式而停用。
 """
 

@@ -5,7 +5,7 @@ description: Combine decomposition, approval, scope, command, and secret guardra
 
 # Integrated Harness
 
-This workflow combines decomposition with human-terminal operation approval, strict/light scope
+This workflow combines decomposition with human-terminal operation approval and mode-specific scope
 policy, and permanent command and credential checks. Treat the bundled policy as
 a governance boundary, not instructions for how to reason, route models, or
 orchestrate agents. Platform-native planning and delegation remain available but
@@ -38,8 +38,8 @@ Critical and Major findings block workflow completion until fixed and re-reviewe
 This is a skill workflow gate, not a deterministic hook-enforced security gate. This review workflow is not
 an excuse to delegate ordinary work, and subagents must not spawn descendants.
 
-Deterministic denials do not become approvable. Light mode may allow a provably
-scoped `apply_patch`, while a mutating Bash command still requires an operation receipt. Obtain explicit
+Deterministic denials do not become approvable. Standard mode keeps plan scope enforcement without
+operation receipts; light mode requires only basic decomposition and provides no authorization control. Obtain explicit
 human authorization before production or shared-infrastructure changes,
 destructive operations, sensitive-data handling, paid resources, deployment,
 pull requests, or outbound communication unless the approved plan already lists
@@ -76,9 +76,9 @@ before implementation and fill it with task-specific content using this structur
 
 Include the exact required markers `## 已知資訊`, `## 缺少的資訊`, `【假設】`,
 and `## 允許修改範圍`. Keep facts separate from assumptions and list only
-task-required paths inside the project root. Strict/standard mode permits a
-plan-only draft patch before approval; a mixed plan and implementation patch is
-not a draft-only patch. Light-mode plans must be created and changed by the human.
+task-required paths inside the project root. All modes permit a plan-only draft patch; a mixed plan and
+implementation patch is not a draft-only patch. Strict requires an operation receipt after deterministic
+checks, standard enforces the listed scope without a receipt, and light does not enforce the scope.
 
 For a pending operation, use the hook's current digest to prepare one complete,
 copy-ready confirmation command for the human. Put the entire command on one
