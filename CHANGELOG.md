@@ -10,6 +10,10 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Codex runtime manager 在 Windows 需要執行 extensionless plugin 測試腳本時，若 `PATH`
+  先解析到 WSL 的 `System32\\bash.exe`，現在會從 `git.exe` 安裝位置回退到 Git for
+  Windows Bash；global install、mode switch 與 marketplace refresh 不再因錯誤 Bash
+  launcher 回報 `E_HOOK_FAILED`。
 - Codex `integrated-harness` 現在與 Codex `harness`、Claude 的既有行為一致，會在計畫建立前
   放行經窄化解析的唯讀探索命令（例如 `rg`、`cat`、`git status`）；含 shell operator、
   可執行 helper 或輸出寫入旗標的命令仍須通過原有計畫與操作核准，避免唯讀盤點本身造成鎖死。
