@@ -397,9 +397,19 @@ with tempfile.TemporaryDirectory() as td:
     denied(security_guard, legacy_danger, "危險指令攔截")
 
     ip = install / "integrated-harness/hooks/plan_gate.py"
+    # 唯讀探索不應依賴計畫、模式或一次性操作核准，否則代理無法蒐集建立計畫所需資訊。
+    assert run(ip, event(project, "Bash", {"command": "rg --files"})) is None
+    assert run(ip, event(project, "Bash", {"command": "git status"})) is None
+    for command in ("git diff --output=stolen", "rg x | cat", "find ."):
+        denied(ip, event(project, "Bash", {"command": command}), "缺少有效允許修改範圍")
     assert run(ip, event(project, tool_input={"command": review_patch})) is None
     assert run(ip, event(project, tool_input={"command": plan_patch})) is None
     assert run(ip, event(project, tool_input={"command": plan_patch + "\n"})) is None
+    repeated_plan_patch = plan_patch.replace(
+        "*** End Patch",
+        "*** Update File: .guardrail/plan/decomposition.md\n@@\n+more\n*** End Patch",
+    )
+    assert run(ip, event(project, tool_input={"command": repeated_plan_patch})) is None
     mixed = plan_patch.replace("*** End Patch", "*** Add File: src/other.py\n+x\n*** End Patch")
     denied(ip, event(project, tool_input={"command": mixed}), "缺少有效允許修改範圍")
     session_project = td / "session-project"; session_project.mkdir()
@@ -419,7 +429,7 @@ with tempfile.TemporaryDirectory() as td:
     protocol.unlink()
     global_project = td / "global-no-plan"; global_project.mkdir()
     assert run(ip, event(global_project, "Bash", {"command": "git status"}), global_default=True) is None
-    denied(ip, event(global_project, "Bash", {"command": "git status"}), "請先用一個獨立的 apply_patch 建立 .guardrail/plan/decomposition.md")
+    assert run(ip, event(global_project, "Bash", {"command": "git status"})) is None
     policy = guard / "orchestration-policy.md"
     shutil.copy(install / "integrated-harness/orchestration-policy.md", policy)
     plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】x\n## 允許修改範圍\n- `src/` — 應用程式\n")

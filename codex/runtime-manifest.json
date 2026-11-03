@@ -37,8 +37,8 @@
     },
     "integrated-harness": {
       "archive_path": "codex/runtime-archives/codex-runtime-integrated-harness.tar.gz",
-      "archive_sha256": "850f3a12aabd78dd4fc2e344409bbcc4fe091baf3c72e868c72abb9fddef6070",
-      "archive_size": 15241,
+      "archive_sha256": "3c29f0118a80f66b9a337da475771730fbbd653313f32932b89c4456cf35e466",
+      "archive_size": 15894,
       "entrypoints": {
         "pretool.plan": "hooks/plan_gate.py",
         "pretool.security": "hooks/security_guard.py",

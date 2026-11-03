@@ -13,6 +13,25 @@ MARKERS = ("## 已知資訊", "## 缺少的資訊", "【假設】")
 MODE = re.compile(r"^\s*-\s+Approval Mode[：:]\s*(strict|standard|light)\s*$", re.MULTILINE)
 PATCH_PATH = re.compile(r"^\*\*\* (?:(?:Add|Update|Delete) File|Move to): (.+)$", re.MULTILINE)
 UNSAFE = re.compile(r"[;&|><`\n\r*?\[\]]|\$\(")
+READ_ONLY_COMMANDS = {
+    "ls", "cat", "head", "tail", "grep", "rg", "pwd", "which",
+    "file", "wc", "diff", "stat", "du", "ps", "printenv",
+}
+READ_ONLY_GIT_SUBCOMMANDS = {"status", "log", "diff", "show", "branch", "rev-parse"}
+DISALLOWED_READ_FLAGS = {"--pre", "--hostname-bin", "--ext-diff", "--textconv", "--output"}
+
+def readonly_command(cmd):
+    if not isinstance(cmd, str) or UNSAFE.search(cmd): return False
+    try: tokens = shlex.split(cmd)
+    except ValueError: return False
+    if not tokens: return False
+    if any(token.split("=", 1)[0] in DISALLOWED_READ_FLAGS for token in tokens[1:]): return False
+    if tokens[0] in READ_ONLY_COMMANDS: return True
+    if len(tokens) > 1 and tokens[0] == "git" and tokens[1] in READ_ONLY_GIT_SUBCOMMANDS:
+        if tokens[1] == "branch":
+            return len(tokens) == 2 or all(token in {"--list", "--show-current", "-a", "-r", "-v", "-vv"} for token in tokens[2:])
+        return True
+    return False
 
 def section(text, heading):
     lines = text.splitlines()
@@ -139,6 +158,8 @@ def main():
     event = load_event(sys.stdin); root = project_root(event)
     if os.environ.get("AI_GUARDRAIL_GLOBAL_DEFAULT") == "1" and not (root / PLAN).exists(): return
     tool, data = event["tool_name"], event["tool_input"]
+    # 唯讀探索必須能在計畫建立前執行，否則模型無法蒐集撰寫安全範圍所需的事實。
+    if tool == "Bash" and readonly_command(data.get("command")): return
     mode, allowlist = policy(root)
     if tool == "apply_patch":
         if is_review_artifact_patch(event, root): return
@@ -151,7 +172,7 @@ def main():
         if plan_path.is_symlink():
             deny("計畫閘門：計畫檔不得是符號連結。")
         # 草稿不代表核准；只修改計畫時可先建立或修訂，後續操作重新驗證內容。
-        if targets == [plan_path.resolve()]:
+        if targets and all(target == plan_path.resolve() for target in targets):
             if mode == "light":
                 deny("light 模式的計畫範圍須由人類終端機建立或修改。")
             return
