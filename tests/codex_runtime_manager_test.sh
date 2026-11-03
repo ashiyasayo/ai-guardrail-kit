@@ -10,6 +10,19 @@ root = Path(os.environ['ROOT'])
 spec=importlib.util.spec_from_file_location('manager', root/'scripts/codex-runtime-manager.py')
 m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 
+# Windows PATH 若先解析到 WSL launcher，執行 extensionless fake Codex 會直接失敗；
+# 管理器應利用 Git 可執行檔位置回退到同一套 Git for Windows Bash。
+resolved_bash = m.script_bash(
+    platform='nt',
+    which=lambda name: {
+        'bash': r'C:\Windows\System32\bash.exe',
+        'git': r'C:\Program Files\Git\cmd\git.exe',
+    }.get(name),
+    is_file=lambda path: str(path).lower() == r'c:\program files\git\bin\bash.exe',
+    windows_dir=r'C:\Windows',
+)
+assert str(resolved_bash).lower() == r'c:\program files\git\bin\bash.exe'
+
 def bundle(member='hooks/dispatch.py', kind='regular', data=b'print("ok")\n'):
     out=io.BytesIO()
     with tarfile.open(fileobj=out, mode='w:gz') as t:
