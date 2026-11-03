@@ -8,6 +8,19 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Codex `integrated-harness` 現在與 Codex `harness`、Claude 的既有行為一致，會在計畫建立前
+  放行經窄化解析的唯讀探索命令（例如 `rg`、`cat`、`git status`）；含 shell operator、
+  可執行 helper 或輸出寫入旗標的命令仍須通過原有計畫與操作核准，避免唯讀盤點本身造成鎖死。
+- Codex `integrated-harness` 的 plan-only 例外現在接受同一 patch 內重複但全部指向
+  `.guardrail/plan/decomposition.md` 的目標，不再誤落入計畫檔保護拒絕；混合其他目標與
+  實作目標仍維持拒絕。Codex 預設政策也補齊實際模式語意，並與 Claude 對齊共同的
+  strict 測試／建置 allowlist。
+- Codex `integrated-harness` 的 `standard`／`light` 核准語意現與 Claude 對齊：standard
+  保留拆解與允許修改範圍但免人工核准；light 只要求基本拆解，不強制範圍且免人工核准。
+  strict 的 allowlist、一次性操作收據及永久安全防線維持不變。
+
 ## [0.11.4] - 2026-11-02
 
 ### Fixed

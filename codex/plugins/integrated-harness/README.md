@@ -46,8 +46,8 @@ Set one mode under `## 核准模式`:
 | Mode | `apply_patch` | `exec_command` |
 | --- | --- | --- |
 | `strict` | Requires a human-terminal operation receipt after plan and scope checks pass. | Only commands matching the strict allowlist are eligible, then require a human-terminal operation receipt. |
-| `standard` | Requires a human-terminal operation receipt after plan and scope checks pass. | Requires a human-terminal operation receipt after plan and scope checks pass. |
-| `light` | A patch within the approved scope proceeds without an operation receipt. | Requires a human-terminal operation receipt after plan and scope checks pass. |
+| `standard` | Enforces the plan scope without an operation receipt. | Proceeds after plan and scope validation without an operation receipt. |
+| `light` | Requires only basic decomposition; scope is not enforced and no operation receipt is required. | Proceeds after basic decomposition without an operation receipt. |
 
 Missing or invalid mode values are treated as `strict`.
 
@@ -72,10 +72,15 @@ rejected before approval. Keep entries narrow and project-specific.
 ## Related Guardrails
 
 Before any approval decision, `integrated-harness` requires a valid
-`.guardrail/plan/decomposition.md` with the required sections and an
-explicit allowed-modification scope. A strict/standard patch may edit only the plan draft; light-mode plans and all policy files
-remain human-managed. Start a new Codex thread after installing, switching,
+`.guardrail/plan/decomposition.md` with the required markers. Strict and standard additionally require an
+explicit allowed-modification scope; light does not parse or enforce that section. All modes may edit only
+the plan draft before implementation, while policy files remain human-managed. Start a new Codex thread after installing, switching,
 or refreshing the plugin so its hooks and skills are reloaded.
+
+Narrow, parsed read-only discovery commands such as `rg`, `cat`, and
+`git status` remain available before a plan exists and do not consume an
+operation receipt. Shell operators and read flags capable of executing helpers
+or writing output are rejected from this fast path.
 
 Each entry under `## 允許修改範圍` may include a same-line description after
 a backtick-delimited path, for example ``- `src/app.py` — application code``.

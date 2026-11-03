@@ -317,6 +317,14 @@ Release，並發布完整 40 位 runtime commit SHA；不得手動從 manifest �
 決定工作策略，但仍須遵守計畫與核准、外部副作用、敏感資料、成本、驗收及失敗揭露
 規則。`harness` 不提供編排功能；其歷史編排提示稿已 deprecated。
 
+Codex `integrated-harness` 會在計畫建立前放行經窄化解析的唯讀探索命令（例如 `rg`、
+`cat`、`git status`），不要求一次性操作收據；含 shell operator、輸出寫入旗標或可執行
+helper 的命令仍依模式進入計畫、allowlist 與人工核准流程。
+
+Codex 的核准模式與 Claude 對齊：`strict` 強制拆解、允許修改範圍、strict Bash allowlist
+及人工核准；`standard` 強制拆解與允許修改範圍但免人工核准；`light` 只要求基本拆解，
+不解析允許修改範圍且免人工核准。危險命令、明文憑證與個資防線不受模式影響。
+
 Claude 版會在 SessionStart 載入風險分級的執行協定：精簡進度更新、避免無新證據的
 重複驗證，並將 subagent 限制於具一定規模且可真正獨立並行的工作。這不會放寬任何
 計畫、核准或安全 hook。
