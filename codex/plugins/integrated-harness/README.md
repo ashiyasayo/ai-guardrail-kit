@@ -72,7 +72,7 @@ rejected before approval. Keep entries narrow and project-specific.
 ## Related Guardrails
 
 Before any approval decision, `integrated-harness` requires a valid
-`.guardrail/plan/decomposition.md` with the required markers. Strict and standard additionally require an
+`.codex/guardrail/plan/decomposition.md` with the required markers. Strict and standard additionally require an
 explicit allowed-modification scope; light does not parse or enforce that section. All modes may edit only
 the plan draft before implementation, while policy files remain human-managed. Start a new Codex thread after installing, switching,
 or refreshing the plugin so its hooks and skills are reloaded.

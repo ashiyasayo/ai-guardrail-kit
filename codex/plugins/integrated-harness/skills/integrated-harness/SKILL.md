@@ -49,7 +49,7 @@ a sandbox, and installation alone does not activate them.
 Activate it with `$CODEX_HOME/guardrail/bin/select-codex-mode integrated-harness [--scope project|local|user] [project-dir]`, then verify it with `$CODEX_HOME/guardrail/bin/verify-codex-mode integrated-harness [--scope project|local|user] [project-dir]`. For `user` scope, omit `[project-dir]` to use the global user fallback; provide it for `project` or `local` scope. Start a new thread after switching. The `./scripts/...` equivalents are only for a local checkout.
 
 Only the human may run `python3 "$CODEX_HOME/guardrail/bin/codex-runtime-manager.py" approve`
-in their own terminal. Plan drafts live at `.guardrail/plan/decomposition.md`; create one
+in their own terminal. Plan drafts live at `.codex/guardrail/plan/decomposition.md`; create one
 before implementation and fill it with task-specific content using this structure:
 
 ```md

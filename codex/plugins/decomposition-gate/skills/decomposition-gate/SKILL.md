@@ -5,20 +5,20 @@ description: Require a valid decomposition artifact before implementation work p
 
 # Decomposition Gate
 
-This workflow gates implementation on `.guardrail/plan/decomposition.md`.
+This workflow gates implementation on `.codex/guardrail/plan/decomposition.md`.
 It is workflow discipline, not authorization or a sandbox. Installation alone
 does not activate plugin hooks.
 
 The path is fixed: a plan under `.docs/` does not satisfy this gate. If the file is
 missing, create it with one standalone `apply_patch` whose only target is
-`.guardrail/plan/decomposition.md`; the hook deliberately permits that bootstrap
+`.codex/guardrail/plan/decomposition.md`; the hook deliberately permits that bootstrap
 write, so do not ask the user to create the file merely because the gate denied a
 different target.
 
 ## Write the decomposition document
 
 Before implementation or another project-file write, create
-`.guardrail/plan/decomposition.md` at the project root. Write task-specific
+`.codex/guardrail/plan/decomposition.md` at the project root. Write task-specific
 content; do not create a file containing only the required headings. Use this
 compact structure:
 

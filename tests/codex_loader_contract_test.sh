@@ -57,7 +57,7 @@ with tempfile.TemporaryDirectory() as tmp:
             assert result['permissionDecision']=='allow'
             assert 'test@example.com' not in result['updatedInput']['command']
         if mode=='decomposition-gate':
-            patch=dict(event,tool_name='apply_patch',tool_input={'command':'*** Begin Patch\n*** Add File: .guardrail/plan/decomposition.md\n+draft\n*** End Patch'})
+            patch=dict(event,tool_name='apply_patch',tool_input={'command':'*** Begin Patch\n*** Add File: .codex/guardrail/plan/decomposition.md\n+draft\n*** End Patch'})
             assert invoke('pretool.decomposition',patch) is None
     # 舊 matcher 不得被診斷為可用。
     hooks['hooks']['PreToolUse'][0]['matcher']='exec_command|apply_patch'

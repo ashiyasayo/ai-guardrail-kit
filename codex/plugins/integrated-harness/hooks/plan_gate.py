@@ -7,7 +7,7 @@ from pathlib import Path
 from hook_protocol import deny, load_event, project_root
 from approval import is_review_artifact_patch, require_approval
 
-PLAN = ".guardrail/plan/decomposition.md"
+PLAN = ".codex/guardrail/plan/decomposition.md"
 POLICY = ".codex/guardrail/orchestration-policy.md"
 MARKERS = ("## 已知資訊", "## 缺少的資訊", "【假設】")
 MODE = re.compile(r"^\s*-\s+Approval Mode[：:]\s*(strict|standard|light)\s*$", re.MULTILINE)
@@ -90,7 +90,7 @@ def plan(root):
     except (OSError, UnicodeError):
         deny(
             "計畫閘門：找不到拆解文件。請先用一個獨立的 apply_patch 建立 "
-            ".guardrail/plan/decomposition.md；其他 .docs/ 計畫文件不能取代它。"
+            ".codex/guardrail/plan/decomposition.md；其他 .docs/ 計畫文件不能取代它。"
         )
     if any(marker not in text for marker in MARKERS): deny("計畫閘門：拆解文件缺少必要標記。")
     return text

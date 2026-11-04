@@ -7,7 +7,7 @@ description: Stable Codex loader for project-selected runtimes.
 
 The loader is the user's installed entry point for every selectable mode. When
 `decomposition-gate` or `integrated-harness` is active, create
-`.guardrail/plan/decomposition.md` before implementation. Write task-specific
+`.codex/guardrail/plan/decomposition.md` before implementation. Write task-specific
 content using this structure:
 
 This exact path is the gate control artifact; a task plan under `.docs/` does not

@@ -276,13 +276,13 @@ with tempfile.TemporaryDirectory() as td:
     guard = project / ".codex" / "guardrail"; (guard / "plan").mkdir(parents=True)
 
     dg = install / "decomposition-gate/hooks/decomposition_gate.py"
-    denied(dg, event(project), "請先用一個獨立的 apply_patch 建立 .guardrail/plan/decomposition.md")
-    plan = project / ".guardrail/plan/decomposition.md"
-    plan.parent.mkdir(parents=True)
-    plan_patch = "*** Begin Patch\n*** Add File: .guardrail/plan/decomposition.md\n+draft\n*** End Patch"
+    denied(dg, event(project), "請先用一個獨立的 apply_patch 建立 .codex/guardrail/plan/decomposition.md")
+    plan = project / ".codex/guardrail/plan/decomposition.md"
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    plan_patch = "*** Begin Patch\n*** Add File: .codex/guardrail/plan/decomposition.md\n+draft\n*** End Patch"
     assert run(dg, event(project, tool_input={"command": plan_patch})) is None
     assert run(dg, event(project, tool_input={"command": plan_patch + "\n"})) is None
-    denied(dg, event(project, tool_input={"command": plan_patch.replace(".guardrail/plan/decomposition.md", "x/.guardrail/plan/decomposition.md")}), "其他 .docs/ 計畫文件不能取代它")
+    denied(dg, event(project, tool_input={"command": plan_patch.replace(".codex/guardrail/plan/decomposition.md", "x/.codex/guardrail/plan/decomposition.md")}), "其他 .docs/ 計畫文件不能取代它")
     bypass_patch = "*** Begin Patch\n*** Add File: .codex/guardrail/plan/.gate_disabled\n+emergency\n*** End Patch"
     denied(dg, event(project, tool_input={"command": bypass_patch}), "逃生口")
     denied(dg, event(project, "Bash", {"command": "touch .codex/guardrail/plan/.gate_disabled"}), "逃生口")
@@ -407,7 +407,7 @@ with tempfile.TemporaryDirectory() as td:
     assert run(ip, event(project, tool_input={"command": plan_patch + "\n"})) is None
     repeated_plan_patch = plan_patch.replace(
         "*** End Patch",
-        "*** Update File: .guardrail/plan/decomposition.md\n@@\n+more\n*** End Patch",
+        "*** Update File: .codex/guardrail/plan/decomposition.md\n@@\n+more\n*** End Patch",
     )
     assert run(ip, event(project, tool_input={"command": repeated_plan_patch})) is None
     mixed = plan_patch.replace("*** End Patch", "*** Add File: src/other.py\n+x\n*** End Patch")
@@ -415,13 +415,23 @@ with tempfile.TemporaryDirectory() as td:
     session_project = td / "session-project"; session_project.mkdir()
     session_env = dict(os.environ, AI_GUARDRAIL_PROJECT_ROOT=str(session_project))
     session = run_raw(install / "integrated-harness/hooks/session_start.py", {}, session_env)
-    assert ".guardrail/plan/decomposition.md" in session["systemMessage"]
-    session_plan = session_project / ".guardrail/plan/decomposition.md"
+    assert ".codex/guardrail/plan/decomposition.md" in session["systemMessage"]
+    session_plan = session_project / ".codex/guardrail/plan/decomposition.md"
     assert session_plan.is_file()
     assert "## 允許修改範圍" in session_plan.read_text(encoding="utf-8")
     session_plan.write_text("existing\n", encoding="utf-8")
     session = run_raw(install / "integrated-harness/hooks/session_start.py", {}, session_env)
     assert session_plan.read_text(encoding="utf-8") == "existing\n"
+    legacy_project = td / "legacy-session-project"; legacy_project.mkdir()
+    legacy_plan = legacy_project / ".guardrail/plan/decomposition.md"
+    legacy_plan.parent.mkdir(parents=True)
+    legacy_plan.write_text("legacy plan\n", encoding="utf-8")
+    legacy_env = dict(os.environ, AI_GUARDRAIL_PROJECT_ROOT=str(legacy_project))
+    legacy_session = run_raw(install / "integrated-harness/hooks/session_start.py", {}, legacy_env)
+    migrated_plan = legacy_project / ".codex/guardrail/plan/decomposition.md"
+    assert migrated_plan.read_text(encoding="utf-8") == "legacy plan\n"
+    assert not legacy_plan.exists()
+    assert "已遷移" in legacy_session["systemMessage"]
     protocol = install / "integrated-harness/reasoning-protocol.md"
     protocol.write_text("## Codex protocol test\n")
     session = run_raw(install / "integrated-harness/hooks/session_start.py", {}, session_env)

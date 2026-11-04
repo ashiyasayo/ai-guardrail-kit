@@ -67,8 +67,7 @@ for plugin in names[1:]:
     assert 'For `user` scope, omit `[project-dir]`' in skill, plugin
 dg_manifest = json.loads((root/'codex/plugins/decomposition-gate/.codex-plugin/plugin.json').read_text())
 dg_skill = (root/'codex/plugins/decomposition-gate/skills/decomposition-gate/SKILL.md').read_text()
-assert '.guardrail/plan/decomposition.md' in dg_manifest['description']
-assert '.codex/guardrail/plan/decomposition.md' not in json.dumps(dg_manifest)
+assert '.codex/guardrail/plan/decomposition.md' in dg_manifest['description']
 for marker in ('## 問題與目標', '## 已知資訊', '## 缺少的資訊', '【假設】', '## 做法與驗證', '## 允許修改範圍'):
     assert marker in dg_skill, marker
 assert 'This mode has no human approval step' in dg_skill
@@ -83,7 +82,7 @@ def default_allowlist(text):
     return [line.strip()[3:-1] for line in section.splitlines() if line.strip().startswith('- `')]
 assert default_allowlist(codex_policy) == default_allowlist(claude_policy)
 loader_skill = (root/'codex/plugins/ai-guardrail-loader/skills/ai-guardrail-loader/SKILL.md').read_text()
-for marker in ('.guardrail/plan/decomposition.md', '## 已知資訊', '## 缺少的資訊', '【假設】', '## 允許修改範圍'):
+for marker in ('.codex/guardrail/plan/decomposition.md', '## 已知資訊', '## 缺少的資訊', '【假設】', '## 允許修改範圍'):
     assert marker in loader_skill, marker
 assert 'one complete, copy-ready confirmation command on one line' in loader_skill
 assert 'Decomposition-gate has no human approval step' in loader_skill

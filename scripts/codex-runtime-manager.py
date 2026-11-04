@@ -1827,7 +1827,7 @@ def diagnose_selection(args: argparse.Namespace) -> None:
     print("PASS: cache, effective selector, loader files and hook wiring")
     print("UNVERIFIED: host hooks feature, managed-only policy and exact-definition trust; review /hooks in the target client")
     print("UNVERIFIED: actual host invocation and sandbox permissions; run the opt-in Codex integration test")
-    print("Plan drafts: .guardrail/plan/decomposition.md; installation and protected .codex settings require a human terminal or platform approval")
+    print("Plan drafts: .codex/guardrail/plan/decomposition.md; installation and protected .codex settings require a human terminal or platform approval")
 
 
 def parser() -> argparse.ArgumentParser:

@@ -6,7 +6,7 @@
 | --- | --- | --- | --- |
 | Codex | 四模式 | marketplace、離線 runtime archive、checkout | 共用事件正規化、PII 回寫、接線與契約測試 |
 | Codex | harness、integrated-harness | 同上 | 取代不受支援的 ask 核准契約 |
-| Codex | decomposition-gate、integrated-harness | 同上 | 計畫草稿移至 `.guardrail/plan/decomposition.md` |
+| Codex | decomposition-gate、integrated-harness | 同上 | 計畫草稿統一至 `.codex/guardrail/plan/decomposition.md` |
 | Codex | loader、所有模式 | project/local/user selector、global install | matcher、診斷與 bootstrap 副本同步 |
 | Claude | 四模式 | shared、marketplace、copy-in、global install | 不適用：Claude 的事件、ask 與 `.claude` 計畫契約未改變 |
 | Copilot | decomposition-gate、sensitive-data-guard | copy-in | 不適用：VS Code hook 協定及 `.github` 計畫位置未改變 |
@@ -21,11 +21,12 @@ PII 回寫使用官方 `updatedInput.command`，不回傳舊 patch 欄位。
 
 ## 沙箱與遷移
 
-計畫草稿放在工作區 `.guardrail/plan/decomposition.md`，不再要求模型寫入受保護的
-`.codex/`。既有計畫請由人類檢查後搬移；不自動複製或回退舊計畫，避免採用過期範圍。
-政策、selector 與 decomposition 緊急停用檔仍留在 `.codex/guardrail/`；搬移草稿
-不代表授權模型修改政策或建立停用旗標。integrated-harness 可接受只修改計畫的 patch，
-混入實作、政策或 Move 目標時不適用草稿豁免。
+計畫草稿放在工作區 `.codex/guardrail/plan/decomposition.md`，與 Codex 專案設定統一。
+只有這個固定檔案具有模型可寫的窄化例外；政策、selector、核准資料與 decomposition
+緊急停用檔仍受保護。integrated-harness 可接受只修改計畫的 patch，混入實作、政策
+或其他 Move 目標時不適用草稿豁免。SessionStart 若發現新路徑不存在且舊版
+`.guardrail/plan/decomposition.md` 是專案內一般檔案，會原子搬移至新路徑；新路徑已存在
+時不覆寫，也不採用舊檔。
 
 安裝／更新 loader、下載 runtime 與 selector 登錄是管理操作，應由人類終端機執行，
 或經平台授權。hook 熱路徑離線，不要求關閉 sandbox。更新 loader 後，必須重新在

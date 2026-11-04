@@ -65,7 +65,7 @@ Code session，接著可以繼續對話。命令會在目前工作目錄執行�
 ### Codex
 
 Codex hooks 採官方 `Bash`／`command` 事件格式。`ask` 尚未受支援，本專案改用
-人類終端機建立的 10 分鐘一次性核准；計畫草稿移到 `.guardrail/plan/`。
+人類終端機建立的 10 分鐘一次性核准；計畫草稿位於 `.codex/guardrail/plan/`。
 升級須更新 loader 與 runtime，並重新 `/hooks` 信任。詳見
 [相容性、遷移與驗證](docs/codex-hook-compatibility.md)。
 
@@ -536,7 +536,7 @@ SDG 的完整能力已獨立列於上表。
 | --- | --- | --- | --- | --- | --- | --- |
 | 主要定位 | 先拆解再寫入 | 人工核准＋安全防線 | 拆解、政策、核准、安全與編排 | 先拆解再寫入 | 終端機一次性核准＋安全防線 | 拆解、政策、一次性核准、安全與編排 |
 | `PreToolUse` 確定性關卡 | 有 | 有 | 有 | 有 | 有 | 有 |
-| 拆解文件 | `.claude/plan/decomposition.md` | — | `.claude/plan/decomposition.md` | `.guardrail/plan/decomposition.md` | — | `.guardrail/plan/decomposition.md` |
+| 拆解文件 | `.claude/plan/decomposition.md` | — | `.claude/plan/decomposition.md` | `.codex/guardrail/plan/decomposition.md` | — | `.codex/guardrail/plan/decomposition.md` |
 | 拆解必要標記 | `已知資訊`、`缺少的資訊`、至少一個 `【假設】` | — | 同 DG | 同 Claude DG | — | 同 DG，另需允許修改範圍 |
 | 未完成拆解時封鎖寫入 | 有 | — | 有 | 有 | — | 有 |
 | 唯讀操作可在關卡前執行 | 有 | 有 | 有 | 有 | 有 | 由註冊 hook 與 Codex 原生唯讀流程處理 |
@@ -654,7 +654,7 @@ fail-closed 預設與四種模式的跨平台相容測試。
 風險分級協定：依任務風險調整分析、播報、subagent 委派與驗證深度，避免小型工作
 被固定多方案、反方審查或重複驗證放大。
 
-Codex 唯一全域安裝的 loader skill 會引導建立 `.guardrail/plan/decomposition.md`，列出目標、已知資訊、
+Codex 唯一全域安裝的 loader skill 會引導建立 `.codex/guardrail/plan/decomposition.md`，列出目標、已知資訊、
 待確認資訊、明確假設、做法、驗證方式及修改範圍。Codex `decomposition-gate` 是流程閘門，
 不提供人工核准命令；需要操作收據時請選 `integrated-harness`。
 
