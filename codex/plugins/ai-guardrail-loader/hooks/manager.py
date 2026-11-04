@@ -11,6 +11,7 @@ from collections import Counter
 import hashlib
 import io
 import json
+import ntpath
 import os
 import posixpath
 import re
@@ -25,7 +26,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 
@@ -869,19 +870,19 @@ def script_bash(platform=None, which=None, is_file=None, windows_dir=None):
     """解析可執行腳本的 Bash；Windows 不把 WSL launcher 當成 Git Bash。"""
     platform = os.name if platform is None else platform
     which = shutil.which if which is None else which
-    is_file = (lambda path: path.is_file()) if is_file is None else is_file
+    is_file = (lambda path: Path(str(path)).is_file()) if is_file is None else is_file
     candidate = which("bash")
     if platform != "nt" or not candidate:
         return candidate
 
     windows_dir = windows_dir or os.environ.get("WINDIR", r"C:\Windows")
-    system_bash = Path(windows_dir) / "System32" / "bash.exe"
-    if os.path.normcase(os.path.normpath(candidate)) != os.path.normcase(os.path.normpath(system_bash)):
+    system_bash = PureWindowsPath(windows_dir) / "System32" / "bash.exe"
+    if ntpath.normcase(ntpath.normpath(candidate)) != ntpath.normcase(ntpath.normpath(str(system_bash))):
         return candidate
 
     git = which("git")
     if git:
-        git_path = Path(git)
+        git_path = PureWindowsPath(git)
         git_root = git_path.parent.parent if git_path.parent.name.lower() in {"cmd", "bin"} else None
         if git_root:
             for fallback in (git_root / "bin" / "bash.exe", git_root / "usr" / "bin" / "bash.exe"):
