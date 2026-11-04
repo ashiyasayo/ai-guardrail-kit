@@ -8,8 +8,14 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-04
+
 ### Fixed
 
+- Codex 專案拆解文件統一至 `.codex/guardrail/plan/decomposition.md`，與 selector、政策及
+  Codex 專案設定共用 `.codex/guardrail/` 命名空間；只有固定計畫檔保留模型可寫的窄化
+  例外，其他 `.codex` 控制檔仍受保護。integrated-harness SessionStart 會在新路徑不存在
+  時安全搬移舊版 `.guardrail/plan/decomposition.md`，不覆寫既有新檔。
 - Codex runtime manager 在 Windows 需要執行 extensionless plugin 測試腳本時，若 `PATH`
   先解析到 WSL 的 `System32\\bash.exe`，現在會從 `git.exe` 安裝位置回退到 Git for
   Windows Bash；global install、mode switch 與 marketplace refresh 不再因錯誤 Bash
@@ -18,7 +24,7 @@ All notable changes to this project are documented in this file.
   放行經窄化解析的唯讀探索命令（例如 `rg`、`cat`、`git status`）；含 shell operator、
   可執行 helper 或輸出寫入旗標的命令仍須通過原有計畫與操作核准，避免唯讀盤點本身造成鎖死。
 - Codex `integrated-harness` 的 plan-only 例外現在接受同一 patch 內重複但全部指向
-  `.guardrail/plan/decomposition.md` 的目標，不再誤落入計畫檔保護拒絕；混合其他目標與
+  `.codex/guardrail/plan/decomposition.md` 的目標，不再誤落入計畫檔保護拒絕；混合其他目標與
   實作目標仍維持拒絕。Codex 預設政策也補齊實際模式語意，並與 Claude 對齊共同的
   strict 測試／建置 allowlist。
 - Codex `integrated-harness` 的 `standard`／`light` 核准語意現與 Claude 對齊：standard
