@@ -56,16 +56,16 @@ Code session，接著可以繼續對話。命令會在目前工作目錄執行�
 不得以提示詞中的「允許」、讓模型建立核准旗標，或修改政策檔來繞過此限制。
 
 需要暫時從手機處理低風險修改時，請先在可信任桌機為**個別專案**設定好模式與政策，並
-使用無正式憑證的 branch：Claude 可使用 `integrated-harness` 的 `standard` 模式；Codex
-可使用 `light` 模式，但只限已建立計畫後的範圍內 `apply_patch`，`exec_command`、部署與
-外部副作用仍交由桌機或 CI 處理。所有修改應透過 PR，由 GitHub Actions 驗證後再用手機
+使用無正式憑證的 branch：Claude 與 Codex 都可使用 `integrated-harness` 的 `standard`
+模式（拆解＋範圍，免人工核准）；只有不需要範圍授權控制的低風險工作才使用 `light`
+（僅基本拆解）。部署與外部副作用仍交由桌機或 CI 處理。所有修改應透過 PR，由 GitHub Actions 驗證後再用手機
 審查／合併。這是低權限作業流程，不是 strict 核准的替代品；未來若需手機核准 strict，
 必須實作可驗證身分、範圍與短期效期的外部簽章核准機制。
 
 ### Codex
 
 Codex hooks 採官方 `Bash`／`command` 事件格式。`ask` 尚未受支援，本專案改用
-人類終端機建立的 10 分鐘一次性核准；計畫草稿移到 `.guardrail/plan/`。
+人類終端機建立的 10 分鐘一次性核准；計畫草稿位於 `.codex/guardrail/plan/`。
 升級須更新 loader 與 runtime，並重新 `/hooks` 信任。詳見
 [相容性、遷移與驗證](docs/codex-hook-compatibility.md)。
 
@@ -536,24 +536,24 @@ SDG 的完整能力已獨立列於上表。
 | --- | --- | --- | --- | --- | --- | --- |
 | 主要定位 | 先拆解再寫入 | 人工核准＋安全防線 | 拆解、政策、核准、安全與編排 | 先拆解再寫入 | 終端機一次性核准＋安全防線 | 拆解、政策、一次性核准、安全與編排 |
 | `PreToolUse` 確定性關卡 | 有 | 有 | 有 | 有 | 有 | 有 |
-| 拆解文件 | `.claude/plan/decomposition.md` | — | `.claude/plan/decomposition.md` | `.guardrail/plan/decomposition.md` | — | `.guardrail/plan/decomposition.md` |
+| 拆解文件 | `.claude/plan/decomposition.md` | — | `.claude/plan/decomposition.md` | `.codex/guardrail/plan/decomposition.md` | — | `.codex/guardrail/plan/decomposition.md` |
 | 拆解必要標記 | `已知資訊`、`缺少的資訊`、至少一個 `【假設】` | — | 同 DG | 同 Claude DG | — | 同 DG，另需允許修改範圍 |
 | 未完成拆解時封鎖寫入 | 有 | — | 有 | 有 | — | 有 |
 | 唯讀操作可在關卡前執行 | 有 | 有 | 有 | 有 | 有 | 由註冊 hook 與 Codex 原生唯讀流程處理 |
 | 緊急停用拆解關卡 | 人類建立 `.claude/plan/.gate_disabled` | — | — | 人類建立 `.codex/guardrail/plan/.gate_disabled` | — | — |
 | 防止模型自建／修改逃生口 | 有，檔案工具與 Bash 都攔截 | — | — | 有，`apply_patch` 與 `exec_command` 都攔截 | — | — |
-| 人類核准方式 | — | 人類建立 `.claude/.plan_approved` | `strict` 下執行 `approve_plan.py` | — | 人類終端機建立短效操作憑證 | `strict`／`standard` 使用短效操作憑證 |
+| 人類核准方式 | — | 人類建立 `.claude/.plan_approved` | `strict` 下執行 `approve_plan.py` | — | 人類終端機建立短效操作憑證 | `strict` 使用短效操作憑證 |
 | 核准有效範圍 | — | 旗標建立後 60 分鐘 | 綁定拆解文件 SHA-256，60 分鐘 | — | 10 分鐘內一次匹配操作 | 10 分鐘內一次操作；綁定計畫／政策 SHA-256 |
 | 防止模型自我核准 | — | 有，禁止工具操作核准旗標 | 有，禁止修改核准紀錄與政策 | — | 受保護的 CODEX_HOME 核准庫與平台沙箱 | 受保護的 CODEX_HOME 核准庫與平台沙箱 |
 | 政策模式 | — | — | `strict`／`standard`／`light` | — | — | `strict`／`standard`／`light` |
 | 專案政策檔 | — | — | `.claude/orchestration-policy.md` | — | — | `.codex/guardrail/orchestration-policy.md` |
 | 個人政策 fallback | — | — | `~/.claude/orchestration-policy.md` | — | — | `~/.codex/guardrail/orchestration-policy.md` |
 | 無政策或政策無效 | — | — | fail closed 為 `strict` | — | — | fail closed 為 `strict`，空 Bash allowlist |
-| 允許修改範圍 | — | — | `strict`／`standard` 強制；`light` 不解析、不強制 | — | — | 所有模式的 `apply_patch` 都強制範圍；`light` 只免除 patch 的操作憑證 |
+| 允許修改範圍 | — | — | `strict`／`standard` 強制；`light` 不解析、不強制 | — | — | `strict`／`standard` 強制；`light` 不解析、不強制 |
 | `strict` Bash allowlist | — | — | 有；不在清單的一般 Bash 直接拒絕 | — | — | 有；符合清單後仍須終端機核准 |
 | `strict` git 專屬規則 | — | — | allowlist 列入 `git add`／`git commit` 時：`git add` 只接受允許修改範圍內的相對路徑（含範圍內 `.claude/` 底下的檔案），不得帶選項；`git commit` 只接受 `-m`／`--message` | — | — | 無；每個指令都須以完整指令 SHA-256 的終端機收據核准 |
-| `standard` 行為 | — | — | 拆解＋範圍，免人工核准 | — | — | 拆解＋範圍，`apply_patch`／`exec_command` 仍須終端機核准 |
-| `light` 行為 | — | — | 只要求基本拆解；免範圍與人工核准 | — | — | 人類建立計畫後，範圍內 `apply_patch` 免操作憑證；Bash 仍須終端機核准 |
+| `standard` 行為 | — | — | 拆解＋範圍，免人工核准 | — | — | 拆解＋範圍，免人工核准 |
+| `light` 行為 | — | — | 只要求基本拆解；免範圍與人工核准 | — | — | 只要求基本拆解；免範圍與人工核准 |
 | 子代理委派（`Agent`／`Task` 等非 Bash、非檔案寫入類工具） | — | — | `plan_gate.py` 依 `tool_name` 攔截，不區分呼叫來源（含 slash command 間接觸發）：不在 `PRE_PLAN_SAFE_TOOLS` 白名單者，`strict` 需拆解文件＋60 分鐘內人工核准才放行；`standard`／`light` 只需拆解文件存在即可放行 | — | — | 同一機制是否涵蓋 Codex 端子代理／委派工具尚未查證，暫缺 |
 | 永久危險命令阻擋 | — | 有 | 有 | — | 有 | 有 |
 | 危險命令涵蓋 | — | 毀滅性刪除、force push、下載即執行、`find -exec`、命令替換等 | 同 H | — | 與 Claude 對齊的 token 化判定＋regex fallback | 同 H |
@@ -614,7 +614,7 @@ SDG 的完整能力已獨立列於上表。
 | `decomposition-gate` | 最小、容易理解；只約束「先拆解、後修改」；不引入人工核准、政策與安全規則的額外摩擦；適合個人、教學與 PoC | 不是授權控制；模型能自行完成拆解後繼續；不阻擋危險命令、秘密或個資；不能取代沙箱與人工審查 | 只想改善思考與工作紀律，不希望每次修改都要求人工核准時 | **有條件必要**：提供最低摩擦的獨立入口；若只剩完整版，這類使用者會被迫承擔不需要的治理成本 |
 | `sensitive-data-guard` | 將資料外洩防線獨立安裝；阻擋明文秘密與提示詞個資，並遮罩寫入內容的個資；不改變團隊工作流程 | 不阻擋危險命令、不要求拆解或人工核准；規則式辨識仍可能誤判或漏判，不能取代完整 DLP | 已有自己的流程與權限控制，只想加裝敏感資料檢查時 | **必要**：讓資料保護成為可獨立採用的最小能力，不必連帶安裝核准與編排 |
 | `harness` | 不要求採用本專案的拆解／編排方法；可直接補上人工核准、危險命令、秘密與個資防線；容易接到既有 SDLC、規格或外部編排流程 | 本身不驗證拆解品質與修改範圍；Claude 與 Codex 的人工核准生命週期不同；安全規則仍有 regex／token 判定盲點 | 團隊已有自己的計畫、工單、編排或審批流程，只缺確定性施作授權與安全底線時 | **有條件必要**：避免強迫成熟團隊改用本專案的拆解格式與編排規範 |
-| `integrated-harness` | 一次提供拆解、範圍、政策模式、人工核准、安全防線、個資保護、SessionStart 提醒及精簡治理政策；治理邊界最完整 | 設定與學習成本最高；strict 模式摩擦最大；政策錯誤可能導致 fail closed；兩平台的 `standard`／`light` 行為不同，維護與測試矩陣最大 | 新專案、多人協作、高風險資料、正式系統，或需要明確授權與稽核邊界時 | **必要**：作為完整治理方案，避免使用者自行拼裝 DG 與 H 後產生 hook 順序、政策或核准語意衝突 |
+| `integrated-harness` | 一次提供拆解、範圍、政策模式、人工核准、安全防線、個資保護、SessionStart 提醒及精簡治理政策；治理邊界最完整 | 設定與學習成本最高；strict 模式摩擦最大；政策錯誤可能導致 fail closed | 新專案、多人協作、高風險資料、正式系統，或需要明確授權與稽核邊界時 | **必要**：作為完整治理方案，避免使用者自行拼裝 DG 與 H 後產生 hook 順序、政策或核准語意衝突 |
 
 ### 拆成四種模式的整體優缺點
 
@@ -654,7 +654,7 @@ fail-closed 預設與四種模式的跨平台相容測試。
 風險分級協定：依任務風險調整分析、播報、subagent 委派與驗證深度，避免小型工作
 被固定多方案、反方審查或重複驗證放大。
 
-Codex 唯一全域安裝的 loader skill 會引導建立 `.guardrail/plan/decomposition.md`，列出目標、已知資訊、
+Codex 唯一全域安裝的 loader skill 會引導建立 `.codex/guardrail/plan/decomposition.md`，列出目標、已知資訊、
 待確認資訊、明確假設、做法、驗證方式及修改範圍。Codex `decomposition-gate` 是流程閘門，
 不提供人工核准命令；需要操作收據時請選 `integrated-harness`。
 

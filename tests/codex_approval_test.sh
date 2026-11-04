@@ -67,22 +67,24 @@ with tempfile.TemporaryDirectory() as tmp:
     other=base/'other';other.mkdir();deny(event(other))
     sub=project/'sub';sub.mkdir();deny(event(sub))
     # integrated 的內容與政策都必須與人類審閱版本一致。
-    plan=project/'.guardrail/plan/decomposition.md';plan.parent.mkdir(parents=True)
+    plan=project/'.codex/guardrail/plan/decomposition.md';plan.parent.mkdir(parents=True)
     plan.write_text('## 已知資訊\n## 缺少的資訊\n【假設】x\n## 允許修改範圍\n- `src/`\n')
-    policy=project/'.codex/guardrail/orchestration-policy.md';policy.parent.mkdir(parents=True)
-    policy.write_text('- Approval Mode: standard\n')
-    integrated_digest,_=approval.operation(data,project,'integrated-harness')
-    approval.grant(data,project,'integrated-harness',integrated_digest)
+    policy=project/'.codex/guardrail/orchestration-policy.md';policy.parent.mkdir(parents=True, exist_ok=True)
+    policy.write_text('- Approval Mode: strict\n')
+    integrated_data=event(project);integrated_data['tool_name']='apply_patch'
+    integrated_data['tool_input']={'command':'*** Begin Patch\n*** Add File: src/example.txt\n+x\n*** End Patch'}
+    integrated_digest,_=approval.operation(integrated_data,project,'integrated-harness')
+    approval.grant(integrated_data,project,'integrated-harness',integrated_digest)
     plan.write_text(plan.read_text()+'changed\n')
-    deny(data,'integrated-harness')
-    integrated_digest,_=approval.operation(data,project,'integrated-harness')
-    approval.grant(data,project,'integrated-harness',integrated_digest)
+    deny(integrated_data,'integrated-harness')
+    integrated_digest,_=approval.operation(integrated_data,project,'integrated-harness')
+    approval.grant(integrated_data,project,'integrated-harness',integrated_digest)
     policy.write_text(policy.read_text()+'changed\n')
-    deny(data,'integrated-harness')
-    integrated_digest,_=approval.operation(data,project,'integrated-harness')
-    approval.grant(data,project,'integrated-harness',integrated_digest)
-    assert run(data,'integrated-harness') is None
-    deny(data,'integrated-harness')
+    deny(integrated_data,'integrated-harness')
+    integrated_digest,_=approval.operation(integrated_data,project,'integrated-harness')
+    approval.grant(integrated_data,project,'integrated-harness',integrated_digest)
+    assert run(integrated_data,'integrated-harness') is None
+    deny(integrated_data,'integrated-harness')
     # preview 不建立憑證；錯誤的確認 digest 也不得授權。
     cli=[sys.executable,str(root/'shared/codex/approval.py'),'--project',str(project),'--mode','harness','--command','touch reviewed.txt']
     preview=subprocess.run(cli,text=True,capture_output=True);assert preview.returncode==0,preview.stderr
@@ -91,10 +93,10 @@ with tempfile.TemporaryDirectory() as tmp:
     assert subprocess.run(cli+['--confirm','0'*64],capture_output=True).returncode==1
     assert subprocess.run(cli+['--confirm',confirm],capture_output=True).returncode==0
     assert run(denied_event) is None
-    # light 不能經可寫草稿擴大免核准範圍。
+    # light 與 Claude 對齊：基本拆解免人工核准，計畫也可由模型修訂。
     policy.write_text('- Approval Mode: light\n')
     patch=event(project);patch['tool_name']='apply_patch'
-    patch['tool_input']={'command':'*** Begin Patch\n*** Update File: .guardrail/plan/decomposition.md\n@@\n+x\n*** End Patch'}
-    assert '人類終端機' in deny(patch,'integrated-harness')['permissionDecisionReason']
+    patch['tool_input']={'command':'*** Begin Patch\n*** Update File: .codex/guardrail/plan/decomposition.md\n@@\n+x\n*** End Patch'}
+    assert run(patch,'integrated-harness') is None
 print('PASS: Codex operation approvals, expiry, binding, replay and concurrency')
 PY

@@ -136,7 +136,8 @@ loader 從 Codex event 的 `cwd` 找最近含 selector 的 project root，依 pr
 
 ## Hook compatibility and approval
 
-計畫草稿使用 `.guardrail/plan/decomposition.md`；`.codex` 仍保存受保護的設定。
+計畫草稿使用 `.codex/guardrail/plan/decomposition.md`。只有該固定計畫檔可由模型以
+獨立 patch 修改；同目錄的政策、selector、核准資料與停用旗標仍受保護。
 `harness`／`integrated-harness` 使用人類終端機一次性核准，不回傳未支援的 `ask`。
 `verify-codex-mode --diagnose` 可檢查接線，但不替代 `/hooks` 信任或真實宿主測試。
 完整指令、遷移與限制見 [相容性說明](codex-hook-compatibility.md)。

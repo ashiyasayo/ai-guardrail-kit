@@ -65,9 +65,11 @@ selector commit 同步維護 `$CODEX_HOME/guardrail/selector-index.json`，讓�
 `$CODEX_HOME/guardrail/approvals/`，須在工作區外，且不得授予模型寫入權限。
 若 hook 執行環境無法消耗憑證，一律 deny，不降級成 allow 或未支援的 ask。
 
-計畫草稿在 `.guardrail/plan/`；政策、selector、緊急停用檔仍在受保護的 `.codex/`。
-strict／standard 允許只修改草稿的 patch，內容變更會使既有核准不匹配；light 的計畫
-仍由人類建立／修改，避免模型擴張免核准範圍。loader 傳遞已解析 project root，
+計畫草稿、政策、selector 與緊急停用檔統一位於 `.codex/guardrail/`。只有
+`.codex/guardrail/plan/decomposition.md` 具有模型可寫的窄化例外；政策、selector、
+核准資料與緊急停用檔仍受保護。
+三種模式都允許只修改草稿的 patch；strict 的內容變更會使既有核准不匹配，standard
+仍強制允許修改範圍但免人工核准，light 則只要求基本拆解、不提供範圍授權控制。loader 傳遞已解析 project root，
 讓子目錄 session 仍檢查同一專案計畫。
 
 本機 verify 僅證明 selector/cache；`--diagnose` 另驗接線與有效選擇，明列宿主 trust、

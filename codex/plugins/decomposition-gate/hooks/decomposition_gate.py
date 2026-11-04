@@ -3,7 +3,7 @@ import re
 import sys
 from hook_protocol import deny, load_event, project_root
 
-PLAN = ".guardrail/plan/decomposition.md"
+PLAN = ".codex/guardrail/plan/decomposition.md"
 GATE_BYPASS = ".codex/guardrail/plan/.gate_disabled"
 MARKERS = ("## 已知資訊", "## 缺少的資訊", "【假設】")
 PATCH_PATH = re.compile(r"^\*\*\* (?:(?:Add|Update|Delete) File|Move to): (.+)$", re.MULTILINE)
@@ -56,7 +56,7 @@ def main():
     except (OSError, UnicodeError):
         deny(
             "Plan gate: 找不到或無法讀取拆解產出物。請先用一個獨立的 apply_patch 建立 "
-            ".guardrail/plan/decomposition.md；其他 .docs/ 計畫文件不能取代它。"
+            ".codex/guardrail/plan/decomposition.md；其他 .docs/ 計畫文件不能取代它。"
         )
     if any(marker not in content for marker in MARKERS):
         deny("Plan gate: 拆解產出物不完整。")

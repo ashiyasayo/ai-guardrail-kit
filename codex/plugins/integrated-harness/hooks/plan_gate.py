@@ -7,12 +7,31 @@ from pathlib import Path
 from hook_protocol import deny, load_event, project_root
 from approval import is_review_artifact_patch, require_approval
 
-PLAN = ".guardrail/plan/decomposition.md"
+PLAN = ".codex/guardrail/plan/decomposition.md"
 POLICY = ".codex/guardrail/orchestration-policy.md"
 MARKERS = ("## 已知資訊", "## 缺少的資訊", "【假設】")
 MODE = re.compile(r"^\s*-\s+Approval Mode[：:]\s*(strict|standard|light)\s*$", re.MULTILINE)
 PATCH_PATH = re.compile(r"^\*\*\* (?:(?:Add|Update|Delete) File|Move to): (.+)$", re.MULTILINE)
 UNSAFE = re.compile(r"[;&|><`\n\r*?\[\]]|\$\(")
+READ_ONLY_COMMANDS = {
+    "ls", "cat", "head", "tail", "grep", "rg", "pwd", "which",
+    "file", "wc", "diff", "stat", "du", "ps", "printenv",
+}
+READ_ONLY_GIT_SUBCOMMANDS = {"status", "log", "diff", "show", "branch", "rev-parse"}
+DISALLOWED_READ_FLAGS = {"--pre", "--hostname-bin", "--ext-diff", "--textconv", "--output"}
+
+def readonly_command(cmd):
+    if not isinstance(cmd, str) or UNSAFE.search(cmd): return False
+    try: tokens = shlex.split(cmd)
+    except ValueError: return False
+    if not tokens: return False
+    if any(token.split("=", 1)[0] in DISALLOWED_READ_FLAGS for token in tokens[1:]): return False
+    if tokens[0] in READ_ONLY_COMMANDS: return True
+    if len(tokens) > 1 and tokens[0] == "git" and tokens[1] in READ_ONLY_GIT_SUBCOMMANDS:
+        if tokens[1] == "branch":
+            return len(tokens) == 2 or all(token in {"--list", "--show-current", "-a", "-r", "-v", "-vv"} for token in tokens[2:])
+        return True
+    return False
 
 def section(text, heading):
     lines = text.splitlines()
@@ -70,9 +89,8 @@ def plan(root):
     try: text = (root / PLAN).read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         deny(
-            "計畫閘門：找不到拆解文件。strict／standard 模式請先用一個獨立的 "
-            "apply_patch 建立 .guardrail/plan/decomposition.md；其他 .docs/ 計畫文件不能取代它。"
-            "light 模式的拆解文件須由人類終端機建立。"
+            "計畫閘門：找不到拆解文件。請先用一個獨立的 apply_patch 建立 "
+            ".codex/guardrail/plan/decomposition.md；其他 .docs/ 計畫文件不能取代它。"
         )
     if any(marker not in text for marker in MARKERS): deny("計畫閘門：拆解文件缺少必要標記。")
     return text
@@ -139,6 +157,8 @@ def main():
     event = load_event(sys.stdin); root = project_root(event)
     if os.environ.get("AI_GUARDRAIL_GLOBAL_DEFAULT") == "1" and not (root / PLAN).exists(): return
     tool, data = event["tool_name"], event["tool_input"]
+    # 唯讀探索必須能在計畫建立前執行，否則模型無法蒐集撰寫安全範圍所需的事實。
+    if tool == "Bash" and readonly_command(data.get("command")): return
     mode, allowlist = policy(root)
     if tool == "apply_patch":
         if is_review_artifact_patch(event, root): return
@@ -151,23 +171,25 @@ def main():
         if plan_path.is_symlink():
             deny("計畫閘門：計畫檔不得是符號連結。")
         # 草稿不代表核准；只修改計畫時可先建立或修訂，後續操作重新驗證內容。
-        if targets == [plan_path.resolve()]:
-            if mode == "light":
-                deny("light 模式的計畫範圍須由人類終端機建立或修改。")
+        if targets and all(target == plan_path.resolve() for target in targets):
             return
-    text = plan(root); allowed = scopes(text, root)
+    text = plan(root)
+    # 與 Claude 對齊：light 只要求基本拆解，不解析或強制允許修改範圍。
+    allowed = [] if mode == "light" else scopes(text, root)
     if tool == "apply_patch":
         targets = patch_targets(data, root)
         if any(target in {(root / PLAN).resolve(), (root / POLICY).resolve()} for target in targets):
             deny("計畫與政策檔不得由 integrated harness 修改。")
-        if any(not in_scope(target, allowed) for target in targets): deny("計畫閘門：目標不在計畫允許修改範圍。")
+        if mode != "light" and any(not in_scope(target, allowed) for target in targets):
+            deny("計畫閘門：目標不在計畫允許修改範圍。")
     elif tool == "Bash":
         cmd = data.get("command")
         if not isinstance(cmd, str): deny("Malformed Bash command payload.")
         if mode == "strict" and not strict_command(cmd, allowlist, root): deny("strict 模式禁止非 allowlist 指令。")
     else:
         deny("Unknown tool is not proven read-only.")
-    if mode == "light" and tool == "apply_patch": return
+    # standard 保留拆解與範圍；light 只保留基本拆解。兩者皆免人工操作收據。
+    if mode in {"standard", "light"}: return
     require_approval(event, root, "integrated-harness")
 
 if __name__ == "__main__": main()

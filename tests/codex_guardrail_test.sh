@@ -276,13 +276,13 @@ with tempfile.TemporaryDirectory() as td:
     guard = project / ".codex" / "guardrail"; (guard / "plan").mkdir(parents=True)
 
     dg = install / "decomposition-gate/hooks/decomposition_gate.py"
-    denied(dg, event(project), "請先用一個獨立的 apply_patch 建立 .guardrail/plan/decomposition.md")
-    plan = project / ".guardrail/plan/decomposition.md"
-    plan.parent.mkdir(parents=True)
-    plan_patch = "*** Begin Patch\n*** Add File: .guardrail/plan/decomposition.md\n+draft\n*** End Patch"
+    denied(dg, event(project), "請先用一個獨立的 apply_patch 建立 .codex/guardrail/plan/decomposition.md")
+    plan = project / ".codex/guardrail/plan/decomposition.md"
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    plan_patch = "*** Begin Patch\n*** Add File: .codex/guardrail/plan/decomposition.md\n+draft\n*** End Patch"
     assert run(dg, event(project, tool_input={"command": plan_patch})) is None
     assert run(dg, event(project, tool_input={"command": plan_patch + "\n"})) is None
-    denied(dg, event(project, tool_input={"command": plan_patch.replace(".guardrail/plan/decomposition.md", "x/.guardrail/plan/decomposition.md")}), "其他 .docs/ 計畫文件不能取代它")
+    denied(dg, event(project, tool_input={"command": plan_patch.replace(".codex/guardrail/plan/decomposition.md", "x/.codex/guardrail/plan/decomposition.md")}), "其他 .docs/ 計畫文件不能取代它")
     bypass_patch = "*** Begin Patch\n*** Add File: .codex/guardrail/plan/.gate_disabled\n+emergency\n*** End Patch"
     denied(dg, event(project, tool_input={"command": bypass_patch}), "逃生口")
     denied(dg, event(project, "Bash", {"command": "touch .codex/guardrail/plan/.gate_disabled"}), "逃生口")
@@ -397,21 +397,41 @@ with tempfile.TemporaryDirectory() as td:
     denied(security_guard, legacy_danger, "危險指令攔截")
 
     ip = install / "integrated-harness/hooks/plan_gate.py"
+    # 唯讀探索不應依賴計畫、模式或一次性操作核准，否則代理無法蒐集建立計畫所需資訊。
+    assert run(ip, event(project, "Bash", {"command": "rg --files"})) is None
+    assert run(ip, event(project, "Bash", {"command": "git status"})) is None
+    for command in ("git diff --output=stolen", "rg x | cat", "find ."):
+        denied(ip, event(project, "Bash", {"command": command}), "缺少有效允許修改範圍")
     assert run(ip, event(project, tool_input={"command": review_patch})) is None
     assert run(ip, event(project, tool_input={"command": plan_patch})) is None
     assert run(ip, event(project, tool_input={"command": plan_patch + "\n"})) is None
+    repeated_plan_patch = plan_patch.replace(
+        "*** End Patch",
+        "*** Update File: .codex/guardrail/plan/decomposition.md\n@@\n+more\n*** End Patch",
+    )
+    assert run(ip, event(project, tool_input={"command": repeated_plan_patch})) is None
     mixed = plan_patch.replace("*** End Patch", "*** Add File: src/other.py\n+x\n*** End Patch")
     denied(ip, event(project, tool_input={"command": mixed}), "缺少有效允許修改範圍")
     session_project = td / "session-project"; session_project.mkdir()
     session_env = dict(os.environ, AI_GUARDRAIL_PROJECT_ROOT=str(session_project))
     session = run_raw(install / "integrated-harness/hooks/session_start.py", {}, session_env)
-    assert ".guardrail/plan/decomposition.md" in session["systemMessage"]
-    session_plan = session_project / ".guardrail/plan/decomposition.md"
+    assert ".codex/guardrail/plan/decomposition.md" in session["systemMessage"]
+    session_plan = session_project / ".codex/guardrail/plan/decomposition.md"
     assert session_plan.is_file()
     assert "## 允許修改範圍" in session_plan.read_text(encoding="utf-8")
     session_plan.write_text("existing\n", encoding="utf-8")
     session = run_raw(install / "integrated-harness/hooks/session_start.py", {}, session_env)
     assert session_plan.read_text(encoding="utf-8") == "existing\n"
+    legacy_project = td / "legacy-session-project"; legacy_project.mkdir()
+    legacy_plan = legacy_project / ".guardrail/plan/decomposition.md"
+    legacy_plan.parent.mkdir(parents=True)
+    legacy_plan.write_text("legacy plan\n", encoding="utf-8")
+    legacy_env = dict(os.environ, AI_GUARDRAIL_PROJECT_ROOT=str(legacy_project))
+    legacy_session = run_raw(install / "integrated-harness/hooks/session_start.py", {}, legacy_env)
+    migrated_plan = legacy_project / ".codex/guardrail/plan/decomposition.md"
+    assert migrated_plan.read_text(encoding="utf-8") == "legacy plan\n"
+    assert not legacy_plan.exists()
+    assert "已遷移" in legacy_session["systemMessage"]
     protocol = install / "integrated-harness/reasoning-protocol.md"
     protocol.write_text("## Codex protocol test\n")
     session = run_raw(install / "integrated-harness/hooks/session_start.py", {}, session_env)
@@ -419,7 +439,7 @@ with tempfile.TemporaryDirectory() as td:
     protocol.unlink()
     global_project = td / "global-no-plan"; global_project.mkdir()
     assert run(ip, event(global_project, "Bash", {"command": "git status"}), global_default=True) is None
-    denied(ip, event(global_project, "Bash", {"command": "git status"}), "請先用一個獨立的 apply_patch 建立 .guardrail/plan/decomposition.md")
+    assert run(ip, event(global_project, "Bash", {"command": "git status"})) is None
     policy = guard / "orchestration-policy.md"
     shutil.copy(install / "integrated-harness/orchestration-policy.md", policy)
     plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】x\n## 允許修改範圍\n- `src/` — 應用程式\n")
@@ -429,11 +449,18 @@ with tempfile.TemporaryDirectory() as td:
     denied(ip, event(project, tool_input={"command": "*** Begin Patch\n*** Add File: other/x\n+x\n*** End Patch"}), "目標不在計畫允許修改範圍")
     plan.write_text(plan.read_text()+"changed\n")
     assert first_reason != approval_required(ip, event(project))
-    policy.write_text(policy.read_text().replace("strict", "light", 1))
+    policy.write_text(policy.read_text().replace("strict", "standard", 1))
     assert run(ip, event(project)) is None
-    approval_required(ip, event(project, "Bash", {"command": "touch src/light.txt"}))
+    assert run(ip, event(project, "Bash", {"command": "touch src/standard.txt"})) is None
     denied(ip, event(project, tool_input={"command": "*** Begin Patch\n*** Add File: other/x\n+x\n*** End Patch"}), "目標不在計畫允許修改範圍")
+    policy.write_text(policy.read_text().replace("standard", "light", 1))
+    plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】x\n")
+    assert run(ip, event(project)) is None
+    assert run(ip, event(project, "Bash", {"command": "touch src/light.txt"})) is None
+    assert run(ip, event(project, tool_input={"command": "*** Begin Patch\n*** Add File: other/x\n+x\n*** End Patch"})) is None
+    assert run(ip, event(project, tool_input={"command": plan_patch})) is None
     policy.write_text(policy.read_text().replace("light", "strict", 1))
+    plan.write_text("## 已知資訊\n## 缺少的資訊\n【假設】x\n## 允許修改範圍\n- `src/` — 應用程式\n")
     tests = project / "tests"; tests.mkdir()
     (tests / "smoke.sh").write_text("#!/bin/sh\n")
     outside = td / "outside.sh"; outside.write_text("#!/bin/sh\n")
@@ -466,7 +493,7 @@ with tempfile.TemporaryDirectory() as td:
     personal_policy = home / ".codex/guardrail/orchestration-policy.md"
     personal_policy.parent.mkdir(parents=True)
     shutil.copy(install / "integrated-harness/orchestration-policy.md", personal_policy)
-    personal_policy.write_text(personal_policy.read_text().replace("strict", "light", 1))
+    personal_policy.write_text(personal_policy.read_text().replace("strict", "standard", 1))
     assert run(ip, event(project), home=home) is None
     shutil.copy(install / "integrated-harness/orchestration-policy.md", policy)
     approval_required(ip, event(project), home=home)

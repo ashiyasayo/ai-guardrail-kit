@@ -11,6 +11,7 @@ from collections import Counter
 import hashlib
 import io
 import json
+import ntpath
 import os
 import posixpath
 import re
@@ -25,7 +26,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 
@@ -865,6 +866,31 @@ def _loader_hook_data(path: Path, python: str, action: str) -> Dict[str, Any]:
 LOADER_PLUGIN_ID = "ai-guardrail-loader@ai-guardrail-kit"
 
 
+def script_bash(platform=None, which=None, is_file=None, windows_dir=None):
+    """解析可執行腳本的 Bash；Windows 不把 WSL launcher 當成 Git Bash。"""
+    platform = os.name if platform is None else platform
+    which = shutil.which if which is None else which
+    is_file = (lambda path: Path(str(path)).is_file()) if is_file is None else is_file
+    candidate = which("bash")
+    if platform != "nt" or not candidate:
+        return candidate
+
+    windows_dir = windows_dir or os.environ.get("WINDIR", r"C:\Windows")
+    system_bash = PureWindowsPath(windows_dir) / "System32" / "bash.exe"
+    if ntpath.normcase(ntpath.normpath(candidate)) != ntpath.normcase(ntpath.normpath(str(system_bash))):
+        return candidate
+
+    git = which("git")
+    if git:
+        git_path = PureWindowsPath(git)
+        git_root = git_path.parent.parent if git_path.parent.name.lower() in {"cmd", "bin"} else None
+        if git_root:
+            for fallback in (git_root / "bin" / "bash.exe", git_root / "usr" / "bin" / "bash.exe"):
+                if is_file(fallback):
+                    return str(fallback)
+    return candidate
+
+
 def _run_codex_plugin(action: str) -> None:
     codex = shutil.which("codex")
     if not codex:
@@ -872,7 +898,7 @@ def _run_codex_plugin(action: str) -> None:
     command = [codex, "plugin", action, LOADER_PLUGIN_ID]
     # Windows 的測試 fake 是 Bash script；正式 Codex 通常是 exe/cmd，仍維持 shell=False。
     if os.name == "nt" and Path(codex).suffix.lower() not in (".exe", ".cmd", ".bat"):
-        bash = shutil.which("bash")
+        bash = script_bash()
         if bash:
             command = [bash, codex, "plugin", action, LOADER_PLUGIN_ID]
     try:
@@ -889,7 +915,7 @@ def _remove_codex_marketplace() -> None:
         raise _error("E_HOOK_FAILED", "Codex CLI is unavailable")
     command = [codex, "plugin", "marketplace", "remove", "ai-guardrail-kit"]
     if os.name == "nt" and Path(codex).suffix.lower() not in (".exe", ".cmd", ".bat"):
-        bash = shutil.which("bash")
+        bash = script_bash()
         if bash:
             command = [bash, codex, "plugin", "marketplace", "remove", "ai-guardrail-kit"]
     try:
@@ -1802,7 +1828,7 @@ def diagnose_selection(args: argparse.Namespace) -> None:
     print("PASS: cache, effective selector, loader files and hook wiring")
     print("UNVERIFIED: host hooks feature, managed-only policy and exact-definition trust; review /hooks in the target client")
     print("UNVERIFIED: actual host invocation and sandbox permissions; run the opt-in Codex integration test")
-    print("Plan drafts: .guardrail/plan/decomposition.md; installation and protected .codex settings require a human terminal or platform approval")
+    print("Plan drafts: .codex/guardrail/plan/decomposition.md; installation and protected .codex settings require a human terminal or platform approval")
 
 
 def parser() -> argparse.ArgumentParser:

@@ -15,7 +15,7 @@ from pathlib import Path
 from hook_protocol import deny, normalize_event
 
 TTL_SECONDS = 600
-PLAN = ".guardrail/plan/decomposition.md"
+PLAN = ".codex/guardrail/plan/decomposition.md"
 POLICY = ".codex/guardrail/orchestration-policy.md"
 REVIEW_ARTIFACT = re.compile(r"^\.guardrail/approval-requests/[0-9a-f]{64}\.diff$")
 PATCH_TARGET = re.compile(r"^\*\*\* (?:(?:Add|Update|Delete) File|Move to): (.+)$", re.MULTILINE)

@@ -8,7 +8,7 @@
   "modes": {
     "decomposition-gate": {
       "archive_path": "codex/runtime-archives/codex-runtime-decomposition-gate.tar.gz",
-      "archive_sha256": "e963efc1c650cf6a687bb5621e8e19c80e8d8f15fd43b35a2f7c5122dcc86a8d",
+      "archive_sha256": "787fda62434b095bab7ea38bafb0c942beef58a891475d8debecde324cf0c2c7",
       "archive_size": 2688,
       "entrypoints": {
         "pretool.decomposition": "hooks/decomposition_gate.py"
@@ -26,7 +26,7 @@
     },
     "harness": {
       "archive_path": "codex/runtime-archives/codex-runtime-harness.tar.gz",
-      "archive_sha256": "6215d9c4be84f0d33616364ffe600df5f6ab6871fd06d98bcecf066dfa7eec31",
+      "archive_sha256": "d08f658490f06fe13d70226197ca73aaaabcaff6f47dba142768a771f2aea5a7",
       "archive_size": 12226,
       "entrypoints": {
         "pretool.plan": "hooks/plan_gate.py",
@@ -37,8 +37,8 @@
     },
     "integrated-harness": {
       "archive_path": "codex/runtime-archives/codex-runtime-integrated-harness.tar.gz",
-      "archive_sha256": "850f3a12aabd78dd4fc2e344409bbcc4fe091baf3c72e868c72abb9fddef6070",
-      "archive_size": 15241,
+      "archive_sha256": "e8c406ce2e8a9ced86193de2ab564e49f84dc180865d558b8972e378635de9af",
+      "archive_size": 16095,
       "entrypoints": {
         "pretool.plan": "hooks/plan_gate.py",
         "pretool.security": "hooks/security_guard.py",
