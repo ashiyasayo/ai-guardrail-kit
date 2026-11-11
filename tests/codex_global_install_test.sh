@@ -5,7 +5,7 @@ root=$(cd "$(dirname "$0")/.." && pwd -P)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/bin" "$tmp/home" "$tmp/project/.codex"
-cp "$root/tests/helpers/fake-codex" "$tmp/bin/codex"; chmod +x "$tmp/bin/codex"
+bash "$root/tests/helpers/install-fake-codex" "$tmp/bin"
 export PATH="$tmp/bin:$PATH" HOME="$tmp/home" CODEX_HOME="$tmp/home/.codex" AI_GUARDRAIL_TEST_STATE="$tmp/state"
 export AI_GUARDRAIL_ALLOW_DEVELOPMENT_SOURCE=1 AI_GUARDRAIL_MANIFEST_PATH="$root/codex/runtime-manifest.json" AI_GUARDRAIL_ARCHIVE_DIR="$root/codex/runtime-archives"
 runtime_ref=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["release"]["ref"])' "$AI_GUARDRAIL_MANIFEST_PATH")

@@ -5,8 +5,7 @@ root=$(cd "$(dirname "$0")/.." && pwd -P)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/bin" "$tmp/home" "$tmp/project-a/.codex" "$tmp/project-b/.codex"
-cp "$root/tests/helpers/fake-codex" "$tmp/bin/codex"
-chmod +x "$tmp/bin/codex"
+bash "$root/tests/helpers/install-fake-codex" "$tmp/bin"
 export PATH="$tmp/bin:$PATH" HOME="$tmp/home" CODEX_HOME="$tmp/home/.codex" AI_GUARDRAIL_TEST_STATE="$tmp/fake-state"
 export MANAGER="$root/scripts/codex-runtime-manager.py"
 export AI_GUARDRAIL_ALLOW_DEVELOPMENT_SOURCE=1

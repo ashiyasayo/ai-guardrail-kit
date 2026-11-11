@@ -5,7 +5,7 @@ root=$(cd "$(dirname "$0")/.." && pwd -P)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/bin" "$tmp/home"
-cp "$root/tests/helpers/fake-codex" "$tmp/bin/codex"; chmod +x "$tmp/bin/codex"
+bash "$root/tests/helpers/install-fake-codex" "$tmp/bin"
 export PATH="$tmp/bin:$PATH" HOME="$tmp/home" CODEX_HOME="$tmp/home/.codex" AI_GUARDRAIL_TEST_STATE="$tmp/state"
 mkdir -p "$AI_GUARDRAIL_TEST_STATE"
 
