@@ -8,6 +8,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-11
+
 ### Changed
 
 - Claude `integrated-harness` 推理協定（plugin `0.9.1` → `0.9.2`）消除互相矛盾的子代理
