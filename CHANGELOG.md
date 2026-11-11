@@ -8,6 +8,25 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Claude `integrated-harness` 推理協定（plugin `0.9.1` → `0.9.2`）消除互相矛盾的子代理
+  規則：「三個以上外部依賴、核心金流、權限架構」現在只是載入
+  `subagent-driven-development` 流程的條件，其餘工作是否委派依協定的規模與獨立性準則
+  判斷。`subagent-driven-development` 技能（Claude 與 Codex loader 共用）的措辭同步由
+  「常規任務禁止派發子代理」改為「常規任務不套用本流程」。
+- Claude `integrated-harness` 的 `plan_gate.py` 現在會在拆解文件建立前放行 `Skill` 載入
+  本套件隨附的五個工作流技能（固定名單，接受不帶前綴或 `integrated-harness:` 前綴的
+  名稱）；先前連用來產出拆解的 `brainstorming` 都必須等拆解與核准完成才能載入。其他
+  技能維持原本的計畫與核准要求，載入後的寫入與派工仍各自受閘門管制。協定同步說明此
+  行為。
+- 同一協定的拆解與探索階段改為只列與任務相關的面向、不再要求固定至少兩個方案，
+  與 `decomposition-gate` 版協定的校準一致；高風險工作仍須完整執行五個階段。
+- 拆解範本：`integrated-harness` 的「允許修改範圍」範例改為佔位符，避免範例路徑被
+  原樣留下；`decomposition-gate`（plugin `0.3.0` → `0.3.1`）移除「窮舉所有面向」。
+- `integrated-harness/CLAUDE.md` 改以 `@ORCHESTRATOR.md` 匯入治理政策，不再依賴模型
+  自行讀取。
+
 ## [0.12.0] - 2026-11-04
 
 ### Fixed

@@ -312,6 +312,54 @@ with tempfile.TemporaryDirectory() as td:
         "strict 模式禁止一般 Bash",
     )
 
+# 隨附技能可在拆解文件建立前載入（brainstorming 等技能本來就是用來產出拆解），
+# 其他技能與其他工具不得藉此繞過計畫閘門。
+with tempfile.TemporaryDirectory() as td:
+    project = Path(td) / "project"
+    (project / ".claude/plan").mkdir(parents=True)
+    home = Path(td) / "home"
+    home.mkdir()
+    gates = (integrated_legacy / "plan_gate.py", integrated_packaged / "plan_gate.py")
+    bundled_skills = sorted(
+        path.name for path in (root / "shared/skills").iterdir() if path.is_dir()
+    )
+    assert len(bundled_skills) == 5, bundled_skills
+
+    def skill_event(tool_input, tool="Skill"):
+        return event(project, tool=tool, tool_input=tool_input)
+
+    for name in bundled_skills:
+        for skill_name in (name, f"integrated-harness:{name}"):
+            assert_allowed(
+                assert_pair(*gates, skill_event({"skill": skill_name}), project, home=home)
+            )
+
+    for tool_input in (
+        {"skill": "some-other-skill"},
+        {"skill": "superpowers:brainstorming"},
+        {"skill": "integrated-harness:some-other-skill"},
+        {"skill": "x:integrated-harness:brainstorming"},
+        {"skill": ["brainstorming"]},
+        {"args": "brainstorming"},
+    ):
+        assert_denied(
+            assert_pair(*gates, skill_event(tool_input), project, home=home),
+            "找不到拆解文件",
+        )
+
+    # 只有 Skill 工具適用此放行；其他工具帶同名欄位仍須通過計畫
+    assert_denied(
+        assert_pair(*gates, skill_event({"skill": "brainstorming"}, tool="Agent"),
+                    project, home=home),
+        "找不到拆解文件",
+    )
+
+    # 閘門內的固定名單必須與 shared/skills 一致，避免新增技能後漂移
+    for gate in gates:
+        listed = re.search(r"BUNDLED_SKILLS = \{(.*?)\}", gate.read_text(encoding="utf-8"), re.S)
+        assert listed, gate
+        assert sorted(re.findall(r'"([^"]+)"', listed.group(1))) == bundled_skills, gate
+
 # strict 模式且人類將 git add／git commit 加入 allowlist 時，套用 git 專屬規則：
 # 只放行範圍內路徑與 -m 訊息，並允許 git add 範圍內位於 .claude/ 底下的檔案。
 with tempfile.TemporaryDirectory() as td:
