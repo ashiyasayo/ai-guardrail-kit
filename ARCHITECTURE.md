@@ -111,7 +111,8 @@ guardrail 及 global install 等日常回歸；Claude 與 Codex 的完整模式�
 相容資產，不再是產品功能或建議工作流程。
 
 Claude `integrated-harness` 的執行行為校準位於 `reasoning-protocol.md` 與
-`reasoning-protocol-subagent.md`，由 SessionStart hook 注入。它依工作風險控制
+`reasoning-protocol-subagent.md`；SessionStart hook 只注入前者，後者在 copy-in 版由
+`CLAUDE.md` 指向，marketplace 版目前沒有載入入口。協定依工作風險控制
 播報、對抗式審查、信心標示、驗證深度及 subagent 委派；治理授權仍只由
 `ORCHESTRATOR.md`、政策檔與確定性 hooks 決定。copy-in 與 marketplace 版本的兩份
 協定必須逐字節一致。

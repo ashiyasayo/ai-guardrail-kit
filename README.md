@@ -554,7 +554,7 @@ SDG 的完整能力已獨立列於上表。
 | `strict` git 專屬規則 | — | — | allowlist 列入 `git add`／`git commit` 時：`git add` 只接受允許修改範圍內的相對路徑（含範圍內 `.claude/` 底下的檔案），不得帶選項；`git commit` 只接受 `-m`／`--message` | — | — | 無；每個指令都須以完整指令 SHA-256 的終端機收據核准 |
 | `standard` 行為 | — | — | 拆解＋範圍，免人工核准 | — | — | 拆解＋範圍，免人工核准 |
 | `light` 行為 | — | — | 只要求基本拆解；免範圍與人工核准 | — | — | 只要求基本拆解；免範圍與人工核准 |
-| 子代理委派（`Agent`／`Task` 等非 Bash、非檔案寫入類工具） | — | — | `plan_gate.py` 依 `tool_name` 攔截，不區分呼叫來源（含 slash command 間接觸發）：不在 `PRE_PLAN_SAFE_TOOLS` 白名單者，`strict` 需拆解文件＋60 分鐘內人工核准才放行；`standard`／`light` 只需拆解文件存在即可放行 | — | — | 同一機制是否涵蓋 Codex 端子代理／委派工具尚未查證，暫缺 |
+| 子代理委派（`Agent`／`Task` 等非 Bash、非檔案寫入類工具） | — | — | `plan_gate.py` 依 `tool_name` 攔截，不區分呼叫來源（含 slash command 間接觸發）：不在 `PRE_PLAN_SAFE_TOOLS` 白名單者，`strict` 需拆解文件＋60 分鐘內人工核准才放行；`standard`／`light` 只需拆解文件存在即可放行。例外：`Skill` 載入本套件隨附的五個工作流技能（固定名單，不帶前綴或 `integrated-harness:` 前綴）可在拆解前放行，其他技能不適用；不帶前綴的同名技能若來自其他來源也會被放行，載入後的寫入與派工仍受閘門管制 | — | — | 同一機制是否涵蓋 Codex 端子代理／委派工具尚未查證，暫缺 |
 | 永久危險命令阻擋 | — | 有 | 有 | — | 有 | 有 |
 | 危險命令涵蓋 | — | 毀滅性刪除、force push、下載即執行、`find -exec`、命令替換等 | 同 H | — | 與 Claude 對齊的 token 化判定＋regex fallback | 同 H |
 | 明文秘密／憑證阻擋 | — | 有 | 有 | — | 有 | 有 |
@@ -706,7 +706,7 @@ Claude `integrated-harness` 與 Codex loader 另提供五個從
   或派發 subagent。
 - `systematic-debugging`：複雜錯誤或首次修復失敗時，以四階段流程先定位根因，再做
   單一假設驗證、最小修復及回歸保護；三次假設失敗即停損。
-- `subagent-driven-development`：常規任務禁止派發；僅限三個以上外部依賴、核心金流、
+- `subagent-driven-development`：常規任務不套用本流程；僅限三個以上外部依賴、核心金流、
   權限架構或相當風險的資料庫遷移／跨模組重構，完成時自動接續隔離 code review，
   且子代理不得再派發孫代理。
 - `requesting-code-review`：由兩個不繼承實作對話的 reviewer 依序檢查 Spec Compliance
@@ -741,7 +741,7 @@ Claude `integrated-harness` 與 Codex loader 另提供五個從
 | 觸發方式 | SessionStart 注入 `using-superpowers`，要求「只要有 1% 可能適用就必須載入技能」 | 不掛載 `using-superpowers`；依技能 description 與 `reasoning-protocol.md` 的風險分級路由 |
 | 規劃產物 | `brainstorming`／`writing-plans` 產出 spec 與 plan 文件 | 只在對話中提供路徑、簽章與十行內虛擬碼；不自動建立中間文件，拆解改由計畫閘門處理 |
 | Git worktree | 部分流程搭配 `using-git-worktrees` | 任何技能都不自動建立 worktree 或切換分支 |
-| 子代理 | 子代理驅動開發可作為一般實作流程 | 常規任務禁止派發；僅限高風險且責任範圍可隔離的工作，子代理不得再派發下一層 |
+| 子代理 | 子代理驅動開發可作為一般實作流程 | 常規任務不套用此流程（一般委派依協定的規模與獨立性準則）；僅限高風險且責任範圍可隔離的工作，子代理不得再派發下一層 |
 | Code review | 獨立審查流程 | 兩階段 fresh-context 審查，每階段最多兩輪，Critical／Major 阻塞完成 |
 | TDD | 先寫碼就刪除重來；每次執行整套測試 | 只撤回自己未受測試保護的草稿；驗證依影響面調整，完成前仍須跑標準測試入口；加入憑證、個資與既有系統最小變動規則 |
 | 授權邊界 | 無 | 技能路由不構成擴張授權的理由；人類核准、敏感資料與破壞性指令仍由 hooks 控制 |

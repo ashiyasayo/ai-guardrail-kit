@@ -39,6 +39,15 @@ PRE_PLAN_SAFE_TOOLS = {
     "EnterPlanMode", "LSP", "TaskGet", "TaskList", "TaskOutput", "CronList",
     "ListMcpResourcesTool", "ReadMcpResourceTool", "ToolSearch", "WaitForMcpServers",
 }
+# 本套件隨附的工作流技能。載入技能只會把指引放進脈絡，而 brainstorming 等技能正是
+# 用來產出拆解，所以必須能在計畫建立前載入；技能內提到的寫入與派工仍各自受閘門管制。
+# 採固定名單而非掃描技能目錄，避免使用者自行放入的其他技能一併被放行。
+# 名單須與 shared/skills/ 一致（由 tests/claude_guardrail_test.sh 守護）。
+BUNDLED_SKILL_PLUGIN = "integrated-harness"
+BUNDLED_SKILLS = {
+    "brainstorming", "systematic-debugging", "subagent-driven-development",
+    "requesting-code-review", "test-driven-development",
+}
 READ_ONLY_COMMANDS = {
     "ls", "cat", "head", "tail", "grep", "rg", "pwd", "which",
     "file", "wc", "diff", "stat", "du", "ps", "printenv",
@@ -352,6 +361,20 @@ def check_approval(root: str) -> tuple[bool, str]:
     return True, ""
 
 
+def is_bundled_skill(tool_input: object) -> bool:
+    """判斷 Skill 呼叫是否為本套件隨附技能；欄位缺漏或型別不符一律視為否。"""
+    if not isinstance(tool_input, dict):
+        return False
+    name = tool_input.get("skill")
+    if not isinstance(name, str):
+        return False
+    prefix, separator, bare = name.rpartition(":")
+    # plugin 發佈版的名稱帶 plugin 前綴，copy-in 版不帶；其他前綴屬於別的來源
+    if separator and prefix != BUNDLED_SKILL_PLUGIN:
+        return False
+    return bare in BUNDLED_SKILLS
+
+
 def check(data: dict) -> Optional[str]:
     """回傳攔截原因；None 表示放行。供 guard.py 匯入，不做任何 I/O。"""
     tool = data.get("tool_name", "")
@@ -403,6 +426,8 @@ def check(data: dict) -> Optional[str]:
         if target == plan:
             return None
     elif tool in PRE_PLAN_SAFE_TOOLS:
+        return None
+    elif tool == "Skill" and is_bundled_skill(tool_input):
         return None
 
     passed, reason, scopes = check_plan(root, mode)

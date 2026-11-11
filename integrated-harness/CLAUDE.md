@@ -1,6 +1,6 @@
 # Claude 專案規則
 
-1. 主要模型必須載入並遵循 `ORCHESTRATOR.md` 的治理邊界；一般任務分解、模型選擇
+1. 主要模型遵循 `ORCHESTRATOR.md` 的治理邊界（由本檔結尾的匯入自動載入）；一般任務分解、模型選擇
    與代理調度交由平台自行決定，subagent 另遵循任務委派與
    `.claude/reasoning-protocol-subagent.md`。
 2. 任何修改前，先依 `.claude/orchestration-policy.md` 的 `strict`、`standard` 或
@@ -18,3 +18,5 @@
    範例須可直接轉為可執行的測試案例，作為規格與驗收標準的單一事實來源。
 7. 執行與溝通遵循 `.claude/reasoning-protocol.md` 的風險分級：保持進度更新精簡，
    不為一般工作重複驗證，也不為小型或複核工作啟動 subagent。
+
+@ORCHESTRATOR.md
