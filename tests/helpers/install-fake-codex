@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# 在測試用 PATH 目錄安裝假 Codex。
+#
+# Windows 上 Python 的 shutil.which 會回傳 PATHEXT 副檔名的真實 codex.CMD，
+# 而不是沒有副檔名的假檔，runtime manager 因此改去執行真的 Codex CLI。
+# 所以 Windows 另外放一個同目錄的 codex.cmd，只負責用 Git Bash 轉呼叫假檔；
+# manager 既有的 .cmd 分支會直接執行它。Linux／macOS 不需要這個 shim。
+set -euo pipefail
+
+target_dir=${1:?usage: install-fake-codex <target-dir>}
+source_file="$(cd "$(dirname "$0")" && pwd -P)/fake-codex"
+
+cp "$source_file" "$target_dir/codex"
+chmod +x "$target_dir/codex"
+
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    # 以目前這個 Bash 的 Windows 路徑呼叫，不依賴 PATH 上的 bash，
+    # 避免解析到 WSL launcher。
+    bash_windows_path=$(cygpath -w "$BASH")
+    printf '@echo off\r\n"%s" "%%~dp0codex" %%*\r\nexit /b %%ERRORLEVEL%%\r\n' \
+      "$bash_windows_path" > "$target_dir/codex.cmd"
+    ;;
+esac
