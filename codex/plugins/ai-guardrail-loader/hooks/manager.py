@@ -891,6 +891,75 @@ def script_bash(platform=None, which=None, is_file=None, windows_dir=None):
     return candidate
 
 
+# 外部 codex 失敗時帶出的診斷只會經由 CLI 的 stderr 給人類終端機；hook 通道（dispatch）
+# 只輸出錯誤代碼，不輸出這些訊息。去敏是盡力而為的黑名單，不是保證。
+DIAGNOSTIC_INPUT_LIMIT = 16 * 1024
+DIAGNOSTIC_LIMIT = 300
+_REDACTED = "<redacted>"
+_USER_DIRECTORY = re.compile(r"((?:[a-z]:)?[\\/](?:users|home)[\\/])[^\\/\s:\"']+", re.IGNORECASE)
+# 順序有意義：URL 與 Bearer 先處理，避免 key=value 規則只遮到前半段而漏出後面的值。
+_SECRET_REDACTIONS = (
+    (re.compile(r"\b([a-z][a-z0-9+.-]*://)[^/\s@]+@", re.IGNORECASE), r"\1" + _REDACTED + "@"),
+    (re.compile(r"\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}", re.IGNORECASE), r"\1 " + _REDACTED),
+    (re.compile(r"\b([\w.-]*(?:token|secret|passw(?:or)?d|api[_-]?key|authorization)[\w.-]*)\s*[=:]\s*\S+",
+                re.IGNORECASE), r"\1=" + _REDACTED),
+    (re.compile(r"\b(?:gh[pousr]_|github_pat_|sk-|xox[abprs]-)[A-Za-z0-9_-]{16,}"), _REDACTED),
+)
+
+
+def _home_directories() -> List[str]:
+    """目前使用者的家目錄寫法（含 Windows 反斜線與斜線兩種），長的優先以免只換到前綴。"""
+    candidates = set()
+    values = [os.environ.get("HOME"), os.environ.get("USERPROFILE")]
+    try:
+        values.append(str(Path.home()))
+    except (RuntimeError, KeyError, OSError):
+        pass
+    for value in values:
+        # 太短的值（例如 "/"）會把整段輸出都換成 "~"，不具診斷價值
+        if value and len(value) > 3:
+            candidates.add(value)
+            candidates.add(value.replace("\\", "/"))
+    return sorted(candidates, key=len, reverse=True)
+
+
+def _redact_diagnostic(raw: Any) -> str:
+    """把外部指令的輸出整理成單行、去敏且有長度上限的診斷文字。"""
+    if isinstance(raw, bytes):
+        # 不假設編碼：Windows 繁體中文主控台可能是 cp950
+        text = raw[:DIAGNOSTIC_INPUT_LIMIT].decode("utf-8", errors="replace")
+    else:
+        text = str(raw or "")[:DIAGNOSTIC_INPUT_LIMIT]
+    home_flags = re.IGNORECASE if os.name == "nt" else 0
+    for home in _home_directories():
+        text = re.sub(re.escape(home), "~", text, flags=home_flags)
+    text = _USER_DIRECTORY.sub(r"\1<user>", text)
+    for pattern, replacement in _SECRET_REDACTIONS:
+        text = pattern.sub(replacement, text)
+    # 先去敏再截斷，避免被截斷的半個 token 逃過比對
+    text = "".join(char if char.isprintable() else " " for char in text)
+    text = " ".join(text.split())
+    if len(text) > DIAGNOSTIC_LIMIT:
+        text = text[:DIAGNOSTIC_LIMIT - 3] + "..."
+    return text
+
+
+def _codex_failure(summary: str, *, returncode: Optional[int] = None, stderr: Any = None,
+                   exc: Optional[BaseException] = None) -> ManagerError:
+    """建立帶結束碼與去敏 stderr（或例外類型）的 E_HOOK_FAILED。"""
+    if isinstance(exc, subprocess.TimeoutExpired):
+        detail = "timed out after %ss" % exc.timeout
+    elif exc is not None:
+        message = _redact_diagnostic(str(exc))
+        detail = type(exc).__name__ + (": " + message if message else "")
+    else:
+        detail = "exit %s" % returncode
+        message = _redact_diagnostic(stderr)
+        if message:
+            detail += ": " + message
+    return _error("E_HOOK_FAILED", "%s (%s)" % (summary, detail))
+
+
 def _run_codex_plugin(action: str) -> None:
     codex = shutil.which("codex")
     if not codex:
@@ -904,9 +973,10 @@ def _run_codex_plugin(action: str) -> None:
     try:
         result = subprocess.run(command, capture_output=True, timeout=30, shell=False)
     except (OSError, subprocess.TimeoutExpired) as exc:
-        raise _error("E_HOOK_FAILED", "Codex plugin operation failed") from exc
+        raise _codex_failure("Codex plugin operation failed", exc=exc) from exc
     if result.returncode != 0:
-        raise _error("E_HOOK_FAILED", "Codex plugin operation failed")
+        raise _codex_failure("Codex plugin operation failed",
+                             returncode=result.returncode, stderr=result.stderr)
 
 
 def _remove_codex_marketplace() -> None:
@@ -921,9 +991,10 @@ def _remove_codex_marketplace() -> None:
     try:
         result = subprocess.run(command, capture_output=True, timeout=30, shell=False)
     except (OSError, subprocess.TimeoutExpired) as exc:
-        raise _error("E_HOOK_FAILED", "Codex marketplace operation failed") from exc
+        raise _codex_failure("Codex marketplace operation failed", exc=exc) from exc
     if result.returncode != 0:
-        raise _error("E_HOOK_FAILED", "Codex marketplace operation failed")
+        raise _codex_failure("Codex marketplace operation failed",
+                             returncode=result.returncode, stderr=result.stderr)
 
 
 def install_loader(repo: Optional[Path], plugin_root: Optional[Path], update: bool = False, remove: bool = False) -> None:

@@ -8,6 +8,17 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Codex runtime manager 呼叫外部 `codex`（loader 安裝／移除、marketplace 移除）失敗時，
+  `E_HOOK_FAILED` 現在會帶出結束碼與去敏、截斷後的 stderr，例如
+  `Codex plugin operation failed (exit 42: …)`；逾時與啟動失敗則帶逾時秒數或例外類型。
+  先前只有固定字串，無法分辨是找不到 Codex、執行失敗還是被 Codex 拒絕。訊息只經由 CLI
+  的 stderr 輸出，hook 通道仍只輸出錯誤代碼。去敏為盡力而為：遮蔽家目錄與使用者目錄、
+  URL 內嵌帳密、`token`／`secret`／`password`／`api_key`／`authorization` 類賦值、
+  `Bearer` 值與常見前綴 token，單行且最多 300 字元。`uninstall` 在最後一步移除
+  marketplace 失敗時的重新包裝訊息尚未帶出 stderr。
+
 ## [0.13.0] - 2026-11-11
 
 ### Changed

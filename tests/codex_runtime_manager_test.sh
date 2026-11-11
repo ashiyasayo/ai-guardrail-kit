@@ -23,6 +23,87 @@ resolved_bash = m.script_bash(
 )
 assert str(resolved_bash).lower() == r'c:\program files\git\bin\bash.exe'
 
+# 外部 codex 指令失敗時，錯誤訊息必須帶出結束碼與去敏後的 stderr；否則 E_HOOK_FAILED
+# 無法分辨是找不到 Codex、執行失敗，還是被真的 Codex 拒絕。
+# 敏感樣本一律以相鄰字串片段拼接，避免本 repo 的 guardrail 擋寫入或遮罩測試資料。
+import subprocess as _subprocess
+
+def capture_codex_failure(call, run):
+    original_which, original_run = m.shutil.which, m.subprocess.run
+    m.shutil.which = lambda name: 'codex.exe'
+    m.subprocess.run = run
+    try:
+        call()
+    except m.ManagerError as error:
+        assert error.code == 'E_HOOK_FAILED', error.code
+        return str(error)
+    finally:
+        m.shutil.which, m.subprocess.run = original_which, original_run
+    raise AssertionError('expected ManagerError')
+
+def failing_run(returncode, stderr):
+    def _run(command, **kwargs):
+        return _subprocess.CompletedProcess(command, returncode, stdout=b'', stderr=stderr)
+    return _run
+
+def raising_run(error):
+    def _run(command, **kwargs):
+        raise error
+    return _run
+
+plugin_call = lambda: m._run_codex_plugin('add')
+marketplace_call = lambda: m._remove_codex_marketplace()
+
+for call, summary in ((plugin_call, 'Codex plugin operation failed'),
+                      (marketplace_call, 'Codex marketplace operation failed')):
+    message = capture_codex_failure(call, failing_run(42, b'fake codex: forced add failure\n'))
+    assert message.startswith(summary), message
+    assert 'exit 42' in message and 'forced add failure' in message, message
+    # 空 stderr 時只保留結束碼，不留下多餘的冒號
+    assert capture_codex_failure(call, failing_run(3, b'')) == summary + ' (exit 3)'
+
+sensitive_stderr = (
+    'cannot open ' '/home/' 'alice-example' '/.codex/config.toml; '
+    'also ' 'C:\\Users\\' 'bob-example' '\\AppData\\codex.toml; '
+    'remote ' 'https://' 'deploy' ':' 'hunter2-example' '@example.invalid/r.git; '
+    'TOKEN=' 'abc123example; '
+    'Authorization: Bearer ' 'abcdefgh12345678; '
+    'key ' 'ghp_' 'abcdefghijklmnopqrstuvwxyz0123456789; '
+    'home ' '/srv/' 'carol-example' '/state'
+)
+saved_home = {name: os.environ.get(name) for name in ('HOME', 'USERPROFILE')}
+os.environ['HOME'] = os.environ['USERPROFILE'] = '/srv/' 'carol-example'
+try:
+    message = capture_codex_failure(plugin_call, failing_run(1, sensitive_stderr.encode('utf-8')))
+finally:
+    for name, value in saved_home.items():
+        if value is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = value
+for leaked in ('alice-example', 'bob-example', 'hunter2-example', 'abc123example',
+               'abcdefgh12345678', 'abcdefghijklmnopqrstuvwxyz0123456789', 'carol-example'):
+    assert leaked not in message, (leaked, message)
+# 去敏不得把一般診斷文字一併吃掉
+assert 'cannot open' in message and 'config.toml' in message, message
+
+noisy = b'\x1b[31m' + b'line one\nline two\r\n' + b'x' * 5000
+message = capture_codex_failure(plugin_call, failing_run(1, noisy))
+assert '\x1b' not in message and '\n' not in message and '\r' not in message, repr(message)
+assert 'line one' in message and len(message) < 500, len(message)
+
+# stderr 不是 UTF-8（例如 Windows cp950 主控台）時不得讓診斷本身拋例外
+message = capture_codex_failure(plugin_call, failing_run(1, b'\xff\xfe bad bytes'))
+assert 'bad bytes' in message, message
+
+message = capture_codex_failure(plugin_call, raising_run(_subprocess.TimeoutExpired('codex', 30)))
+assert 'timed out after 30s' in message, message
+message = capture_codex_failure(
+    plugin_call, raising_run(OSError(2, 'No such file ' '/home/' 'alice-example' '/bin/codex')))
+# OSError(2, ...) 會被 Python 建成 FileNotFoundError；訊息應報出實際的例外類別
+assert 'FileNotFoundError' in message and 'alice-example' not in message, message
+assert '/home/<user>/' in message, message
+
 def bundle(member='hooks/dispatch.py', kind='regular', data=b'print("ok")\n'):
     out=io.BytesIO()
     with tarfile.open(fileobj=out, mode='w:gz') as t:
