@@ -184,6 +184,47 @@ with tempfile.TemporaryDirectory() as scratch:
     assert policy_marker not in degraded_context
     assert "護欄提醒" in degraded_context
 
+# SessionStart 只注入主代理；子代理協議改由官方 SubagentStart 事件注入 marketplace 版的子代理。
+# copy-in 版由 CLAUDE.md 指向協定，不註冊此事件，避免重複載入。
+integrated_hooks = json.loads((integrated_root / "hooks/hooks.json").read_text())["hooks"]
+assert "SubagentStart" in integrated_hooks, "plugin does not register SubagentStart"
+subagent_commands = [
+    hook["command"]
+    for group in integrated_hooks["SubagentStart"]
+    for hook in group["hooks"]
+]
+assert any("inject_subagent_protocol.py" in command for command in subagent_commands)
+copyin_settings = json.loads((integrated_copyin / ".claude/settings.json").read_text())["hooks"]
+assert "SubagentStart" not in copyin_settings, "copy-in must not register SubagentStart"
+
+subagent_hook = integrated_root / "hooks/inject_subagent_protocol.py"
+subagent_output = subprocess.run(
+    [sys.executable, str(subagent_hook)],
+    capture_output=True,
+    env={**{k: v for k, v in os.environ.items() if k != "CLAUDE_PLUGIN_ROOT"},
+         "PYTHONUTF8": "1", "CLAUDE_PLUGIN_ROOT": str(integrated_root)},
+    check=False,
+)
+assert subagent_output.returncode == 0, subagent_output.stderr.decode("utf-8", "replace")
+subagent_payload = json.loads(subagent_output.stdout.decode("utf-8"))["hookSpecificOutput"]
+assert subagent_payload["hookEventName"] == "SubagentStart"
+assert "Subagent 精簡協定" in subagent_payload["additionalContext"]
+
+with tempfile.TemporaryDirectory() as scratch:
+    # 協定檔缺失時不得影響子代理啟動：成功結束且不輸出
+    scratch_root = Path(scratch) / "plugin"
+    shutil.copytree(integrated_root, scratch_root, ignore=shutil.ignore_patterns("__pycache__"))
+    (scratch_root / "reasoning-protocol-subagent.md").unlink()
+    degraded = subprocess.run(
+        [sys.executable, str(scratch_root / "hooks/inject_subagent_protocol.py")],
+        capture_output=True,
+        env={**{k: v for k, v in os.environ.items() if k != "CLAUDE_PLUGIN_ROOT"},
+             "PYTHONUTF8": "1", "CLAUDE_PLUGIN_ROOT": str(scratch_root)},
+        check=False,
+    )
+    assert degraded.returncode == 0
+    assert degraded.stdout.strip() == b""
+
 guide_path = root / "docs/claude-marketplace.md"
 assert guide_path.is_file(), f"missing {guide_path.relative_to(root)}"
 guide = guide_path.read_text()
