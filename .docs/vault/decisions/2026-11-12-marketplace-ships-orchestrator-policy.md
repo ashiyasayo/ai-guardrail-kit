@@ -1,4 +1,4 @@
-# marketplace 版 integrated-harness 發佈 ORCHESTRATOR.md，子代理協議暫不發佈
+# marketplace 版 integrated-harness 發佈 ORCHESTRATOR.md 與子代理協議
 
 日期：2026-11-12
 
@@ -9,7 +9,8 @@
   逐位元組一致（`tests/claude_marketplace_test.sh`）。
 - copy-in 版維持以 `CLAUDE.md` 的 `@ORCHESTRATOR.md` 匯入，hook 不注入，避免重複。兩份
   `inject_protocol.py` 仍逐位元組一致，行為差異只來自環境變數。
-- `reasoning-protocol-subagent.md` 在 marketplace 版刻意不載入。
+- `reasoning-protocol-subagent.md` 在 marketplace 版最初刻意不載入；此項已被取代，
+  改由 `SubagentStart` hook 注入（見文末「後續更新」）。
 
 ## 理由
 
@@ -37,4 +38,11 @@
   理由改為：即使 SessionStart 是否在子代理觸發不明，`SubagentStart` 才是文件明載的子代理注入入口。
 - 結論：載入子代理協議的前提（有入口）已成立，已實作：plugin 0.9.4 新增 `SubagentStart` hook
   （`inject_subagent_protocol.py`），不設 matcher，copy-in 不註冊。缺檔時不輸出並正常結束。
-  實際環境的注入行為屬文件外驗證，尚未實測。
+  實際環境的注入行為屬文件外驗證，當時尚未實測（已於下節驗證）。
+
+## 後續更新（v0.15.0）
+
+- PR #55 合併，plugin 0.9.4 隨 v0.15.0（2026-11-12）發版，marketplace 版正式發佈子代理協議。
+- 人工驗證（真實 Claude Code 環境）：子代理自述其 context 內有該協定，引用內容與
+  `reasoning-protocol-subagent.md` 相符；主代理 context 沒有。這是子代理自述，沒有 debug log 佐證。
+- 仍未確認：`SubagentStart` 的版本需求（官方文件未載）、SessionStart 是否在子代理觸發（文件未明說）。
