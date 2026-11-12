@@ -17,7 +17,8 @@ All notable changes to this project are documented in this file.
   的 stderr 輸出，hook 通道仍只輸出錯誤代碼。去敏為盡力而為：遮蔽家目錄與使用者目錄、
   URL 內嵌帳密、`token`／`secret`／`password`／`api_key`／`authorization` 類賦值、
   `Bearer` 值與常見前綴 token，單行且最多 300 字元。`uninstall` 在最後一步移除
-  marketplace 失敗時的重新包裝訊息尚未帶出 stderr。
+  marketplace 失敗時，重新包裝的訊息同樣保留內層診斷：
+  `guardrail removed but marketplace removal failed: Codex marketplace operation failed (exit 42: …)`。
 
 ## [0.13.0] - 2026-11-11
 

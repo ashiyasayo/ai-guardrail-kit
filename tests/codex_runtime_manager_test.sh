@@ -104,6 +104,28 @@ message = capture_codex_failure(
 assert 'FileNotFoundError' in message and 'alice-example' not in message, message
 assert '/home/<user>/' in message, message
 
+# uninstall 最後一步（移除 marketplace）失敗時，loader 與 selector 已經移除，錯誤會被重新包裝；
+# 重新包裝後仍須保留內層去敏過的診斷，否則使用者只看到固定字串。
+original_install_loader = m.install_loader
+saved_codex_home = os.environ.get('CODEX_HOME')
+with tempfile.TemporaryDirectory() as isolated_home:
+    # 空的 CODEX_HOME 沒有 selector，uninstall 只會走到 marketplace 移除
+    os.environ['CODEX_HOME'] = isolated_home
+    m.install_loader = lambda *args, **kwargs: None
+    try:
+        message = capture_codex_failure(
+            lambda: m.uninstall_guardrail(True, False),
+            failing_run(42, ('marketplace gone ' '/home/' 'dave-example' '/state').encode('utf-8')))
+    finally:
+        m.install_loader = original_install_loader
+        if saved_codex_home is None:
+            os.environ.pop('CODEX_HOME', None)
+        else:
+            os.environ['CODEX_HOME'] = saved_codex_home
+assert message.startswith('guardrail removed but marketplace removal failed'), message
+assert 'exit 42' in message and 'marketplace gone' in message, message
+assert 'dave-example' not in message, message
+
 def bundle(member='hooks/dispatch.py', kind='regular', data=b'print("ok")\n'):
     out=io.BytesIO()
     with tarfile.open(fileobj=out, mode='w:gz') as t:
