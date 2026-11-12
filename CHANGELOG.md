@@ -8,6 +8,17 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Claude marketplace 版 `integrated-harness`（plugin `0.9.2` → `0.9.3`）現在會在
+  SessionStart 注入 `ORCHESTRATOR.md` 治理政策。先前只有 copy-in 版透過 `CLAUDE.md` 的
+  `@ORCHESTRATOR.md` 載入，marketplace 版模型看不到授權、外部副作用、驗收與失敗揭露邊界
+  （確定性 hooks 的硬性關卡不受影響）。copy-in 版不變，不會重複注入；plugin 內新增
+  `ORCHESTRATOR.md` 副本，由 `tests/claude_marketplace_test.sh` 守護與來源逐位元組一致，
+  政策檔缺失或無法讀取時 hook 仍輸出基本提醒與協定。每個 session 多約 75 行 context。
+  子代理協議 `reasoning-protocol-subagent.md` 在 marketplace 版仍不載入：SessionStart
+  不會對子代理觸發，尚無已驗證的替代入口。
+
 ## [0.13.1] - 2026-11-12
 
 ### Changed

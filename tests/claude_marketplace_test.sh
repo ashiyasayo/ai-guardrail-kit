@@ -133,6 +133,57 @@ assert any(
     for hook in group["hooks"]
 )
 
+# marketplace 版沒有 CLAUDE.md 可以 @ 匯入治理政策，改由 SessionStart hook 注入；
+# copy-in 版已由 @ORCHESTRATOR.md 匯入，hook 不得重複注入（兩份 hook 逐位元組一致，
+# 差異只來自 CLAUDE_PLUGIN_ROOT 環境變數）。
+import shutil
+import subprocess
+import sys
+import tempfile
+
+policy_marker = "AI 協作治理政策"
+integrated_copyin = root / "integrated-harness"
+
+assert (
+    (integrated_root / "ORCHESTRATOR.md").read_bytes()
+    == (integrated_copyin / "ORCHESTRATOR.md").read_bytes()
+), "integrated-harness ORCHESTRATOR.md drift between plugin and copy-in"
+
+
+def run_inject_hook(hook_path, plugin_root_value):
+    """以乾淨環境執行 SessionStart hook，回傳 additionalContext。"""
+    environment = {key: value for key, value in os.environ.items() if key != "CLAUDE_PLUGIN_ROOT"}
+    environment["PYTHONUTF8"] = "1"
+    if plugin_root_value is not None:
+        environment["CLAUDE_PLUGIN_ROOT"] = str(plugin_root_value)
+    completed = subprocess.run(
+        [sys.executable, str(hook_path)],
+        capture_output=True,
+        env=environment,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr.decode("utf-8", "replace")
+    return json.loads(completed.stdout.decode("utf-8"))["hookSpecificOutput"]["additionalContext"]
+
+
+plugin_context = run_inject_hook(integrated_root / "hooks/inject_protocol.py", integrated_root)
+assert policy_marker in plugin_context, "plugin SessionStart does not inject ORCHESTRATOR.md"
+assert plugin_context.count(policy_marker) == 1
+
+copyin_context = run_inject_hook(
+    integrated_copyin / ".claude/hooks/inject_protocol.py", None
+)
+assert policy_marker not in copyin_context, "copy-in would inject the policy twice"
+
+with tempfile.TemporaryDirectory() as scratch:
+    # 缺少政策檔時，hook 仍須成功並保留基本提醒與協定
+    scratch_root = Path(scratch) / "plugin"
+    shutil.copytree(integrated_root, scratch_root, ignore=shutil.ignore_patterns("__pycache__"))
+    (scratch_root / "ORCHESTRATOR.md").unlink()
+    degraded_context = run_inject_hook(scratch_root / "hooks/inject_protocol.py", scratch_root)
+    assert policy_marker not in degraded_context
+    assert "護欄提醒" in degraded_context
+
 guide_path = root / "docs/claude-marketplace.md"
 assert guide_path.is_file(), f"missing {guide_path.relative_to(root)}"
 guide = guide_path.read_text()
