@@ -8,6 +8,16 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Claude marketplace 版 `integrated-harness`（plugin `0.9.3` → `0.9.4`）新增 `SubagentStart`
+  hook（`hooks/inject_subagent_protocol.py`），在子代理啟動時以 `additionalContext` 注入
+  `reasoning-protocol-subagent.md`。先前 marketplace 版的子代理收不到這份協定。依官方 hooks
+  文件，`SubagentStart` 不能阻擋子代理建立，只能注入 context；協定檔缺失或無法讀取時 hook
+  不輸出並正常結束。copy-in 版不變，仍由 `CLAUDE.md` 指向協定，不註冊此事件。未對所有子代理
+  設定 matcher。plugin hook 註冊 `SubagentStart` 在實際 Claude Code 環境的注入行為尚未實測，
+  需以 `/hooks` 或 debug log 驗證。
+
 ## [0.14.0] - 2026-11-12
 
 ### Changed
