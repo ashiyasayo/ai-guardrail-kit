@@ -22,12 +22,15 @@
   token。刻意不做「長字串一律遮蔽」，會連正常的長路徑與雜湊一起遮掉。
 - 先去敏再截斷（300 字元），避免被截斷的半個 token 逃過比對；輸入先限制在 16 KiB。
 - 只帶 stderr，不帶 stdout。
+- `uninstall_guardrail` 在最後一步移除 marketplace 失敗時會重新包裝，現在把內層訊息併入
+  （`guardrail removed but marketplace removal failed: <內層>`）。不變量：
+  `_remove_codex_marketplace` 只會丟出固定字串或 `_codex_failure` 已去敏的訊息，所以併入
+  不新增外洩面；若日後它會丟出未去敏的訊息，uninstall 會原樣帶出，須重新評估。
 - 單一來源是 `scripts/codex-runtime-manager.py`，發佈副本 `hooks/manager.py` 須逐位元組
   一致（`tests/codex_loader_sync_test.sh`）；strict allowlist 無法執行同步腳本，需手動雙改。
 
 ## 已知限制
 
-- `uninstall_guardrail` 在 marketplace 移除失敗時重新包裝成固定字串，尚未帶出 stderr。
 - 去敏規則只以自行構造的樣本驗證，不能證明沒有漏網；新增可能含敏感資料的診斷來源時，
   須重新評估這個清單。
 - 敏感測試樣本須以相鄰字串片段拼接，否則本 repo 自己的 guardrail 會擋寫入或遮罩資料。

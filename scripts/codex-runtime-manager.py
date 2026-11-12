@@ -1756,7 +1756,9 @@ def uninstall_guardrail(confirm: bool, prune: bool) -> None:
         _remove_codex_marketplace()
     except ManagerError as error:
         # loader 已成功移除，回復 selector 只會留下指向不存在 loader 的不一致狀態。
-        raise _error("E_HOOK_FAILED", "guardrail removed but marketplace removal failed") from error
+        # 內層訊息只可能是固定字串或 _codex_failure 已去敏的診斷，可直接併入；
+        # 若日後 _remove_codex_marketplace 會丟出未去敏的訊息，這裡須重新評估。
+        raise _error("E_HOOK_FAILED", "guardrail removed but marketplace removal failed: %s" % error) from error
     if prune:
         removed = prune_cache(store, 0, dry_run=False)
         print("Pruned %d unreferenced Codex runtime cache entr%s" %
