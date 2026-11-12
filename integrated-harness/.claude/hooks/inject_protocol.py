@@ -12,6 +12,8 @@ import sys
 
 # 五階段思考協定檔名（marketplace 與 copy-in 兩種佈局同名）
 PROTOCOL_FILENAME = "reasoning-protocol.md"
+# 精簡治理政策檔名；僅 marketplace 佈局由 hook 注入
+POLICY_FILENAME = "ORCHESTRATOR.md"
 
 
 def find_reasoning_protocol():
@@ -30,6 +32,19 @@ def find_reasoning_protocol():
     return None
 
 
+def find_governance_policy():
+    """回傳 plugin 根目錄的 ORCHESTRATOR.md；只在 marketplace 佈局有值。
+
+    marketplace 版沒有 CLAUDE.md 可以 @ 匯入政策，必須由本 hook 注入。copy-in 版已由
+    CLAUDE.md 匯入，且不會設定 CLAUDE_PLUGIN_ROOT，故回傳 None 以免重複載入。
+    """
+    plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT")
+    if not plugin_root:
+        return None
+    candidate = os.path.join(plugin_root, POLICY_FILENAME)
+    return candidate if os.path.isfile(candidate) else None
+
+
 def build_reminder():
     reminder = (
         "【護欄提醒 · integrated-harness】\n"
@@ -44,13 +59,14 @@ def build_reminder():
         "4. 平台可自行決定任務分解、模型選擇與代理調度，但不得繞過人類授權、\n"
         "   外部副作用、敏感資料、成本、驗收與失敗揭露邊界。\n"
     )
-    protocol_path = find_reasoning_protocol()
-    if protocol_path:
+    for section_path in (find_reasoning_protocol(), find_governance_policy()):
+        if not section_path:
+            continue
         try:
-            with open(protocol_path, encoding="utf-8") as handle:
+            with open(section_path, encoding="utf-8") as handle:
                 reminder += "\n---\n" + handle.read()
-        except OSError:
-            pass  # 協定檔讀取失敗不影響基本提醒
+        except (OSError, UnicodeDecodeError):
+            pass  # 單一檔案讀取失敗不影響基本提醒與其他段落
     return reminder
 
 

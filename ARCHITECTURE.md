@@ -112,7 +112,10 @@ guardrail 及 global install 等日常回歸；Claude 與 Codex 的完整模式�
 
 Claude `integrated-harness` 的執行行為校準位於 `reasoning-protocol.md` 與
 `reasoning-protocol-subagent.md`；SessionStart hook 只注入前者，後者在 copy-in 版由
-`CLAUDE.md` 指向，marketplace 版目前沒有載入入口。協定依工作風險控制
+`CLAUDE.md` 指向，marketplace 版刻意不載入（SessionStart 不會對子代理觸發，
+尚無已驗證的替代入口）。`ORCHESTRATOR.md` 在 copy-in 版由 `CLAUDE.md` 以 `@` 匯入，
+marketplace 版沒有 `CLAUDE.md`，改由同一個 SessionStart hook 在設定了
+`CLAUDE_PLUGIN_ROOT` 時注入，避免 copy-in 重複載入。協定依工作風險控制
 播報、對抗式審查、信心標示、驗證深度及 subagent 委派；治理授權仍只由
 `ORCHESTRATOR.md`、政策檔與確定性 hooks 決定。copy-in 與 marketplace 版本的兩份
 協定必須逐字節一致。
