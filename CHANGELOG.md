@@ -8,6 +8,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-11-12
+
 ### Changed
 
 - Codex runtime manager 呼叫外部 `codex`（loader 安裝／移除、marketplace 移除）失敗時，
