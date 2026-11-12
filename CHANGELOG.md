@@ -8,6 +8,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-12
+
 ### Changed
 
 - Claude marketplace 版 `integrated-harness`（plugin `0.9.2` → `0.9.3`）現在會在
