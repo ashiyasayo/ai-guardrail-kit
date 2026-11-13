@@ -1904,6 +1904,82 @@ def diagnose_selection(args: argparse.Namespace) -> None:
     print("Plan drafts: .codex/guardrail/plan/decomposition.md; installation and protected .codex settings require a human terminal or platform approval")
 
 
+def setup_command(*arguments: str) -> str:
+    tokens = [sys.executable, str(RuntimeStore(codex_home()).root / "bin" / "codex-runtime-manager.py"), *arguments]
+    if os.name == "nt":
+        return "& " + " ".join("'" + token.replace("'", "''") + "'" for token in tokens)
+    return shlex.join(tokens)
+
+
+def print_setup_next_steps(scope: str = "user", project: Optional[Path] = None,
+                           no_managed_mode: bool = False, diagnosed: bool = False) -> None:
+    """提示失敗不得改變已完成操作的結果，也不得把宿主信任當成本機可驗證狀態。"""
+    print("COMMAND SHELL: " + ("PowerShell" if os.name == "nt" else "POSIX shell"))
+    try:
+        store = RuntimeStore(codex_home())
+        project = project or Path.cwd()
+        path = store.selector_path(scope, project)
+        effective, _, root = resolve_runtime({"cwd": str(project)}, store)
+        effective_scope = "disabled"
+        if effective is not None:
+            for candidate in ("local", "project", "user"):
+                candidate_path = store.selector_path(candidate, root)
+                if not (candidate_path.exists() or candidate_path.is_symlink()):
+                    continue
+                data = _load_selector(store, candidate_path, candidate)
+                if candidate != "user" and not _is_registered_selector(store, candidate_path, candidate, data["identity"]["archive_sha256"]):
+                    continue
+                effective_scope = candidate
+                break
+        print("EFFECTIVE: mode=%s, scope=%s, project=%s" %
+              (effective["mode"] if effective else "disabled", effective_scope, root))
+        if no_managed_mode:
+            print("PASS: no selector remains in requested scope=%s; other scopes are reported above" % scope)
+            return
+        if not (path.exists() or path.is_symlink()):
+            print("STATUS: no %s default mode configured; installing the loader alone does not activate a mode" % scope)
+            print("NEXT: choose a mode; obtain the published 40-hex commit from the official GitHub Release runtime metadata:")
+            print("https://github.com/ashiyasayo/ai-guardrail-kit/releases")
+            print("TEMPLATE: replace <40-hex-commit> before running (integrated-harness is an example mode):")
+            print(setup_command("select", "integrated-harness", "--scope", scope,
+                                "--project", str(project), "--ref", "<40-hex-commit>"))
+        else:
+            identity, _ = _selector_identity(store, path, scope)
+            print("STATUS: configured mode=%s, scope=%s (local > project > user > disabled)" % (identity["mode"], scope))
+            if effective != identity or effective_scope != scope:
+                print("NOTICE: requested selector is overridden or unregistered; inspect the effective scope above")
+            if not diagnosed and effective is not None:
+                print("NEXT: check the effective selector and loader wiring:")
+                print(setup_command("verify", "--scope", effective_scope, "--project", str(root), "--diagnose"))
+        print("NEXT: open a new Codex thread; review and trust ai-guardrail-loader via /hooks in the target client")
+        print("UNVERIFIED: host hook trust and actual execution; installation/configuration alone do not prove activation")
+    except (ManagerError, OSError, ValueError) as error:
+        print("WARNING: setup status could not be determined (%s); completed operation is unchanged" %
+              (error.code if isinstance(error, ManagerError) else "I/O or invalid data"))
+        print("NEXT: inspect the selector/cache with verify --diagnose before assuming activation")
+
+
+def print_verify_recovery(args: argparse.Namespace, error: ManagerError) -> None:
+    """錯誤保留原結束碼；修復提示不執行安裝或覆寫設定。"""
+    print("COMMAND SHELL: " + ("PowerShell" if os.name == "nt" else "POSIX shell"), file=sys.stderr)
+    if error.code in ("E_LOADER_MISSING", "E_HOOK_WIRING"):
+        print("NEXT: find ai-guardrail-loader in the installed plugin list, then run its bootstrap and review /hooks:", file=sys.stderr)
+        print("codex plugin list --json", file=sys.stderr)
+        print("TEMPLATE: <plugin-directory>/hooks/install-codex-guardrail-loader --plugin-root <plugin-directory>", file=sys.stderr)
+    elif error.code == "E_SELECTOR_INACTIVE":
+        print("NEXT: inspect local > project > user precedence; verify the intended effective scope before changing selectors", file=sys.stderr)
+    elif error.code == "E_RUNTIME_MISSING" and not args.no_managed_mode:
+        print("NEXT: select the intended mode using a published commit from https://github.com/ashiyasayo/ai-guardrail-kit/releases", file=sys.stderr)
+        print("TEMPLATE: replace <40-hex-commit>; integrated-harness is an example mode:", file=sys.stderr)
+        print(setup_command("select", "integrated-harness", "--scope", args.scope,
+                            "--project", str(Path(args.project).absolute()), "--ref", "<40-hex-commit>"), file=sys.stderr)
+    else:
+        print("NEXT: inspect the reported selector/cache error; preserve existing settings before reselecting a published runtime", file=sys.stderr)
+    print("NEXT: after repair, retry:", file=sys.stderr)
+    print(setup_command("verify", "--scope", args.scope, "--project", str(Path(args.project).absolute()),
+                        *( ["--no-managed-mode"] if args.no_managed_mode else ["--diagnose"] )), file=sys.stderr)
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="codex-runtime-manager")
     sub = p.add_subparsers(dest="command", required=True)
@@ -2012,6 +2088,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             identity = prepared["identity"]
             print("Selected Codex mode %s (%s), ref=%s, commit=%s, sha256=%s, cache_hit=%s" %
                   (identity["mode"], args.scope, identity["ref"], identity["commit"], identity["archive_sha256"][:12], prepared["cache_hit"]))
+            print_setup_next_steps(args.scope, Path(args.project).resolve(strict=True))
             return 0
         if args.command == "remove":
             remove_selection(args)
@@ -2025,6 +2102,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             else:
                 verify_selection(args)
                 print("Verified Codex selector/cache only (%s); hook trust and host execution are not checked" % args.scope)
+            print_setup_next_steps(args.scope, Path(args.project).resolve(strict=True), args.no_managed_mode, args.diagnose)
             return 0
         if args.command == "approve":
             store = RuntimeStore(codex_home())
@@ -2049,6 +2127,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             plugin_root = Path(args.plugin_root).resolve(strict=True) if args.plugin_root else None
             install_loader(repo, plugin_root, update=args.update, remove=args.remove)
             print("Installed Codex guardrail loader" if not args.remove else "Removed Codex guardrail loader")
+            if not args.remove:
+                print_setup_next_steps()
             return 0
         if args.command == "uninstall":
             uninstall_guardrail(args.confirm, args.prune_cache)
@@ -2067,6 +2147,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return 0
     except ManagerError as error:
         print("%s: %s" % (error.code, error), file=sys.stderr)
+        if args.command == "verify":
+            print_verify_recovery(args, error)
         return 1
     except (OSError, ValueError) as error:
         print("E_SCOPE_UNSAFE: managed operation failed", file=sys.stderr)

@@ -10,6 +10,75 @@ root = Path(os.environ['ROOT'])
 spec=importlib.util.spec_from_file_location('manager', root/'scripts/codex-runtime-manager.py')
 m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 
+# 提示必須區分安裝與啟用，且含空白及單引號的路徑仍可直接複製執行。
+import contextlib
+with tempfile.TemporaryDirectory(prefix="guardrail hints '") as hint_dir:
+    old_home = os.environ.get('CODEX_HOME')
+    os.environ['CODEX_HOME'] = hint_dir
+    try:
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            m.print_setup_next_steps()
+        message = output.getvalue()
+        assert 'no user default mode configured' in message
+        assert 'replace <40-hex-commit>' in message
+        assert '--scope' in message and 'user' in message
+        assert '/hooks' in message and 'UNVERIFIED' in message
+        store = m.RuntimeStore(Path(hint_dir))
+        selector = store.selector_path('user', Path.cwd())
+        selector.parent.mkdir(parents=True, exist_ok=True)
+        selector.write_text('{}')
+        original_resolve = m.resolve_runtime
+        m.resolve_runtime = lambda event, store: (None, None, Path.cwd())
+        original_identity = m._selector_identity
+        m._selector_identity = lambda *args: ({'mode': 'harness'}, None)
+        try:
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                m.print_setup_next_steps()
+            assert 'configured mode=harness, scope=user' in output.getvalue()
+            assert 'overridden or unregistered' in output.getvalue()
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                m.print_setup_next_steps(no_managed_mode=True)
+            assert 'no selector remains' in output.getvalue()
+            assert 'TEMPLATE:' not in output.getvalue()
+            assert 'NEXT: open' not in output.getvalue()
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                m.print_setup_next_steps(diagnosed=True)
+            assert '--diagnose' not in output.getvalue()
+            original_load = m._load_selector
+            m._load_selector = lambda *args: {'identity': {'archive_sha256': 'a' * 64}}
+            m.resolve_runtime = lambda event, store: ({'mode': 'harness'}, None, Path.cwd())
+            try:
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    m.print_setup_next_steps(diagnosed=True)
+                assert 'EFFECTIVE: mode=harness, scope=user' in output.getvalue()
+                assert '--diagnose' not in output.getvalue()
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    m.print_setup_next_steps()
+                assert '--diagnose' in output.getvalue()
+            finally:
+                m._load_selector = original_load
+            error_output = io.StringIO()
+            with contextlib.redirect_stderr(error_output):
+                m.print_verify_recovery(m.parser().parse_args(['verify', '--scope', 'user']),
+                                        m._error('E_SELECTOR_INACTIVE', 'shadowed'))
+            assert 'precedence' in error_output.getvalue()
+            assert '--diagnose' in error_output.getvalue()
+            assert 'COMMAND SHELL:' in error_output.getvalue()
+        finally:
+            m._selector_identity = original_identity
+            m.resolve_runtime = original_resolve
+    finally:
+        if old_home is None:
+            os.environ.pop('CODEX_HOME', None)
+        else:
+            os.environ['CODEX_HOME'] = old_home
+
 # Windows PATH 若先解析到 WSL launcher，執行 extensionless fake Codex 會直接失敗；
 # 管理器應利用 Git 可執行檔位置回退到同一套 Git for Windows Bash。
 resolved_bash = m.script_bash(
