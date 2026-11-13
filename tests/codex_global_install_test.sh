@@ -17,7 +17,10 @@ printf '%s\n' '{"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"ke
 
 # 直接從 marketplace plugin 自帶的 hook bootstrap，模擬沒有 repository checkout 的流程。
 "$root/codex/plugins/ai-guardrail-loader/hooks/install-codex-guardrail-loader" --plugin-root "$root/codex/plugins/ai-guardrail-loader" >/dev/null
-"$root/scripts/install-codex-global-integrated-harness" "$root" >/dev/null
+"$root/scripts/install-codex-global-integrated-harness" "$root" >"$tmp/install-output"
+grep -Fq "configured mode=integrated-harness, scope=user" "$tmp/install-output"
+grep -Fq "NEXT:" "$tmp/install-output"
+grep -Fq "/hooks" "$tmp/install-output"
 "$root/scripts/verify-codex-global-integrated-harness" "$root" >/dev/null
 grep -Fxq 'unrelated@elsewhere' "$AI_GUARDRAIL_TEST_STATE/installed"
 grep -Fxq 'ai-guardrail-loader@ai-guardrail-kit' "$AI_GUARDRAIL_TEST_STATE/installed"

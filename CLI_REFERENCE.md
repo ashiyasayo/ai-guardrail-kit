@@ -3,6 +3,10 @@
 本專案提供四種互斥模式：`decomposition-gate`、`sensitive-data-guard`、
 `harness`、`integrated-harness`。同一平台、同一專案只能啟用一種。
 
+`install-loader` 與 `verify` 成功後會列出設定狀態、下一步指令與新 thread／`/hooks` 信任提醒；`verify --no-managed-mode` 會提示重新設定模式。Windows 指令使用 PowerShell 語法；未指定發布 commit 的選擇指令明確標示為範本。
+
+提示會區分指定 scope 與目前有效模式；移除驗證不建議重新啟用，診斷成功不重複要求診斷。模式選擇成功會列出驗證步驟；驗證失敗保留非零結束碼並列出修復方向與重試指令。輸出標示指令使用 PowerShell 或 POSIX shell。
+
 ## 互動命令模式
 
 在 Codex 或 Claude Code 的互動輸入列開頭加上 `!`，可直接執行 shell 命令，不必離開

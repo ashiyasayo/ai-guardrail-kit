@@ -8,6 +8,12 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Codex 提示補上有效模式與 scope、模式切換後驗證、失敗重試、發布 commit 來源與 shell 標示；移除驗證不提示重新啟用，診斷成功不重複診斷。
+
+- Codex Loader 安裝與 selector 驗證成功後顯示設定狀態、下一步指令及宿主信任提醒，涵蓋 checkout、marketplace 與全域安裝入口。
+
 ## [0.15.0] - 2026-11-12
 
 ### Added

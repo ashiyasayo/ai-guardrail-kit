@@ -131,6 +131,10 @@ selector 仍可覆寫全域設定，優先序為 `local > project > user > disab
 切換後請開啟新的 Codex thread；首次安裝或 hook 更新後另以 `/hooks` 審閱並信任
 `ai-guardrail-loader`。
 
+安裝 Loader 與驗證 selector 後，終端會顯示設定狀態及下一步；未設定模式時提供選擇模式的指令範本（須填入發布 commit），已設定時提供完整診斷指令。提示不代表宿主 hooks 已信任或實際執行。
+
+提示會區分指定 scope 與目前有效模式；移除驗證不建議重新啟用，診斷成功不重複要求診斷。模式選擇成功會列出驗證步驟；驗證失敗保留非零結束碼並列出修復方向與重試指令。輸出標示指令使用 PowerShell 或 POSIX shell。
+
 #### Codex marketplace、git clone 與 selector 的關係
 
 這三個步驟的職責不同，不能把 marketplace 註冊視為 selector 的替代品：
